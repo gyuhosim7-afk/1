@@ -477,7 +477,7 @@ const Game = {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    ctx.font = 'bold 16px system-ui, sans-serif';
+    ctx.font = 'bold 16px "IBM Plex Sans KR", system-ui, sans-serif';
     ctx.textAlign = 'center';
     for (const f of this.floaters) {
       ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
@@ -505,7 +505,7 @@ const Game = {
     for (let y = y0; y <= y1; y += g) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
     ctx.stroke();
     // 지역명
-    ctx.font = 'bold 26px system-ui, sans-serif';
+    ctx.font = 'bold 26px "IBM Plex Sans KR", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.07)';
     for (const z of World.zones) ctx.fillText(z.name, z.x, z.y);
@@ -548,7 +548,7 @@ const Game = {
       ctx.fillStyle = hp > 0.5 ? '#7ee787' : (hp > 0.25 ? '#e3b341' : '#ff6b6b');
       ctx.fillRect(c.x - w / 2, c.y - c.r - 16, w * hp, 5);
       if (!c.isPlayer) {
-        ctx.font = '11px system-ui, sans-serif';
+        ctx.font = '11px "IBM Plex Sans KR", system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.fillText(c.name, c.x, c.y - c.r - 20);

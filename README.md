@@ -5,6 +5,8 @@
 
 ## 실행 방법
 
+가장 간단한 방법은 `index.html` 을 브라우저로 여는 것입니다. 설치나 빌드가 필요 없습니다.
+
 ```bash
 # 방법 1: 파일을 그대로 열기
 xdg-open index.html      # macOS 는 open index.html
@@ -12,6 +14,19 @@ xdg-open index.html      # macOS 는 open index.html
 # 방법 2: 간단한 로컬 서버
 npx http-server . -p 8080   # http://localhost:8080
 ```
+
+### 단일 파일로 배포하기
+
+`dist/last-survivor.html` 은 CSS 와 JS 를 모두 품은 한 개짜리 파일입니다. 이 파일만
+전달하거나 정적 호스팅에 올리면 그대로 실행됩니다. 소스를 고친 뒤에는 아래 명령으로
+다시 만듭니다.
+
+```bash
+python3 tools/build-single.py
+```
+
+GitHub Pages 로 공개하려면 저장소 Settings → Pages 에서 브랜치를 선택해 배포한 뒤
+`https://<사용자명>.github.io/<저장소명>/` 으로 접속하면 됩니다.
 
 ## 조작
 
