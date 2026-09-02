@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>라스트 서바이버 — 배틀로얄</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hurt"></div>
+<div id="crosshair"></div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div class="stat"><span class="label">생존자</span><b id="alive">30</b></div>
+    <div class="stat"><span class="label">처치</span><b id="kills">0</b></div>
+    <div class="stat zone"><span class="label">자기장</span><b id="zoneText">--</b></div>
+  </div>
+
+  <div id="feed"></div>
+
+  <div id="minimapWrap">
+    <canvas id="minimap" width="190" height="190"></canvas>
+  </div>
+
+  <div id="prompt" class="hidden"></div>
+
+  <div id="bottombar">
+    <div id="hpWrap">
+      <div id="hpBar"><div id="hp"></div></div>
+      <span id="hpText">100</span>
+    </div>
+    <div id="gunbox">
+      <div id="weapon">맨손</div>
+      <div id="ammo">무기를 주우세요</div>
+    </div>
+    <div id="medbox"><span class="kit"></span><b id="meds">1</b></div>
+  </div>
+
+  <div id="helpbar">
+    <span><kbd>WASD</kbd> 이동</span>
+    <span><kbd>Shift</kbd> 달리기</span>
+    <span><kbd>마우스</kbd> 조준·사격</span>
+    <span><kbd>F</kbd> 줍기</span>
+    <span><kbd>R</kbd> 재장전</span>
+    <span><kbd>Q</kbd> 치료</span>
+    <span><kbd>M</kbd> 소리</span>
+  </div>
+</div>
+
+<!-- 시작 화면 -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>라스트 서바이버</h1>
+    <p class="sub">마지막 한 명이 될 때까지 살아남으세요</p>
+    <ul class="rules">
+      <li>맵에 흩어진 <b>무기·탄약·구급킷</b>을 주워 무장합니다.</li>
+      <li><b>자기장</b>이 계속 좁아지고, 밖에 있으면 피해를 입습니다.</li>
+      <li>AI 생존자들도 서로 싸웁니다. 마지막까지 남으면 승리입니다.</li>
+    </ul>
+    <label class="field">봇 수
+      <input id="botCount" type="number" min="4" max="59" value="29">
+    </label>
+    <button id="startBtn">게임 시작</button>
+    <p class="hint">WASD 이동 · 마우스 조준/사격 · F 줍기 · R 재장전 · Q 치료</p>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <h1 id="result">탈락</h1>
+    <p class="sub" id="resultSub"></p>
+    <div id="resultStats" class="stats"></div>
+    <button id="againBtn">다시 하기</button>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
