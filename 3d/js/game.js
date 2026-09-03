@@ -19,7 +19,9 @@ const Game = {
   /* ---------- 초기화 ---------- */
   init(canvas) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    // 터치 기기(태블릿·휴대폰)는 해상도와 그림자를 낮춰 부드럽게 돌아가게 합니다
+    this.low = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.low ? 1.15 : 1.75));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -28,7 +30,7 @@ const Game = {
     this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(0xbcc9d2), CFG.FOG_NEAR, CFG.FOG_FAR);
+    this.scene.fog = new THREE.Fog(srgb(0xbcc9d2), CFG.FOG_NEAR, this.low ? 260 : CFG.FOG_FAR);
     this.scene.background = new THREE.Color(0xa9c1d8);
 
     this.camera = new THREE.PerspectiveCamera(CFG.FOV, window.innerWidth / window.innerHeight, 0.12, 1400);
@@ -53,7 +55,7 @@ const Game = {
     this.sun = new THREE.DirectionalLight(0xffe4c0, 2.6);
     this.sun.position.set(70, 90, 40);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(this.low ? 1024 : 2048, this.low ? 1024 : 2048);
     const sc = this.sun.shadow.camera;
     sc.near = 1; sc.far = 320; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70;
     this.sun.shadow.bias = -0.0008;
@@ -142,6 +144,9 @@ const Game = {
 
     this.spawnLoot();
     this.buildMinimapImage();
+    this.ads = false;
+    this.camDist = CFG.CAM_DIST;
+    this.updateCamera(0.016);   // 첫 프레임 전에 카메라를 제자리에 놓습니다
     this.state = 'playing';
     this.pushFeed('전투 시작 — 생존자 ' + this.chars.length + '명');
   },
@@ -257,16 +262,18 @@ const Game = {
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
     const r = this._v2.set(f.z, 0, -f.x);
-    let mx = 0, mz = 0;
-    if (input.fwd) { mx += f.x; mz += f.z; }
-    if (input.back) { mx -= f.x; mz -= f.z; }
-    if (input.left) { mx -= r.x; mz -= r.z; }
-    if (input.right) { mx += r.x; mz += r.z; }
+    // 키보드와 조이스틱을 함께 받습니다 (ax: 좌우, az: 앞뒤, -1~1)
+    let ix = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
+    let iz = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
+    ix = Math.max(-1, Math.min(1, ix));
+    iz = Math.max(-1, Math.min(1, iz));
+    const mx = f.x * iz + r.x * ix;
+    const mz = f.z * iz + r.z * ix;
 
     p.crouch = !!input.crouch;
     let speed = CFG.WALK;
     if (p.crouch) speed = CFG.CROUCH;
-    else if (input.sprint && input.fwd && !this.ads) speed = CFG.SPRINT;
+    else if (input.sprint && iz > 0.5 && !this.ads) speed = CFG.SPRINT;
     if (p.healing > 0) speed = Math.min(speed, 1.6);
     if (this.ads) speed = Math.min(speed, CFG.WALK * 0.6);
 

@@ -163,7 +163,8 @@ kbd {
   display: flex; align-items: center; justify-content: center;
   background: rgba(5, 8, 12, .78); backdrop-filter: blur(7px);
 }
-#pause { background: rgba(5, 8, 12, .45); }
+/* 일시정지 안내는 클릭을 가로채지 않아야 캔버스를 눌러 이어서 할 수 있습니다 */
+#pause { background: rgba(5, 8, 12, .45); pointer-events: none; }
 #pause .small { font-size: 15px; color: var(--muted); }
 
 .panel {
@@ -214,3 +215,52 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   #hp, #hurt, #hitmark, #dmgDir, button { transition: none !important; }
 }
+
+/* ============================================================
+   터치 조작 (휴대폰·태블릿)
+   ============================================================ */
+#scene { touch-action: none; }
+
+#touch { position: fixed; inset: 0; z-index: 9; pointer-events: none; }
+
+#stick {
+  position: absolute; left: 26px; bottom: 26px;
+  width: 132px; height: 132px; border-radius: 50%;
+  background: rgba(10, 14, 20, .38); border: 1px solid var(--line);
+  pointer-events: auto; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+}
+#knob {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: rgba(255, 255, 255, .5); border: 1px solid rgba(255, 255, 255, .5);
+  pointer-events: none;
+}
+
+#tbtns {
+  position: absolute; right: 18px; bottom: 22px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+#tbtns .row { display: flex; gap: 10px; align-items: center; }
+#tbtns button {
+  width: 74px; height: 46px; padding: 0; font-size: 13px; font-weight: 600;
+  background: rgba(10, 14, 20, .55); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); pointer-events: auto; touch-action: none; backdrop-filter: blur(3px);
+}
+#tbtns button.fire {
+  width: 104px; height: 104px; border-radius: 50%; font-size: 16px;
+  background: rgba(210, 60, 55, .5); border-color: rgba(255, 120, 110, .55);
+}
+#tbtns button.on { filter: brightness(1.5); }
+#tbtns button.active { background: rgba(47, 129, 247, .55); border-color: #58a6ff; }
+
+/* 터치 기기 HUD: 조이스틱과 버튼을 피해 재배치합니다 */
+body.touch #keys { display: none; }
+body.touch #bottom { left: 26px; bottom: 178px; transform: none; }
+body.touch #hpBar { width: 210px; }
+body.touch #gunbox {
+  left: 50%; right: auto; bottom: 18px; transform: translateX(-50%); text-align: center;
+}
+body.touch #prompt { bottom: 236px; }
+body.touch #healBar { bottom: 214px; }
+body.touch #minimapWrap { left: 12px; top: 12px; bottom: auto; transform: scale(.78); transform-origin: top left; }
+body.touch #topleft { left: 174px; }

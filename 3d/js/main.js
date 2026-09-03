@@ -40,12 +40,18 @@ const UI = {
     const ids = ['menu', 'over', 'hud', 'hp', 'hpText', 'gunName', 'ammo', 'meds', 'alive',
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
-      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill'];
+      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill',
+      'touch', 'stick', 'knob'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
     this.bctx = this.el.bigmapCanvas.getContext('2d');
   },
+  /* 조이스틱 손잡이 위치 */
+  setKnob(dx, dy) {
+    this.el.knob.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+  },
+
   showMenu() { this.el.menu.classList.remove('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.add('hidden'); },
   showGame() { this.el.menu.classList.add('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.remove('hidden'); },
   showResult(r) {
@@ -236,25 +242,29 @@ const Input = {
   keys: {}, dx: 0, dy: 0,
   fwd: false, back: false, left: false, right: false,
   sprint: false, crouch: false, jump: false, fire: false, ads: false,
-  locked: false, lockFailed: false, mouseX: 0, mouseY: 0, inside: false,
+  ax: 0, az: 0,                      // 조이스틱 아날로그 입력
+  mode: 'lock',                      // lock: 마우스 잠금 / edge: 화면 가장자리 / touch: 터치 조작
+  locked: false, lockFailed: false,
+  mouseX: 0, mouseY: 0, inside: false,
+  lookId: null, lookX: 0, lookY: 0, stickId: null, stickX: 0, stickY: 0,
 
   init(canvas) {
     this.canvas = canvas;
+    const coarse = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches;
+    if (coarse) this.mode = 'touch';
+
+    if (this.mode === 'touch') { this.initTouch(canvas); return; }
 
     canvas.addEventListener('click', () => {
       Sfx.init();
-      if (Game.state === 'playing' && !this.locked && !this.lockFailed) canvas.requestPointerLock();
+      if (Game.state === 'playing' && this.mode === 'lock' && !this.locked) canvas.requestPointerLock();
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      UI.el.pause.classList.toggle('hidden', this.locked || Game.state !== 'playing' || this.lockFailed);
       if (!this.locked) { this.fire = false; this.ads = false; }
     });
-    document.addEventListener('pointerlockerror', () => {
-      this.lockFailed = true;
-      UI.el.pause.classList.add('hidden');
-      UI.el.lockHint.classList.remove('hidden');
-    });
+    // 잠금이 조용히 실패하는 브라우저를 대비해 오류 이벤트와 시간 초과를 모두 봅니다
+    document.addEventListener('pointerlockerror', () => this.fallbackToEdge());
 
     window.addEventListener('mousemove', e => {
       if (this.locked) { this.dx += e.movementX; this.dy += e.movementY; }
@@ -271,7 +281,19 @@ const Input = {
     });
     window.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('blur', () => { this.keys = {}; this.fire = false; this.ads = false; });
+    this.initKeys();
+  },
 
+  fallbackToEdge() {
+    if (this.mode !== 'lock') return;
+    this.mode = 'edge';
+    this.lockFailed = true;
+    UI.el.pause.classList.add('hidden');
+    UI.el.lockHint.classList.remove('hidden');
+    setTimeout(() => UI.el.lockHint.classList.add('hidden'), 6000);
+  },
+
+  initKeys() {
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
       if ([' ', 'tab', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
@@ -287,17 +309,90 @@ const Input = {
     window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
   },
 
+  /* ---------- 터치 조작 ---------- */
+  initTouch(canvas) {
+    this.initKeys();                       // 블루투스 키보드가 있으면 함께 씁니다
+    UI.el.touch.classList.remove('hidden');
+    document.body.classList.add('touch');
+
+    // 화면을 끌어 시점 회전
+    canvas.addEventListener('pointerdown', e => {
+      Sfx.init();
+      if (this.lookId !== null) return;
+      this.lookId = e.pointerId; this.lookX = e.clientX; this.lookY = e.clientY;
+    });
+    window.addEventListener('pointermove', e => {
+      if (e.pointerId === this.lookId) {
+        this.dx += (e.clientX - this.lookX) * 1.5;
+        this.dy += (e.clientY - this.lookY) * 1.5;
+        this.lookX = e.clientX; this.lookY = e.clientY;
+      }
+      if (e.pointerId === this.stickId) this.moveStick(e.clientX, e.clientY);
+    });
+    const endPointer = e => {
+      if (e.pointerId === this.lookId) this.lookId = null;
+      if (e.pointerId === this.stickId) { this.stickId = null; this.ax = this.az = 0; this.sprint = false; UI.setKnob(0, 0); }
+    };
+    window.addEventListener('pointerup', endPointer);
+    window.addEventListener('pointercancel', endPointer);
+
+    // 왼쪽 조이스틱
+    const stick = UI.el.stick;
+    stick.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      this.stickId = e.pointerId;
+      const r = stick.getBoundingClientRect();
+      this.stickX = r.left + r.width / 2;
+      this.stickY = r.top + r.height / 2;
+      this.moveStick(e.clientX, e.clientY);
+    });
+
+    // 오른쪽 버튼들
+    UI.el.touch.querySelectorAll('button[data-act]').forEach(btn => {
+      const act = btn.dataset.act;
+      btn.addEventListener('pointerdown', e => {
+        e.preventDefault(); e.stopPropagation();
+        btn.classList.add('on');
+        const p = Game.player;
+        if (act === 'fire') this.fire = true;
+        else if (act === 'ads') { this.ads = !this.ads; btn.classList.toggle('active', this.ads); }
+        else if (act === 'jump') this.jump = true;
+        else if (act === 'crouch') { this.keys['c'] = !this.keys['c']; btn.classList.toggle('active', !!this.keys['c']); }
+        else if (Game.state !== 'playing') return;
+        else if (act === 'pick') { const l = Game.nearestLoot(p); if (l) Game.pickUp(p, l); }
+        else if (act === 'reload') p.startReload();
+        else if (act === 'heal') p.startHeal();
+        else if (act === 'map') UI.el.bigmap.classList.toggle('hidden');
+      });
+      const up = () => { btn.classList.remove('on'); if (act === 'fire') this.fire = false; };
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointercancel', up);
+      btn.addEventListener('pointerleave', up);
+    });
+  },
+
+  moveStick(x, y) {
+    const R = 46;
+    let dx = x - this.stickX, dy = y - this.stickY;
+    const d = Math.hypot(dx, dy);
+    if (d > R) { dx = dx / d * R; dy = dy / d * R; }
+    this.ax = dx / R;
+    this.az = -dy / R;
+    this.sprint = Math.hypot(this.ax, this.az) > 0.86;
+    UI.setKnob(dx, dy);
+  },
+
   poll() {
     const k = this.keys;
     this.fwd = !!(k['w'] || k['arrowup']);
     this.back = !!(k['s'] || k['arrowdown']);
     this.left = !!(k['a'] || k['arrowleft']);
     this.right = !!(k['d'] || k['arrowright']);
-    this.sprint = !!k['shift'];
+    if (this.mode !== 'touch') this.sprint = !!k['shift'];
     this.crouch = !!(k['c'] || k['control']);
 
-    // 포인터 잠금을 쓸 수 없을 때: 화면 가장자리로 시점 회전
-    if (this.lockFailed && this.inside) {
+    // 마우스 잠금을 쓸 수 없을 때: 화면 가장자리로 시점 회전
+    if (this.mode === 'edge' && this.inside) {
       const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
       const ox = this.mouseX - cx, oy = this.mouseY - cy;
       const dead = 60;
@@ -327,14 +422,19 @@ const Main = {
     const n = Math.max(4, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
     UI.showGame();
     Game.start(n);
-    if (!Input.lockFailed) Game.renderer.domElement.requestPointerLock();
+    if (Input.mode === 'lock') {
+      Game.renderer.domElement.requestPointerLock();
+      // 잠금이 조용히 무시되는 브라우저에서는 대체 조작으로 넘어갑니다
+      setTimeout(() => { if (!Input.locked) Input.fallbackToEdge(); }, 900);
+    }
   },
 
   loop(t) {
     const dt = Math.min(CFG.MAX_DT, (t - this.last) / 1000);
     this.last = t;
     if (Game.state === 'playing') {
-      const paused = !Input.locked && !Input.lockFailed;
+      const paused = Input.mode === 'lock' && !Input.locked;
+      UI.el.pause.classList.toggle('hidden', !paused);
       if (!paused) {
         Input.poll();
         Game.update(dt, Input);
@@ -342,6 +442,7 @@ const Main = {
       }
       Game.render();
     } else if (Game.scene && Game.player) {
+      UI.el.pause.classList.add('hidden');
       Game.render();
     }
     requestAnimationFrame(nt => this.loop(nt));

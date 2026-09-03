@@ -227,7 +227,8 @@ const Scenery = {
   scatterNature(towns) {
     const nearTown = (x, z, pad) => towns.some(t => Math.hypot(t.x - x, t.z - z) < t.r + pad);
 
-    for (let i = 0; i < 1100; i++) {
+    const density = Game.low ? 0.6 : 1;
+    for (let i = 0; i < Math.round(1100 * density); i++) {
       const lim = World.half * 0.95;
       const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
       const y = World.height(x, z);
@@ -247,7 +248,7 @@ const Scenery = {
       World.addCyl({ x: s0.x, z: s0.z, r: 1.05 * s, top: s0.y + 1.5 * s, h: 3 * s });
     }
 
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < Math.round(900 * density); i++) {
       const lim = World.half * 0.95;
       const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
       const y = World.height(x, z);
