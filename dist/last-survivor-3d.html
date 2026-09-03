@@ -365,67 +365,119 @@ body.playing.paused { cursor: default; }
 @media (prefers-reduced-motion: reduce) { #winBanner { animation: none; } }
 
 /* ============================================================
-   로비
+   로비 (상단 메뉴 · 가운데 캐릭터 · 좌하단 시작)
    ============================================================ */
 .lobbyOverlay {
-  background: linear-gradient(100deg, rgba(6, 9, 13, .97) 0%, rgba(6, 9, 13, .93) 38%,
-              rgba(6, 9, 13, .55) 56%, rgba(6, 9, 13, .1) 74%, rgba(6, 9, 13, 0) 100%);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 30%, rgba(3,5,8,.55) 78%, rgba(3,5,8,.92) 100%),
+    linear-gradient(180deg, rgba(4,6,10,.9) 0%, rgba(4,6,10,0) 22%, rgba(4,6,10,0) 62%, rgba(4,6,10,.85) 100%);
   backdrop-filter: none;
-  align-items: stretch; justify-content: flex-start;
+  display: block;
 }
-#lobby {
-  width: min(560px, 94vw); height: 100%;
-  padding: 26px 30px 24px; display: flex; flex-direction: column; gap: 16px;
-  overflow-y: auto;
-}
-.lobbyTop { display: flex; align-items: center; justify-content: space-between; }
-.lobbyTop .brand { font-family: var(--display); font-size: 26px; letter-spacing: .01em; }
-.lobbyTop .brand em { font-style: normal; color: var(--accent); }
-.wallet {
-  display: flex; align-items: baseline; gap: 8px;
-  background: rgba(255, 255, 255, .06); border: 1px solid var(--line);
-  border-radius: 9px; padding: 6px 14px;
-}
-.wallet span { font-size: 10px; color: var(--muted); letter-spacing: .1em; }
-.wallet b { font-size: 19px; color: #f0c674; font-variant-numeric: tabular-nums; }
+#lobby { position: absolute; inset: 0; }
 
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-.tabs button {
-  width: auto; flex: 1; padding: 10px 8px; font-size: 13px; font-weight: 600;
-  background: none; border: 0; border-bottom: 2px solid transparent;
-  color: var(--muted); border-radius: 0; cursor: pointer;
+/* 상단 메뉴 */
+.navBar {
+  position: absolute; top: 0; left: 0; right: 0; height: 56px;
+  display: grid; grid-template-columns: 260px 1fr 260px; align-items: center;
+  padding: 0 26px; gap: 20px;
+  background: linear-gradient(180deg, rgba(6,9,13,.95), rgba(6,9,13,.55) 70%, transparent);
 }
-.tabs button:hover { color: var(--text); filter: none; }
-.tabs button.on { color: #fff; border-bottom-color: var(--accent); }
+.navBar .logo { font-family: var(--display); font-size: 20px; letter-spacing: .02em; }
+.navBar .logo em { font-style: normal; color: #f0c453; }
+.navBar .tabs { display: flex; justify-content: center; gap: 26px; border: 0; }
+.navBar .tabs button {
+  width: auto; padding: 6px 2px; background: none; border: 0; border-radius: 0;
+  font-size: 13px; font-weight: 600; letter-spacing: .02em;
+  color: rgba(255,255,255,.55); cursor: pointer; position: relative;
+}
+.navBar .tabs button:hover { color: #fff; filter: none; }
+.navBar .tabs button.on { color: #f0c453; }
+.navBar .tabs button.on::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: #f0c453;
+}
+.account { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; }
+.account .bpTag { font-size: 10px; color: var(--muted); letter-spacing: .12em; }
+.account b { font-size: 17px; color: #f0c453; font-variant-numeric: tabular-nums; }
+.account .nick {
+  margin-left: 10px; padding: 4px 10px; font-size: 12px; color: #cfd8e3;
+  background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 6px;
+}
 
-#lobby .panel { display: flex; flex-direction: column; gap: 14px; }
-#lobby .lead { font-size: 13px; color: #cbd6e2; line-height: 1.7; }
-#lobby h3 { font-size: 12px; color: var(--muted); letter-spacing: .06em; font-weight: 600; }
-#lobby button.primary { padding: 14px; font-size: 16px; }
-#lobby .field { margin-bottom: 0; }
+/* 좌하단 시작 패널 */
+.playDock {
+  position: absolute; left: 26px; bottom: 26px; width: 268px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.dockGroup {
+  background: rgba(8, 11, 16, .72); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px;
+}
+.dockLabel { display: block; font-size: 10px; color: var(--muted); letter-spacing: .12em; margin-bottom: 6px; }
+.dockRow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.dockRow b { color: #f0c453; }
+.dockRow span { font-size: 12px; color: var(--muted); }
+.dockRow input {
+  width: 52px; margin: 0 4px; padding: 4px 6px; text-align: center;
+  background: #0d1117; border: 1px solid var(--line); border-radius: 5px;
+  color: var(--text); font-family: inherit; font-size: 12px;
+}
+.segmented { display: flex; gap: 6px; }
+.segmented button {
+  flex: 1; width: auto; padding: 7px 0; font-size: 12px; font-weight: 600;
+  background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--muted); cursor: pointer;
+}
+.segmented button.on { background: rgba(240, 196, 83, .16); border-color: #f0c453; color: #f0c453; }
+.startBtn {
+  width: 100%; padding: 15px; font-size: 19px; font-weight: 800; letter-spacing: .08em;
+  color: #1a1405; background: linear-gradient(180deg, #ffd75e, #e0ac1f);
+  border: 0; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(224, 172, 31, .28);
+}
+.startBtn:hover { filter: brightness(1.08); }
+.dockHint { font-size: 10px; color: rgba(255,255,255,.45); line-height: 1.6; }
 
-/* 상자 */
+/* 보상·커스터마이징·전적 시트 */
+.sheet {
+  position: absolute; left: 50%; top: 76px; transform: translateX(-50%);
+  width: min(880px, 92vw); max-height: calc(100% - 110px); overflow-y: auto;
+  background: rgba(8, 11, 16, .93); border: 1px solid var(--line); border-radius: 14px;
+  padding: 26px 28px; display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+}
+.sheet h2 { font-family: var(--display); font-size: 26px; }
+.sheet .sheetSub { font-size: 12px; color: var(--muted); margin-top: -8px; }
+.sheet h3 { font-size: 12px; color: var(--muted); letter-spacing: .06em; margin-top: 6px; }
+
+/* 상자 카드 */
+#crateList { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .crate {
-  display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 14px;
+  display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center;
   background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
-  border-radius: 12px; padding: 14px;
+  border-radius: 12px; padding: 18px 14px;
 }
 .crateIcon {
-  width: 46px; height: 46px; border-radius: 8px;
-  background: linear-gradient(150deg, #4b566b, #232a36);
-  border: 1px solid rgba(255, 255, 255, .16); position: relative;
+  width: 96px; height: 78px; border-radius: 8px; position: relative;
+  background: linear-gradient(160deg, #59657d, #232a36 70%);
+  border: 1px solid rgba(255, 255, 255, .18);
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,.45);
+}
+.crateIcon::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 42%; height: 8px;
+  background: linear-gradient(180deg, #f0c453, #b98a1f);
 }
 .crateIcon::after {
-  content: ''; position: absolute; left: 0; right: 0; top: 46%; height: 5px;
-  background: rgba(240, 198, 116, .8);
+  content: ''; position: absolute; left: 50%; top: 34%; width: 18px; height: 24px;
+  margin-left: -9px; border-radius: 3px; background: #1b2029; border: 1px solid rgba(255,255,255,.2);
 }
-.crateBody b { display: block; font-size: 14px; }
-.crateBody span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
-.bars { display: flex; height: 5px; margin-top: 8px; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,.4); }
+.crateBody b { display: block; font-size: 15px; }
+.crateBody span { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.bars { display: flex; height: 5px; width: 100%; margin-top: 10px; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,.45); }
 .bars .bar { height: 100%; }
 .crate .buy {
-  width: auto; padding: 9px 14px; font-size: 12px; white-space: nowrap;
-  background: linear-gradient(180deg, #2f81f7, #1f6feb);
+  width: 100%; padding: 10px; font-size: 13px; font-weight: 700;
+  color: #1a1405; background: linear-gradient(180deg, #ffd75e, #e0ac1f); border: 0; border-radius: 6px;
 }
 
 .rates { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -440,7 +492,7 @@ body.playing.paused { cursor: default; }
 .poolRow em { font-style: normal; color: var(--muted); white-space: nowrap; }
 
 /* 스킨 목록 */
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .item {
   width: auto; text-align: left; padding: 11px 12px; border-radius: 10px;
   background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
@@ -454,8 +506,8 @@ body.playing.paused { cursor: default; }
 .item .tag { display: block; font-size: 10px; margin: 3px 0 0 8px; }
 .item .state { display: block; font-size: 10px; color: var(--muted); margin: 4px 0 0 8px; }
 .item.locked { opacity: .45; }
-.item.on { background: rgba(47, 129, 247, .18); border-color: var(--accent); }
-.item.on .state { color: var(--accent); }
+.item.on { background: rgba(240, 196, 83, .16); border-color: #f0c453; }
+.item.on .state { color: #f0c453; }
 
 /* 전적 */
 .statRow {
@@ -464,6 +516,13 @@ body.playing.paused { cursor: default; }
 }
 .statRow span { color: var(--muted); }
 .statRow b { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 780px) {
+  .navBar { grid-template-columns: 1fr auto; }
+  .navBar .tabs { display: none; }
+  #crateList { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* 상자 결과 */
 #reveal { z-index: 40; background: rgba(4, 6, 10, .82); cursor: pointer; }
@@ -600,46 +659,62 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 
 <div id="menu" class="overlay lobbyOverlay">
   <div id="lobby">
-    <header class="lobbyTop">
-      <div class="brand">라스트 서바이버 <em>3D</em></div>
-      <div class="wallet"><span>BP</span><b id="bp">0</b></div>
+    <header class="navBar">
+      <div class="logo">라스트 <em>서바이버</em></div>
+      <nav class="tabs">
+        <button data-tab="play" class="on">플레이</button>
+        <button data-tab="skin">커스터마이징</button>
+        <button data-tab="crate">보상</button>
+        <button data-tab="stats">전적</button>
+      </nav>
+      <div class="account">
+        <span class="bpTag">BP</span><b id="bp">0</b>
+        <span class="nick">생존자</span>
+      </div>
     </header>
 
-    <nav class="tabs">
-      <button data-tab="play" class="on">플레이</button>
-      <button data-tab="crate">상자</button>
-      <button data-tab="skin">스킨</button>
-      <button data-tab="stats">기록</button>
-    </nav>
-
-    <section class="panel" id="tab-play">
-      <p class="lead">30명이 섬에 낙하합니다. 마지막 한 명이 될 때까지 살아남으세요.</p>
-      <ul class="rules">
-        <li>상공에서 <b>낙하산</b>으로 내려와 무기와 <b>조준경</b>을 챙깁니다.</li>
-        <li>무기는 <b>두 자루</b>까지, 조준경은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
-        <li>자기장이 7단계로 좁아지고, 매치가 끝나면 <b>BP</b> 를 받습니다.</li>
-      </ul>
-      <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-      <button id="startBtn" class="primary">매치 시작</button>
-      <p class="hint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+    <!-- 플레이: 화면 왼쪽 아래 설정과 시작 버튼 -->
+    <section class="panel playDock" id="tab-play">
+      <div class="dockGroup">
+        <span class="dockLabel">모드</span>
+        <div class="dockRow"><b>솔로</b><span>봇 <input id="botCount" type="number" min="4" max="59" value="29">명</span></div>
+      </div>
+      <div class="dockGroup">
+        <span class="dockLabel">시점</span>
+        <div class="segmented">
+          <button data-view="tpp">3인칭</button>
+          <button data-view="fpp" class="on">1인칭</button>
+        </div>
+      </div>
+      <button id="startBtn" class="startBtn">시작</button>
+      <p class="dockHint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
-    <section class="panel hidden" id="tab-crate">
+    <!-- 보상(상자) -->
+    <section class="panel sheet hidden" id="tab-crate">
+      <h2>보상 상자</h2>
+      <p class="sheetSub">매치에서 모은 BP 로 상자를 열어 스킨을 모으세요.</p>
       <div id="crateList"></div>
       <details class="rates" open>
-        <summary>획득 확률</summary>
+        <summary>획득 확률 안내</summary>
         <div id="rateTable"></div>
       </details>
     </section>
 
-    <section class="panel hidden" id="tab-skin">
-      <h3>캐릭터 스킨</h3>
+    <!-- 커스터마이징 -->
+    <section class="panel sheet hidden" id="tab-skin">
+      <h2>커스터마이징</h2>
+      <p class="sheetSub">장착한 스킨은 로비와 전장에 그대로 반영됩니다.</p>
+      <h3>캐릭터</h3>
       <div id="skinGrid" class="grid"></div>
       <h3>총기 도장</h3>
       <div id="gunGrid" class="grid"></div>
     </section>
 
-    <section class="panel hidden" id="tab-stats">
+    <!-- 전적 -->
+    <section class="panel sheet hidden" id="tab-stats">
+      <h2>전적</h2>
+      <p class="sheetSub">지금까지의 기록입니다.</p>
       <div id="statList"></div>
     </section>
   </div>
@@ -1968,14 +2043,16 @@ const CharArt = {
     const torsoParts = [
       sc(B.pillar(0.155, 0.145, 0.20, pants, 0, 0.09, 0), 1, 1, 0.72),      // 골반
       B.box(0.33, 0.055, 0.24, gear, 0, 0.19, 0),                            // 허리띠
-      sc(B.pillar(0.145, 0.185, 0.30, top, 0, 0.36, 0), 1, 1, 0.70),         // 배
-      sc(B.pillar(0.185, 0.19, 0.22, top, 0, 0.60, 0), 1, 1, 0.68),          // 가슴
-      sc(B.box(0.38, 0.30, 0.27, vest, 0, 0.55, 0.005), 1, 1, 1),            // 방탄복
-      B.box(0.09, 0.26, 0.29, gear, -0.15, 0.60, 0),                         // 어깨끈
-      B.box(0.09, 0.26, 0.29, gear, 0.15, 0.60, 0),
-      B.box(0.13, 0.10, 0.09, gear, 0, 0.44, 0.14),                          // 탄창 주머니
-      sc(B.sphere(0.085, top, -0.195, 0.615, 0), 1, 1, 1),                   // 어깨
-      sc(B.sphere(0.085, top, 0.195, 0.615, 0), 1, 1, 1),
+      sc(B.pillar(0.145, 0.183, 0.30, top, 0, 0.36, 0), 1, 1, 0.72),         // 배
+      sc(B.pillar(0.183, 0.192, 0.24, top, 0, 0.61, 0), 1, 1, 0.70),         // 가슴
+      sc(B.pillar(0.196, 0.20, 0.30, vest, 0, 0.55, 0.004), 1, 1, 0.76),     // 방탄조끼
+      sc(B.pillar(0.20, 0.19, 0.06, gear, 0, 0.40, 0.004), 1, 1, 0.78),      // 조끼 아래단
+      B.box(0.085, 0.24, 0.30, gear, -0.145, 0.615, 0),                      // 어깨끈
+      B.box(0.085, 0.24, 0.30, gear, 0.145, 0.615, 0),
+      B.box(0.13, 0.10, 0.07, gear, 0, 0.45, 0.15),                          // 탄창 주머니
+      B.box(0.10, 0.08, 0.06, gear, -0.13, 0.44, 0.14),
+      sc(B.sphere(0.098, top, -0.202, 0.60, 0), 1, 0.95, 1),                 // 어깨
+      sc(B.sphere(0.098, top, 0.202, 0.60, 0), 1, 0.95, 1),
       B.box(0.28, 0.34, 0.15, 0x4a4a3e, 0, 0.46, -0.20),                     // 배낭
       B.box(0.30, 0.09, 0.17, gear, 0, 0.30, -0.20),
       sc(B.pillar(0.058, 0.065, 0.10, tone, 0, 0.72, 0), 1, 1, 1),           // 목
@@ -1983,7 +2060,9 @@ const CharArt = {
       B.box(0.155, 0.10, 0.16, tone, 0, 0.785, 0.02),                        // 턱
       sc(B.sphere(0.03, tone, -0.113, 0.845, 0), 0.6, 1, 1),                 // 귀
       sc(B.sphere(0.03, tone, 0.113, 0.845, 0), 0.6, 1, 1),
-      sc(B.sphere(0.121, hair, 0, 0.868, -0.01), 1, 0.85, 1),                // 머리카락
+      sc(B.sphere(0.121, hair, 0, 0.872, -0.012), 1, 0.82, 1),               // 머리카락
+      sc(B.sphere(0.10, hair, 0, 0.815, -0.055), 1, 0.7, 1),                 // 뒷머리
+      B.box(0.03, 0.038, 0.03, tone, 0, 0.828, 0.108),                       // 코
       B.box(0.035, 0.026, 0.02, 0x1a1a20, -0.048, 0.855, 0.104),             // 눈
       B.box(0.035, 0.026, 0.02, 0x1a1a20, 0.048, 0.855, 0.104),
       B.box(0.046, 0.013, 0.02, hair, -0.048, 0.888, 0.103),                 // 눈썹
@@ -1998,7 +2077,8 @@ const CharArt = {
 
     /* 팔 (어깨 관절이 원점) */
     const arm = [
-      sc(B.pillar(0.06, 0.052, 0.30, top, 0, -0.17, 0), 1, 1, 1),            // 윗팔
+      sc(B.sphere(0.072, top, 0, -0.02, 0), 1, 1, 1),                        // 어깨 이음새
+      sc(B.pillar(0.066, 0.052, 0.30, top, 0, -0.17, 0), 1, 1, 1),           // 윗팔
       B.sphere(0.05, top, 0, -0.32, 0),                                      // 팔꿈치
       sc(B.pillar(0.05, 0.043, 0.28, top, 0, -0.46, 0.005), 1, 1, 1),        // 아래팔
       B.box(0.072, 0.045, 0.08, gear, 0, -0.60, 0.005),                      // 손목
@@ -3781,41 +3861,71 @@ const Game = {
 const Lobby = {
   scene: null, camera: null, group: null, spin: 0, ready: false,
 
-  /* ---------- 3D 미리보기 ---------- */
+  /* ---------- 3D 미리보기 (해질녘 벌판에 선 캐릭터) ---------- */
   initScene() {
     if (this.scene) return;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.1, 60);
-    // 왼쪽 패널을 피해 캐릭터가 오른쪽에 서 보이도록 카메라를 옮깁니다
-    this.camera.position.set(-1.25, 1.12, 4.5);
-    this.camera.lookAt(-1.25, 0.95, 0);
+    this.scene.fog = new THREE.Fog(srgb(0x2b3446), 14, 62);
+    this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera.position.set(0, 1.05, 6.0);
+    this.camera.lookAt(0, 0.98, 0);
 
-    this.scene.add(new THREE.HemisphereLight(0x9cc0e4, 0x22262c, 1.05));
-    const key = new THREE.DirectionalLight(0xfff2de, 2.6);
-    key.position.set(2.0, 3.0, 3.6);
+    // 하늘: 해질녘 그라데이션
+    const skyGeo = new THREE.SphereGeometry(150, 24, 16);
+    const sky = new THREE.Mesh(skyGeo, new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { top: { value: new THREE.Color(0x1d2942) }, bottom: { value: new THREE.Color(0xb08054) } },
+      vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY;' +
+        'void main(){ float t = smoothstep(-0.08, 0.5, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
+    }));
+    this.scene.add(sky);
+
+    // 바닥
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(220, 220),
+      new THREE.MeshStandardMaterial({ color: srgb(0x4a5539), roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // 뒤쪽 실루엣 (나무와 폐허)
+    const dark = new THREE.MeshStandardMaterial({ color: srgb(0x232b33), roughness: 1 });
+    for (let i = 0; i < 14; i++) {
+      const ang = -Math.PI * 0.15 + (i / 13) * Math.PI * 1.3;
+      const dist = 22 + Math.random() * 16;
+      const h = 5 + Math.random() * 6;
+      const tree = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random(), h, 7), dark);
+      tree.position.set(Math.sin(ang) * dist, h / 2, -Math.abs(Math.cos(ang)) * dist - 4);
+      this.scene.add(tree);
+    }
+    const ruin = new THREE.Mesh(new THREE.BoxGeometry(6, 4.4, 5), dark);
+    ruin.position.set(-9.5, 2.2, -16);
+    this.scene.add(ruin);
+
+    // 조명: 따뜻한 역광 + 앞쪽 보조광
+    this.scene.add(new THREE.HemisphereLight(0xa8c0dc, 0x3a3a28, 1.0));
+    const key = new THREE.DirectionalLight(0xffe0b0, 2.4);
+    key.position.set(2.6, 3.2, 3.4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -4; key.shadow.camera.right = 4;
+    key.shadow.camera.top = 4; key.shadow.camera.bottom = -2;
+    key.shadow.camera.near = 0.5; key.shadow.camera.far = 20;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x7fb4ff, 1.7);
-    rim.position.set(-3, 2, -2.4);
+    const rim = new THREE.DirectionalLight(0xffb877, 2.2);
+    rim.position.set(-3.2, 2.4, -3.6);
     this.scene.add(rim);
-
-    // 받침대
-    const pod = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.15, 1.3, 0.16, 40),
-      new THREE.MeshStandardMaterial({ color: srgb(0x1b2028), roughness: 0.6, metalness: 0.3 }));
-    pod.position.y = -0.08;
-    this.scene.add(pod);
-    const ring = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.18, 1.18, 0.02, 40),
-      new THREE.MeshBasicMaterial({ color: srgb(0x2f81f7) }));
-    ring.position.y = 0.01;
-    this.scene.add(ring);
+    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.0);   // 얼굴이 어둡지 않도록
+    fill.position.set(0.4, 1.6, 5);
+    this.scene.add(fill);
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
     this.ready = true;
   },
 
-  /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 */
+  /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 (편히 선 자세) */
   refresh() {
     this.initScene();
     while (this.group.children.length) this.group.remove(this.group.children[0]);
@@ -3823,7 +3933,7 @@ const Lobby = {
     const skin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
     const art = CharArt.get(skin);
     const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
-    const mk = geo => new THREE.Mesh(geo, mat);
+    const mk = geo => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; };
 
     const hips = new THREE.Group();
     hips.position.y = 0.92;
@@ -3833,35 +3943,39 @@ const Lobby = {
     const armR = new THREE.Group(); armR.position.set(-0.21, 0.615, 0);
     const armL = new THREE.Group(); armL.position.set(0.21, 0.615, 0);
     armR.add(mk(art.arm)); armL.add(mk(art.arm));
-    armR.rotation.set(-0.95, 0.1, 0.16);      // 총을 든 자세
-    armL.rotation.set(-1.05, -0.3, -0.5);
+    armR.rotation.set(-0.06, 0, -0.10);          // 팔을 자연스럽게 내린 자세
+    armL.rotation.set(-0.02, 0, 0.12);
     hips.add(armR); hips.add(armL);
-
-    const gun = new THREE.Mesh(
-      GunArt.geo('rifle', 0, Profile.data.equipped.gun),
-      Mats.vc({ roughness: 0.55, metalness: 0.25 }));
-    gun.position.set(-0.02, -0.60, 0.22);
-    gun.rotation.x = 0.95;
-    armR.add(gun);
+    this.armR = armR; this.armL = armL; this.hipsRef = hips;
 
     for (const s of [-1, 1]) {
       const leg = new THREE.Group();
       leg.position.set(0.105 * s, 0.92, 0);
-      leg.rotation.set(s > 0 ? 0.06 : -0.04, 0, 0.02 * s);
+      leg.rotation.set(s > 0 ? 0.05 : -0.03, 0, 0.03 * s);
       leg.add(mk(art.thigh));
       const knee = new THREE.Group();
       knee.position.y = -0.44;
-      knee.rotation.x = -0.05;
+      knee.rotation.x = -0.04;
       knee.add(mk(art.shin));
       leg.add(knee);
       this.group.add(leg);
     }
+    this.group.rotation.y = 0.12;
   },
 
   update(dt) {
     if (!this.ready) return;
-    this.spin += dt * 0.35;
-    this.group.rotation.y = Math.sin(this.spin) * 0.55 + 0.25;
+    this.spin += dt;
+    // 숨쉬는 듯한 미세한 움직임과 아주 느린 시선 이동
+    if (this.hipsRef) {
+      this.hipsRef.position.y = 0.92 + Math.sin(this.spin * 1.4) * 0.008;
+      this.hipsRef.rotation.y = Math.sin(this.spin * 0.5) * 0.05;
+      if (this.armR) this.armR.rotation.x = -0.06 + Math.sin(this.spin * 1.4) * 0.02;
+      if (this.armL) this.armL.rotation.x = -0.02 + Math.sin(this.spin * 1.4 + 0.6) * 0.02;
+    }
+    this.group.rotation.y = 0.12 + Math.sin(this.spin * 0.22) * 0.16;
+    this.camera.position.x = Math.sin(this.spin * 0.16) * 0.12;
+    this.camera.lookAt(0, 0.98, 0);
   },
 
   render(renderer) {
@@ -3892,12 +4006,26 @@ const Lobby = {
     };
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
+
+    // 시점(1인칭/3인칭) 전환
+    this.viewBtns = document.querySelectorAll('.segmented button[data-view]');
+    this.viewBtns.forEach(btn => btn.addEventListener('click', () => {
+      Settings.data.fpv = btn.dataset.view === 'fpp';
+      Settings.save(); Settings.sync();
+      this.syncView();
+    }));
+    this.syncView();
     document.getElementById('reveal').addEventListener('click', () => {
       this.el.reveal.classList.add('hidden');
     });
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
+  },
+
+  syncView() {
+    if (!this.viewBtns) return;
+    this.viewBtns.forEach(b => b.classList.toggle('on', (b.dataset.view === 'fpp') === !!Settings.data.fpv));
   },
 
   tab(name) {

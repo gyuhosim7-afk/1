@@ -101,46 +101,62 @@
 
 <div id="menu" class="overlay lobbyOverlay">
   <div id="lobby">
-    <header class="lobbyTop">
-      <div class="brand">라스트 서바이버 <em>3D</em></div>
-      <div class="wallet"><span>BP</span><b id="bp">0</b></div>
+    <header class="navBar">
+      <div class="logo">라스트 <em>서바이버</em></div>
+      <nav class="tabs">
+        <button data-tab="play" class="on">플레이</button>
+        <button data-tab="skin">커스터마이징</button>
+        <button data-tab="crate">보상</button>
+        <button data-tab="stats">전적</button>
+      </nav>
+      <div class="account">
+        <span class="bpTag">BP</span><b id="bp">0</b>
+        <span class="nick">생존자</span>
+      </div>
     </header>
 
-    <nav class="tabs">
-      <button data-tab="play" class="on">플레이</button>
-      <button data-tab="crate">상자</button>
-      <button data-tab="skin">스킨</button>
-      <button data-tab="stats">기록</button>
-    </nav>
-
-    <section class="panel" id="tab-play">
-      <p class="lead">30명이 섬에 낙하합니다. 마지막 한 명이 될 때까지 살아남으세요.</p>
-      <ul class="rules">
-        <li>상공에서 <b>낙하산</b>으로 내려와 무기와 <b>조준경</b>을 챙깁니다.</li>
-        <li>무기는 <b>두 자루</b>까지, 조준경은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
-        <li>자기장이 7단계로 좁아지고, 매치가 끝나면 <b>BP</b> 를 받습니다.</li>
-      </ul>
-      <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-      <button id="startBtn" class="primary">매치 시작</button>
-      <p class="hint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+    <!-- 플레이: 화면 왼쪽 아래 설정과 시작 버튼 -->
+    <section class="panel playDock" id="tab-play">
+      <div class="dockGroup">
+        <span class="dockLabel">모드</span>
+        <div class="dockRow"><b>솔로</b><span>봇 <input id="botCount" type="number" min="4" max="59" value="29">명</span></div>
+      </div>
+      <div class="dockGroup">
+        <span class="dockLabel">시점</span>
+        <div class="segmented">
+          <button data-view="tpp">3인칭</button>
+          <button data-view="fpp" class="on">1인칭</button>
+        </div>
+      </div>
+      <button id="startBtn" class="startBtn">시작</button>
+      <p class="dockHint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
-    <section class="panel hidden" id="tab-crate">
+    <!-- 보상(상자) -->
+    <section class="panel sheet hidden" id="tab-crate">
+      <h2>보상 상자</h2>
+      <p class="sheetSub">매치에서 모은 BP 로 상자를 열어 스킨을 모으세요.</p>
       <div id="crateList"></div>
       <details class="rates" open>
-        <summary>획득 확률</summary>
+        <summary>획득 확률 안내</summary>
         <div id="rateTable"></div>
       </details>
     </section>
 
-    <section class="panel hidden" id="tab-skin">
-      <h3>캐릭터 스킨</h3>
+    <!-- 커스터마이징 -->
+    <section class="panel sheet hidden" id="tab-skin">
+      <h2>커스터마이징</h2>
+      <p class="sheetSub">장착한 스킨은 로비와 전장에 그대로 반영됩니다.</p>
+      <h3>캐릭터</h3>
       <div id="skinGrid" class="grid"></div>
       <h3>총기 도장</h3>
       <div id="gunGrid" class="grid"></div>
     </section>
 
-    <section class="panel hidden" id="tab-stats">
+    <!-- 전적 -->
+    <section class="panel sheet hidden" id="tab-stats">
+      <h2>전적</h2>
+      <p class="sheetSub">지금까지의 기록입니다.</p>
       <div id="statList"></div>
     </section>
   </div>

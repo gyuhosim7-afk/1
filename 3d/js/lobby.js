@@ -4,41 +4,71 @@
 const Lobby = {
   scene: null, camera: null, group: null, spin: 0, ready: false,
 
-  /* ---------- 3D 미리보기 ---------- */
+  /* ---------- 3D 미리보기 (해질녘 벌판에 선 캐릭터) ---------- */
   initScene() {
     if (this.scene) return;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.1, 60);
-    // 왼쪽 패널을 피해 캐릭터가 오른쪽에 서 보이도록 카메라를 옮깁니다
-    this.camera.position.set(-1.25, 1.12, 4.5);
-    this.camera.lookAt(-1.25, 0.95, 0);
+    this.scene.fog = new THREE.Fog(srgb(0x2b3446), 14, 62);
+    this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera.position.set(0, 1.05, 6.0);
+    this.camera.lookAt(0, 0.98, 0);
 
-    this.scene.add(new THREE.HemisphereLight(0x9cc0e4, 0x22262c, 1.05));
-    const key = new THREE.DirectionalLight(0xfff2de, 2.6);
-    key.position.set(2.0, 3.0, 3.6);
+    // 하늘: 해질녘 그라데이션
+    const skyGeo = new THREE.SphereGeometry(150, 24, 16);
+    const sky = new THREE.Mesh(skyGeo, new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: { top: { value: new THREE.Color(0x1d2942) }, bottom: { value: new THREE.Color(0xb08054) } },
+      vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY;' +
+        'void main(){ float t = smoothstep(-0.08, 0.5, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
+    }));
+    this.scene.add(sky);
+
+    // 바닥
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(220, 220),
+      new THREE.MeshStandardMaterial({ color: srgb(0x4a5539), roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // 뒤쪽 실루엣 (나무와 폐허)
+    const dark = new THREE.MeshStandardMaterial({ color: srgb(0x232b33), roughness: 1 });
+    for (let i = 0; i < 14; i++) {
+      const ang = -Math.PI * 0.15 + (i / 13) * Math.PI * 1.3;
+      const dist = 22 + Math.random() * 16;
+      const h = 5 + Math.random() * 6;
+      const tree = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random(), h, 7), dark);
+      tree.position.set(Math.sin(ang) * dist, h / 2, -Math.abs(Math.cos(ang)) * dist - 4);
+      this.scene.add(tree);
+    }
+    const ruin = new THREE.Mesh(new THREE.BoxGeometry(6, 4.4, 5), dark);
+    ruin.position.set(-9.5, 2.2, -16);
+    this.scene.add(ruin);
+
+    // 조명: 따뜻한 역광 + 앞쪽 보조광
+    this.scene.add(new THREE.HemisphereLight(0xa8c0dc, 0x3a3a28, 1.0));
+    const key = new THREE.DirectionalLight(0xffe0b0, 2.4);
+    key.position.set(2.6, 3.2, 3.4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.left = -4; key.shadow.camera.right = 4;
+    key.shadow.camera.top = 4; key.shadow.camera.bottom = -2;
+    key.shadow.camera.near = 0.5; key.shadow.camera.far = 20;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x7fb4ff, 1.7);
-    rim.position.set(-3, 2, -2.4);
+    const rim = new THREE.DirectionalLight(0xffb877, 2.2);
+    rim.position.set(-3.2, 2.4, -3.6);
     this.scene.add(rim);
-
-    // 받침대
-    const pod = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.15, 1.3, 0.16, 40),
-      new THREE.MeshStandardMaterial({ color: srgb(0x1b2028), roughness: 0.6, metalness: 0.3 }));
-    pod.position.y = -0.08;
-    this.scene.add(pod);
-    const ring = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.18, 1.18, 0.02, 40),
-      new THREE.MeshBasicMaterial({ color: srgb(0x2f81f7) }));
-    ring.position.y = 0.01;
-    this.scene.add(ring);
+    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.0);   // 얼굴이 어둡지 않도록
+    fill.position.set(0.4, 1.6, 5);
+    this.scene.add(fill);
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
     this.ready = true;
   },
 
-  /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 */
+  /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 (편히 선 자세) */
   refresh() {
     this.initScene();
     while (this.group.children.length) this.group.remove(this.group.children[0]);
@@ -46,7 +76,7 @@ const Lobby = {
     const skin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
     const art = CharArt.get(skin);
     const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
-    const mk = geo => new THREE.Mesh(geo, mat);
+    const mk = geo => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; };
 
     const hips = new THREE.Group();
     hips.position.y = 0.92;
@@ -56,35 +86,39 @@ const Lobby = {
     const armR = new THREE.Group(); armR.position.set(-0.21, 0.615, 0);
     const armL = new THREE.Group(); armL.position.set(0.21, 0.615, 0);
     armR.add(mk(art.arm)); armL.add(mk(art.arm));
-    armR.rotation.set(-0.95, 0.1, 0.16);      // 총을 든 자세
-    armL.rotation.set(-1.05, -0.3, -0.5);
+    armR.rotation.set(-0.06, 0, -0.10);          // 팔을 자연스럽게 내린 자세
+    armL.rotation.set(-0.02, 0, 0.12);
     hips.add(armR); hips.add(armL);
-
-    const gun = new THREE.Mesh(
-      GunArt.geo('rifle', 0, Profile.data.equipped.gun),
-      Mats.vc({ roughness: 0.55, metalness: 0.25 }));
-    gun.position.set(-0.02, -0.60, 0.22);
-    gun.rotation.x = 0.95;
-    armR.add(gun);
+    this.armR = armR; this.armL = armL; this.hipsRef = hips;
 
     for (const s of [-1, 1]) {
       const leg = new THREE.Group();
       leg.position.set(0.105 * s, 0.92, 0);
-      leg.rotation.set(s > 0 ? 0.06 : -0.04, 0, 0.02 * s);
+      leg.rotation.set(s > 0 ? 0.05 : -0.03, 0, 0.03 * s);
       leg.add(mk(art.thigh));
       const knee = new THREE.Group();
       knee.position.y = -0.44;
-      knee.rotation.x = -0.05;
+      knee.rotation.x = -0.04;
       knee.add(mk(art.shin));
       leg.add(knee);
       this.group.add(leg);
     }
+    this.group.rotation.y = 0.12;
   },
 
   update(dt) {
     if (!this.ready) return;
-    this.spin += dt * 0.35;
-    this.group.rotation.y = Math.sin(this.spin) * 0.55 + 0.25;
+    this.spin += dt;
+    // 숨쉬는 듯한 미세한 움직임과 아주 느린 시선 이동
+    if (this.hipsRef) {
+      this.hipsRef.position.y = 0.92 + Math.sin(this.spin * 1.4) * 0.008;
+      this.hipsRef.rotation.y = Math.sin(this.spin * 0.5) * 0.05;
+      if (this.armR) this.armR.rotation.x = -0.06 + Math.sin(this.spin * 1.4) * 0.02;
+      if (this.armL) this.armL.rotation.x = -0.02 + Math.sin(this.spin * 1.4 + 0.6) * 0.02;
+    }
+    this.group.rotation.y = 0.12 + Math.sin(this.spin * 0.22) * 0.16;
+    this.camera.position.x = Math.sin(this.spin * 0.16) * 0.12;
+    this.camera.lookAt(0, 0.98, 0);
   },
 
   render(renderer) {
@@ -115,12 +149,26 @@ const Lobby = {
     };
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
+
+    // 시점(1인칭/3인칭) 전환
+    this.viewBtns = document.querySelectorAll('.segmented button[data-view]');
+    this.viewBtns.forEach(btn => btn.addEventListener('click', () => {
+      Settings.data.fpv = btn.dataset.view === 'fpp';
+      Settings.save(); Settings.sync();
+      this.syncView();
+    }));
+    this.syncView();
     document.getElementById('reveal').addEventListener('click', () => {
       this.el.reveal.classList.add('hidden');
     });
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
+  },
+
+  syncView() {
+    if (!this.viewBtns) return;
+    this.viewBtns.forEach(b => b.classList.toggle('on', (b.dataset.view === 'fpp') === !!Settings.data.fpv));
   },
 
   tab(name) {
