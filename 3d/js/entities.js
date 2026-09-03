@@ -335,6 +335,59 @@ const CharArt = {
   }
 };
 
+/* 낙하산: 돔 지붕 + 줄 */
+const ChuteArt = {
+  geo: null,
+  build() {
+    if (this.geo) return this.geo;
+    const dome = new THREE.SphereGeometry(2.7, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.52);
+    dome.scale(1, 0.62, 1);
+    const nd = dome.index ? dome.toNonIndexed() : dome;
+    const pos = nd.attributes.position, nor = nd.attributes.normal;
+    const positions = [], normals = [], colors = [];
+    const a = new THREE.Color(0xe8552f).convertSRGBToLinear();
+    const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
+    for (let i = 0; i < pos.count; i += 3) {
+      // 삼각형 하나씩 방위각으로 나눠 색을 번갈아 칠합니다
+      let mx = 0, mz = 0;
+      for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
+      const ang = Math.atan2(mz / 3, mx / 3);
+      const slice = Math.floor((ang + Math.PI) / (Math.PI * 2) * 8);
+      const c = slice % 2 ? a : b;
+      for (let k = 0; k < 3; k++) {
+        positions.push(pos.getX(i + k), pos.getY(i + k) + 3.1, pos.getZ(i + k));
+        normals.push(nor.getX(i + k), nor.getY(i + k), nor.getZ(i + k));
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+    dome.dispose(); if (nd !== dome) nd.dispose();
+
+    // 줄: 캐릭터 어깨에서 지붕 가장자리로
+    const lineParts = [];
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      const x = Math.cos(ang) * 1.35, z = Math.sin(ang) * 1.35;
+      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z, Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
+    }
+    const lines = Build.merge(lineParts);
+    const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
+    for (let i = 0; i < lp.count; i++) {
+      positions.push(lp.getX(i), lp.getY(i), lp.getZ(i));
+      normals.push(ln.getX(i), ln.getY(i), ln.getZ(i));
+      colors.push(lc.getX(i), lc.getY(i), lc.getZ(i));
+    }
+    lines.dispose();
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeBoundingSphere();
+    this.geo = geo;
+    return geo;
+  }
+};
+
 class Char3D {
   constructor(x, z, isPlayer, name, outfit) {
     this.pos = new THREE.Vector3(x, World.height(x, z), z);
@@ -350,13 +403,17 @@ class Char3D {
     this.kills = 0;
     this.rank = 0;
     this.crouch = false;
+    this.flying = null;            // 'freefall' | 'chute' | null
+    this.chuteTilt = 0;
     this.speedNow = 0;
     this.stepPhase = 0;
     this.lean = 0;
     this.aimBlend = 0;
 
-    this.gun = null;
-    this.mag = 0;
+    this.guns = [null, null];      // 무기 두 칸
+    this.mags = [0, 0];
+    this.slot = 0;
+    this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
     this.reloading = 0;
@@ -400,6 +457,13 @@ class Char3D {
     this.armR.add(this.gunMount);
     this.gunMesh = null;
 
+    // 등에 메는 두 번째 무기
+    this.backMount = new THREE.Group();
+    this.backMount.position.set(0.05, 0.45, -0.33);
+    this.backMount.rotation.set(Math.PI / 2, 0.25, 0.6);
+    this.hips.add(this.backMount);
+    this.backMesh = null;
+
     this.legL = new THREE.Group(); this.legL.position.set(-0.11, 0.92, 0);
     this.legR = new THREE.Group(); this.legR.position.set(0.11, 0.92, 0);
     this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.33;
@@ -409,8 +473,24 @@ class Char3D {
 
     this.body.add(this.hips); this.body.add(this.legL); this.body.add(this.legR);
     this.mesh.add(this.body);
+
+    // 낙하산 (필요할 때만 보이게)
+    this.chute = new THREE.Mesh(ChuteArt.build(), Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+    this.chute.castShadow = true;
+    this.chute.position.y = 1.7;
+    this.chute.visible = false;
+    this.mesh.add(this.chute);
+
     this.mesh.position.copy(this.pos);
   }
+
+  /* 현재 든 무기 — 기존 코드가 그대로 쓰도록 접근자로 감쌉니다 */
+  get gun() { return this.guns[this.slot]; }
+  set gun(v) { this.guns[this.slot] = v; }
+  get mag() { return this.mags[this.slot]; }
+  set mag(v) { this.mags[this.slot] = v; }
+  get other() { return this.guns[1 - this.slot]; }
+  get hasTwo() { return !!(this.guns[0] && this.guns[1]); }
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
   get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
@@ -420,21 +500,51 @@ class Char3D {
     return (out || new THREE.Vector3()).set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
   }
 
+  /* 빈 칸이 있으면 그쪽에, 없으면 지금 든 칸에 넣습니다. 넣은 칸 번호를 돌려줍니다 */
   giveGun(key, ammo) {
-    this.gun = key;
-    this.mag = GUNS[key].mag;
+    let idx = this.guns.indexOf(null);
+    if (idx < 0) idx = this.slot;
+    this.guns[idx] = key;
+    this.mags[idx] = GUNS[key].mag;
     this.reserve[key] = (this.reserve[key] || 0) + (ammo == null ? GUNS[key].ammoPer : ammo);
     this.reloading = 0;
-    if (this.gunMesh) this.gunMount.remove(this.gunMesh);
-    this.gunMesh = new THREE.Mesh(GunArt.geo(key), Mats.vc({ roughness: 0.55, metalness: 0.25 }));
-    this.gunMesh.castShadow = true;
-    this.gunMesh.position.set(0, 0, 0.06);      // 총구는 앞(+Z)을 봅니다
-    this.gunMount.add(this.gunMesh);
+    this.slot = idx;
+    this.refreshGuns();
+    return idx;
+  }
+
+  /* 무기 칸 전환 */
+  selectSlot(idx) {
+    if (idx === this.slot || !this.guns[idx] || this.dead || this.flying) return false;
+    this.slot = idx;
+    this.reloading = 0;
+    this.swap = CFG.SWAP_TIME;
+    this.refreshGuns();
+    return true;
+  }
+  swapSlot() { return this.selectSlot(1 - this.slot); }
+
+  /* 든 무기와 등에 멘 무기 모델을 다시 붙입니다 */
+  refreshGuns() {
+    const mat = Mats.vc({ roughness: 0.55, metalness: 0.25 });
+    if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
+    if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
+    if (this.gun) {
+      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun), mat);
+      this.gunMesh.castShadow = true;
+      this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
+      this.gunMount.add(this.gunMesh);
+    }
+    if (this.other) {                            // 남는 무기는 등에 멥니다
+      this.backMesh = new THREE.Mesh(GunArt.geo(this.other), mat);
+      this.backMesh.castShadow = true;
+      this.backMount.add(this.backMesh);
+    }
   }
 
   canShoot() {
-    return !this.dead && this.gun && this.mag > 0 && this.cooldown <= 0 &&
-           this.reloading <= 0 && this.healing <= 0;
+    return !this.dead && !this.flying && this.gun && this.mag > 0 && this.cooldown <= 0 &&
+           this.reloading <= 0 && this.healing <= 0 && this.swap <= 0;
   }
   needsReload() { return this.gun && this.mag <= 0 && this.reserveAmmo > 0 && this.reloading <= 0; }
 
@@ -462,6 +572,32 @@ class Char3D {
     const mesh = this.mesh;
     mesh.position.copy(this.pos);
     mesh.rotation.y = this.yaw;
+
+    if (this.flying) {                     // 낙하 중 자세
+      this.chute.visible = this.flying === 'chute';
+      this.hips.rotation.set(0, 0, 0);
+      if (this.flying === 'freefall') {    // 엎드려 팔다리를 벌린 자세
+        this.body.rotation.x = -1.15;
+        this.body.position.y = 0.55;
+        this.armL.rotation.set(-1.25, 0, 0.95);
+        this.armR.rotation.set(-1.25, 0, -0.95);
+        this.legL.rotation.set(0.3, 0, 0.32);
+        this.legR.rotation.set(0.3, 0, -0.32);
+        this.kneeL.rotation.x = -0.55; this.kneeR.rotation.x = -0.55;
+      } else {                             // 낙하산에 매달린 자세
+        this.body.rotation.x = 0.14;
+        this.body.position.y = 0;
+        this.armL.rotation.set(-2.45, 0, 0.5);
+        this.armR.rotation.set(-2.45, 0, -0.5);
+        this.legL.rotation.x = 0.4; this.legR.rotation.x = 0.22;
+        this.kneeL.rotation.x = -0.75; this.kneeR.rotation.x = -0.5;
+        this.chute.rotation.z = this.chuteTilt;
+        this.chute.rotation.x = Math.sin(this.stepPhase * 0.6) * 0.04;
+        this.stepPhase += dt;
+      }
+      return;
+    }
+    this.chute.visible = false;
 
     if (this.dead) {                       // 쓰러지는 연출
       this.deadT = Math.min(1, this.deadT + dt * 2.6);
@@ -532,6 +668,13 @@ class Char3D {
     this.body.rotation.x = 0;
     this.body.rotation.z = 0;
     this.body.position.y = (this.crouch ? -0.34 : 0) + (moving ? Math.abs(sw2) * 0.035 * run : Math.sin(this.stepPhase * 0.6) * 0.008);
+
+    // 무기 교체 중에는 총을 내렸다가 올립니다
+    if (this.swap > 0) {
+      const t = Math.sin((1 - this.swap / CFG.SWAP_TIME) * Math.PI);
+      this.armR.rotation.x += t * 0.9;
+      this.armL.rotation.x += t * 0.7;
+    }
 
     // 팔 회전을 상쇄해 총이 늘 앞을 향하게 하고, 시선 위아래를 반영합니다
     this.gunMount.rotation.x = -this.armR.rotation.x - this.pitch * 0.8 - 0.06;

@@ -31,7 +31,10 @@ const Sfx = {
   hurt() { this.tone(140, 0.2, 'sawtooth', 0.07); },
   pick() { this.tone(880, 0.07, 'triangle', 0.05); },
   kill() { this.tone(520, 0.25, 'triangle', 0.07); },
-  reload() { this.tone(300, 0.07, 'triangle', 0.04); }
+  reload() { this.tone(300, 0.07, 'triangle', 0.04); },
+  swap() { this.tone(420, 0.06, 'triangle', 0.04); },
+  chute() { this.tone(220, 0.35, 'sine', 0.05); },
+  land() { this.tone(110, 0.16, 'sine', 0.06); }
 };
 
 /* ============================================================
@@ -39,7 +42,7 @@ const Sfx = {
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: true },
   controls: [],
 
   load() {
@@ -54,6 +57,7 @@ const Settings = {
     this.data.sens = Math.max(0.2, Math.min(4, +this.data.sens || 1));
     this.data.ads = Math.max(0.2, Math.min(1.5, +this.data.ads || 0.65));
     this.data.invert = !!this.data.invert;
+    this.data.edge = this.data.edge !== false;
   },
 
   /* data-set 이 붙은 조절기를 모두 연결하고, 값이 바뀌면 서로 맞춰 줍니다 */
@@ -90,7 +94,8 @@ const UI = {
     const ids = ['menu', 'over', 'hud', 'hp', 'hpText', 'gunName', 'ammo', 'meds', 'alive',
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
-      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn'];
+      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
+      'scope', 'alt', 'slots'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -125,11 +130,37 @@ const UI = {
 
     if (p.gun) {
       this.el.gunName.textContent = GUNS[p.gun].short;
-      this.el.ammo.textContent = p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo);
+      this.el.ammo.textContent = p.swap > 0 ? '교체 중'
+        : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo));
     } else {
       this.el.gunName.textContent = '맨손';
       this.el.ammo.textContent = '무기를 찾으세요';
     }
+
+    // 무기 두 칸 표시
+    for (const el of this.el.slots.children) {
+      const i = +el.dataset.slot;
+      const key = p.guns[i];
+      el.querySelector('b').textContent = key ? GUNS[key].short : '비어 있음';
+      el.classList.toggle('active', i === p.slot && !!key);
+      el.classList.toggle('empty', !key);
+      el.style.borderColor = key && i === p.slot
+        ? '#' + GUNS[key].color.toString(16).padStart(6, '0') : '';
+    }
+
+    // 낙하 중 고도
+    if (p.flying) {
+      const altV = Math.max(0, Math.round(p.pos.y - World.height(p.pos.x, p.pos.z)));
+      this.el.alt.classList.remove('hidden');
+      this.el.alt.querySelector('b').textContent = altV;
+      this.el.alt.querySelector('em').textContent = p.flying === 'chute' ? '낙하산' : '자유낙하';
+    } else this.el.alt.classList.add('hidden');
+
+    // 조준경
+    const zoom = p.gun ? (GUNS[p.gun].scope || 1) : 1;
+    const scoped = Game.ads && zoom >= 3 && !p.flying;
+    this.el.scope.classList.toggle('hidden', !scoped);
+    if (scoped) this.el.scope.querySelector('.zoom').textContent = zoom + 'x';
     this.el.meds.textContent = p.meds;
     this.el.alive.textContent = g.alive;
     this.el.kills.textContent = p.kills;
@@ -152,7 +183,7 @@ const UI = {
     const spread = p.gun ? (Game.ads ? GUNS[p.gun].adsSpread : GUNS[p.gun].spread) : 0.05;
     const gapPx = 4 + spread * 460 * (p.speedNow > 2.5 ? 1.7 : 1);
     this.el.cross.style.setProperty('--gap', gapPx.toFixed(1) + 'px');
-    this.el.cross.style.opacity = Game.ads && p.gun && (p.gun === 'sniper' || p.gun === 'dmr') ? 0.25 : 1;
+    this.el.cross.style.opacity = (p.flying || (Game.ads && zoom >= 3)) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
 
@@ -290,6 +321,7 @@ const Input = {
   ax: 0, az: 0,
   mode: 'lock',              // lock: 마우스 잠금 / free: 잠금 없이 움직인 만큼만 회전
   locked: false, settingsOpen: false,
+  mouseX: 0, mouseY: 0, inside: false,
 
   init(canvas) {
     this.canvas = canvas;
@@ -307,6 +339,7 @@ const Input = {
     // 잠금 여부와 상관없이 '움직인 거리'만 반영합니다.
     // 마우스를 멈추면 시점도 곧바로 멈춥니다.
     window.addEventListener('mousemove', e => {
+      this.mouseX = e.clientX; this.mouseY = e.clientY; this.inside = true;
       if (Game.state !== 'playing' || this.settingsOpen) return;
       const mx = e.movementX, my = e.movementY;
       if (mx === undefined) return;
@@ -314,6 +347,8 @@ const Input = {
       if (Math.abs(mx) > 220 || Math.abs(my) > 220) return;
       this.dx += mx; this.dy += my;
     });
+    window.addEventListener('mouseout', e => { if (!e.relatedTarget) this.inside = false; });
+    window.addEventListener('mouseover', () => { this.inside = true; });
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
       if (e.button === 0) this.fire = true;
@@ -324,6 +359,11 @@ const Input = {
       if (e.button === 2) this.ads = false;
     });
     window.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('wheel', e => {
+      if (Game.state !== 'playing' || this.settingsOpen) return;
+      e.preventDefault();
+      if (Game.player.swapSlot()) Sfx.swap();
+    }, { passive: false });
     window.addEventListener('blur', () => { this.keys = {}; this.fire = false; this.ads = false; });
 
     window.addEventListener('keydown', e => {
@@ -339,6 +379,9 @@ const Input = {
       if (k === 'tab') UI.el.bigmap.classList.toggle('hidden');
       if (k === 'm') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
       if (k === 'o') this.toggleSettings();
+      if (k === '1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
+      if (k === '2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
+      if (k === 'x') { if (Game.player.swapSlot()) Sfx.swap(); }
     });
     window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
   },
@@ -371,6 +414,17 @@ const Input = {
     this.right = !!(k['d'] || k['arrowright']);
     this.sprint = !!k['shift'];
     this.crouch = !!(k['c'] || k['control']);
+
+    // 마우스가 잠겨 있지 않을 때: 커서가 화면 가장자리에 닿으면 그 방향으로 계속 돌립니다.
+    // (가운데 기준이 아니라 가장자리 띠 안에서만 작동하므로, 가운데서는 멈춰 있습니다)
+    if (!this.locked && Settings.data.edge && this.inside && Game.state === 'playing' && !this.settingsOpen) {
+      const W = window.innerWidth, H = window.innerHeight, band = 72;
+      const x = this.mouseX, y = this.mouseY;
+      if (x < band) this.dx -= (band - x) * 0.10;
+      else if (x > W - band) this.dx += (x - (W - band)) * 0.10;
+      if (y < band) this.dy -= (band - y) * 0.07;
+      else if (y > H - band) this.dy += (y - (H - band)) * 0.07;
+    }
   }
 };
 

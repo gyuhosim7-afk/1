@@ -260,3 +260,62 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 
 #scene { touch-action: none; }
+
+/* ============================================================
+   조준경, 무기 칸, 낙하 고도
+   ============================================================ */
+#scope {
+  position: absolute; inset: 0; z-index: 7; pointer-events: none;
+  background: radial-gradient(circle at 50% 50%,
+    rgba(0,0,0,0) 0, rgba(0,0,0,0) 33vmin,
+    rgba(0,0,0,.55) 33.2vmin, rgba(0,0,0,.96) 35vmin, #05070a 38vmin);
+}
+#scope .lens {
+  position: absolute; left: 50%; top: 50%; width: 66vmin; height: 66vmin;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  box-shadow: inset 0 0 6vmin rgba(0,0,0,.75), inset 0 0 0 2px rgba(255,255,255,.18);
+}
+#scope .lens i { position: absolute; background: rgba(15, 18, 22, .92); }
+#scope .lens .v { left: 50%; top: 6%; width: 1.5px; height: 88%; margin-left: -0.75px; }
+#scope .lens .h { top: 50%; left: 6%; height: 1.5px; width: 88%; margin-top: -0.75px; }
+#scope .lens .dot {
+  left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%; background: #c9302c;
+}
+#scope .lens .m { left: 50%; width: 12px; height: 1.5px; margin-left: -6px; }
+#scope .lens .m1 { top: 58%; }
+#scope .lens .m2 { top: 64%; width: 9px; margin-left: -4.5px; }
+#scope .lens .m3 { top: 70%; width: 6px; margin-left: -3px; }
+/* 조준경을 볼 때도 체력·탄약 같은 정보는 위에 보이도록 */
+#topleft, #feed, #minimapWrap, #bottom, #gunbox, #alt, #prompt, #healBar, #compass,
+#hitmark, #dmgDir, #keys { z-index: 9; }
+
+#scope .lens .zoom {
+  position: absolute; right: 12%; bottom: 16%;
+  font-size: 12px; color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums;
+}
+
+#slots { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+#slots span {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: rgba(0, 0, 0, .35); font-size: 11px; color: var(--muted);
+}
+#slots span em {
+  font-style: normal; font-size: 9px; color: rgba(255, 255, 255, .5);
+  background: rgba(255, 255, 255, .1); border-radius: 3px; padding: 0 4px;
+}
+#slots span b { font-weight: 600; color: var(--text); }
+#slots span.empty b { color: rgba(255, 255, 255, .3); font-weight: 400; }
+#slots span.active { background: rgba(255, 255, 255, .12); }
+#slots span.active b { color: #fff; }
+
+#alt {
+  position: absolute; top: 44px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: baseline; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 14px; backdrop-filter: blur(3px);
+}
+#alt b { font-size: 22px; font-variant-numeric: tabular-nums; }
+#alt span { font-size: 11px; color: var(--muted); }
+#alt em { font-style: normal; font-size: 11px; color: var(--accent); margin-left: 6px; }

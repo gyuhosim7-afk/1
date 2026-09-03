@@ -218,6 +218,21 @@ const Game = {
       this.chars.push(b);
     }
 
+    // 모두 상공에서 낙하 시작
+    const towns = World.towns;
+    for (const c of this.chars) {
+      c.pos.y = World.height(c.pos.x, c.pos.z) + CFG.DROP_HEIGHT + Math.random() * 40;
+      c.flying = 'freefall';
+      c.vy = -8;
+      c.grounded = false;
+      if (c.ai) {   // 봇은 마을이나 근처 지점을 목표로 내려갑니다
+        const t = towns.length && Math.random() < 0.75
+          ? towns[Math.floor(Math.random() * towns.length)]
+          : { x: c.pos.x + (Math.random() - 0.5) * 120, z: c.pos.z + (Math.random() - 0.5) * 120 };
+        c.ai.drop = { x: t.x + (Math.random() - 0.5) * 60, z: t.z + (Math.random() - 0.5) * 60 };
+      }
+    }
+
     this.spawnLoot();
     this.buildMinimapImage();
     this.ads = false;
@@ -292,6 +307,21 @@ const Game = {
         c.healing -= dt;
         if (c.healing <= 0) { c.meds--; c.hp = Math.min(c.maxHp, c.hp + CFG.HEAL_AMOUNT); }
       }
+      if (c.swap > 0) c.swap -= dt;
+
+      if (c.flying) {                       // 낙하 중에는 전투와 자기장 판정을 쉽니다
+        if (!c.isPlayer) {
+          const t = c.ai.drop;
+          const dx = t.x - c.pos.x, dz2 = t.z - c.pos.z;
+          const d = Math.hypot(dx, dz2);
+          const mx = d > 2 ? dx / d : 0, mz = d > 2 ? dz2 / d : 0;
+          if (d > 2) c.yaw = AI.approach(c.yaw, Math.atan2(mx, mz), 3 * dt);
+          this.updateFlight(c, dt, mx, mz);
+        }
+        c.syncMesh(dt, false);
+        continue;
+      }
+
       if (!c.isPlayer) AI.update(c, dt, this);
 
       const dz = Math.hypot(c.pos.x - this.zone.x, c.pos.z - this.zone.z);
@@ -334,6 +364,10 @@ const Game = {
 
     this.updateWater();
 
+    // 상공에서는 안개를 걷어 섬 전체가 보이게 합니다
+    const wantFar = this.player.flying ? 1200 : (this.low ? 280 : CFG.FOG_FAR);
+    this.scene.fog.far += (wantFar - this.scene.fog.far) * Math.min(1, dt * 1.6);
+
     for (const f of this.feed) f.life -= dt;
     this.feed = this.feed.filter(f => f.life > 0).slice(-6);
     if (this.hitMarker > 0) this.hitMarker -= dt;
@@ -354,7 +388,8 @@ const Game = {
 
     // 시점
     // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
-    const s = 0.0022 * Settings.data.sens * (this.ads ? Settings.data.ads : 1);
+    const zoomAdj = this.ads ? Settings.data.ads * Math.sqrt(this.camera.fov / CFG.FOV) : 1;
+    const s = 0.0022 * Settings.data.sens * zoomAdj;
     this.look.yaw -= input.dx * s;
     this.look.pitch -= input.dy * s * (Settings.data.invert ? -1 : 1);
     this.look.pitch = Math.max(-1.15, Math.min(0.95, this.look.pitch));
@@ -364,6 +399,14 @@ const Game = {
 
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
+    if (p.flying) {
+      const r0 = this._v2.set(-f.z, 0, f.x);
+      let ix = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
+      let iz = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
+      this.updateFlight(p, dt, f.x * iz + r0.x * ix, f.z * iz + r0.z * ix);
+      this.ads = false;
+      return;
+    }
     // 전진 f 를 기준으로 한 오른쪽 벡터. Y 축이 위인 오른손 좌표계에서는 (-f.z, 0, f.x) 입니다
     const r = this._v2.set(-f.z, 0, f.x);
     // 키보드와 조이스틱을 함께 받습니다 (ax: 좌우, az: 앞뒤, -1~1)
@@ -516,10 +559,12 @@ const Game = {
   },
 
   dropLoot(c) {
-    if (c.gun) {
-      const l = new Loot(c.pos.x + 0.8, c.pos.z, 'gun', c.gun, Math.max(15, c.mag + (c.reserve[c.gun] || 0)));
+    c.guns.forEach((key, i) => {
+      if (!key) return;
+      const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
+                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)));
       this.scene.add(l.mesh); this.loots.push(l);
-    }
+    });
     if (c.meds > 0) {
       const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, 1);
       this.scene.add(l.mesh); this.loots.push(l);
@@ -529,17 +574,24 @@ const Game = {
   pickUp(ch, l) {
     if (l.dead) return false;
     if (l.kind === 'gun') {
-      if (ch.gun === l.gun) ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
-      else {
-        const old = ch.gun, oldAmmo = old ? ch.mag + (ch.reserve[old] || 0) : 0;
-        ch.giveGun(l.gun, l.amount);
-        if (old) {
-          ch.reserve[old] = 0;
-          const d = new Loot(l.pos.x + 1.1, l.pos.z, 'gun', old, Math.max(10, oldAmmo));
-          this.scene.add(d.mesh); this.loots.push(d);
-        }
+      if (ch.guns.indexOf(l.gun) >= 0) {          // 이미 가진 총이면 탄약만
+        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
+        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + l.amount);
+      } else if (ch.guns.indexOf(null) >= 0) {    // 빈 칸에 넣기
+        const idx = ch.giveGun(l.gun, l.amount);
+        if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득 (' + (idx + 1) + '번 칸)');
+      } else {                                    // 지금 든 무기와 교체
+        const old = ch.gun, oldAmmo = ch.mag + (ch.reserve[old] || 0);
+        ch.guns[ch.slot] = l.gun;
+        ch.mags[ch.slot] = GUNS[l.gun].mag;
+        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
+        ch.reserve[old] = 0;
+        ch.reloading = 0;
+        ch.refreshGuns();
+        const d = new Loot(l.pos.x + 1.2, l.pos.z, 'gun', old, Math.max(10, oldAmmo));
+        this.scene.add(d.mesh); this.loots.push(d);
+        if (ch === this.player) this.pushFeed(GUNS[old].short + ' → ' + GUNS[l.gun].name + ' 교체');
       }
-      if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득');
     } else if (l.kind === 'ammo') {
       if (!ch.gun) return false;
       ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
@@ -589,6 +641,48 @@ const Game = {
     return this.pickUp(p, l);
   },
 
+  /* 낙하: 자유낙하 → 낙하산 → 착지 */
+  updateFlight(c, dt, mx, mz) {
+    const ground = World.groundY(c.pos.x, c.pos.z, c.pos.y);
+    const alt = c.pos.y - ground;
+
+    if (c.flying === 'freefall') {
+      c.vy = Math.max(-CFG.FREEFALL_SPEED, c.vy - CFG.GRAVITY * 1.6 * dt);
+      if (alt < CFG.CHUTE_OPEN) {
+        c.flying = 'chute';
+        c.vy = Math.max(c.vy, -18);
+        if (c === this.player) { Sfx.chute(); this.pushFeed('낙하산이 펼쳐졌습니다'); }
+      }
+    } else {
+      c.vy += (-CFG.CHUTE_SPEED - c.vy) * Math.min(1, dt * 2.6);
+    }
+
+    const len = Math.hypot(mx, mz);
+    if (len > 0.001) { mx /= len; mz /= len; }
+    const speed = c.flying === 'freefall' ? CFG.FREEFALL_MOVE : CFG.CHUTE_MOVE;
+    const lim = World.half - 6;
+    c.pos.x = Math.max(-lim, Math.min(lim, c.pos.x + mx * speed * dt));
+    c.pos.z = Math.max(-lim, Math.min(lim, c.pos.z + mz * speed * dt));
+    c.pos.y += c.vy * dt;
+    c.speedNow = speed * len;
+
+    // 진행 방향으로 낙하산이 기울어집니다
+    const fwd = Math.sin(c.yaw) * mx + Math.cos(c.yaw) * mz;
+    const side = Math.cos(c.yaw) * mx - Math.sin(c.yaw) * mz;
+    c.chuteTilt += (side * 0.28 - c.chuteTilt) * Math.min(1, dt * 3);
+    c.chutePitch = fwd;
+
+    const gy = World.groundY(c.pos.x, c.pos.z, c.pos.y);
+    if (c.pos.y <= gy) {                    // 착지
+      c.pos.y = gy; c.vy = 0; c.grounded = true; c.flying = null;
+      if (c === this.player) {
+        this.landDip = 0.25;
+        this.pushFeed('착지 완료 — 무기를 찾으세요');
+        Sfx.land();
+      }
+    }
+  },
+
   /* ---------- 이동 ---------- */
   moveChar(ch, mx, mz, speed, dt) {
     const len = Math.hypot(mx, mz);
@@ -623,8 +717,9 @@ const Game = {
       Math.cos(yaw) * Math.cos(pitch)
     ).normalize();
 
-    const wantDist = this.ads ? CFG.ADS_DIST : CFG.CAM_DIST;
-    const side = this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE;
+    const scoped = this.ads && p.gun && GUNS[p.gun].scope >= 3;
+    const wantDist = p.flying ? 7.6 : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST));
+    const side = p.flying ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
     const run = Math.min(1, p.speedNow / CFG.SPRINT);
@@ -650,15 +745,17 @@ const Game = {
     if (this.camera.position.y < minY) this.camera.position.y = minY;
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
-    const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35;
-    const wantFov = this.ads ? CFG.ADS_FOV : CFG.FOV + (sprinting ? 5.5 : 0);
+    const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35 && !p.flying;
+    const zoom = p.gun ? (GUNS[p.gun].scope || 1) : 1;
+    const wantFov = this.ads ? (zoom > 1 ? CFG.FOV / zoom : CFG.ADS_FOV)
+                             : CFG.FOV + (sprinting ? 5.5 : 0) + (p.flying ? 8 : 0);
     if (Math.abs(this.camera.fov - wantFov) > 0.05) {
       this.camera.fov += (wantFov - this.camera.fov) * Math.min(1, dt * 11);
       this.camera.updateProjectionMatrix();
     }
 
     // 카메라가 몸에 바짝 붙으면 아예 몸을 감춰 시야를 가리지 않게 합니다
-    p.mesh.visible = dist > 1.25;
+    p.mesh.visible = dist > 1.25 && !scoped;
   },
 
   /* 카메라 위치가 장애물 안(또는 아주 가까이)에 있는지 */

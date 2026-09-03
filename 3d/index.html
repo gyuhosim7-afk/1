@@ -22,6 +22,14 @@
   <div id="feed"></div>
 
   <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+  <div id="scope" class="hidden">
+    <div class="lens">
+      <i class="v"></i><i class="h"></i><i class="dot"></i>
+      <i class="m m1"></i><i class="m m2"></i><i class="m m3"></i>
+      <b class="zoom">4x</b>
+    </div>
+  </div>
+  <div id="alt" class="hidden"><b>0</b><span>m</span><em>자유낙하</em></div>
   <div id="hitmark"><i></i><i></i></div>
   <div id="dmgDir"><i></i></div>
 
@@ -42,6 +50,10 @@
   <div id="gunbox">
     <div id="gunName">맨손</div>
     <div id="ammo">무기를 찾으세요</div>
+    <div id="slots">
+      <span data-slot="0"><em>1</em><b>비어 있음</b></span>
+      <span data-slot="1"><em>2</em><b>비어 있음</b></span>
+    </div>
   </div>
 
   <div id="keys">
@@ -71,6 +83,10 @@
         <input type="checkbox" data-set="invert">
         <span>Y축 반전</span>
       </label>
+      <label class="row check">
+        <input type="checkbox" data-set="edge">
+        <span>화면 끝 회전 보조 (커서가 가장자리에 닿으면 계속 회전)</span>
+      </label>
     </div>
     <button id="resumeBtn">계속하기</button>
     <p class="small">화면을 클릭해도 이어서 진행합니다 · <kbd>O</kbd> 설정 열고 닫기</p>
@@ -86,6 +102,7 @@
       <li>섬 곳곳의 <b>마을과 창고</b>를 뒤져 총기, 탄약, 구급상자를 챙기세요.</li>
       <li><b>자기장</b>이 7단계로 좁아지고 밖에서는 피해를 입습니다.</li>
       <li>우클릭 <b>정조준</b>과 <b>앉기</b>로 탄퍼짐을 줄이고, 머리를 맞히면 피해가 커집니다.</li>
+      <li>무기는 <b>두 자루</b>까지 들 수 있고 <b>1</b>·<b>2</b> 키나 휠로 바꿉니다. 지정사수총과 저격총에는 <b>조준경</b>이 달려 있습니다.</li>
     </ul>
     <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
     <div class="settings menuSettings">
@@ -102,6 +119,10 @@
       <label class="row check">
         <input type="checkbox" data-set="invert">
         <span>Y축 반전</span>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="edge">
+        <span>화면 끝 회전 보조 (커서가 가장자리에 닿으면 계속 회전)</span>
       </label>
     </div>
     <button id="startBtn">낙하 시작</button>

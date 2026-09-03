@@ -100,6 +100,16 @@ const AI = {
     if (enemy && enemy !== a.target) a.reaction = (1.3 - a.skill) * (0.25 + Math.random() * 0.35);
     a.target = enemy;
 
+    // 무기를 두 자루 들었으면 교전 거리에 맞는 쪽으로 바꿉니다
+    if (enemy && bot.hasTwo && bot.swap <= 0 && bot.reloading <= 0) {
+      const fit = key => {
+        const g = GUNS[key];
+        if (best > g.range) return -1;                 // 사거리 밖
+        return best > 90 ? g.range / 500 : 1 - g.range / 500;
+      };
+      if (fit(bot.other) > fit(bot.gun) + 0.15) bot.swapSlot();
+    }
+
     const noAmmo = !bot.gun || (bot.mag <= 0 && bot.reserveAmmo <= 0);
 
     if (bot.hp < 48 && bot.meds > 0 && (!enemy || best > 55) && !outside) {
