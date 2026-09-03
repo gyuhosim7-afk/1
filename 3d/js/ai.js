@@ -133,13 +133,33 @@ const AI = {
       return;
     }
 
-    // 아이템 찾기
-    if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70)) {
-      let target = null, bd = 70 * 70;
+    // 착지한 보급 상자가 가까우면 챙기러 갑니다
+    if (!enemy) {
+      let box = null, bxd = 130 * 130;
+      for (const dr of game.drops) {
+        if (!dr.landed || dr.opened || dr.dead) continue;
+        const d = (dr.pos.x - bot.pos.x) ** 2 + (dr.pos.z - bot.pos.z) ** 2;
+        if (d < bxd) { bxd = d; box = dr; }
+      }
+      if (box) {
+        a.state = 'loot';
+        a.dest = { x: box.pos.x, z: box.pos.z };
+        if (bxd < CFG.DROP_OPEN * CFG.DROP_OPEN) game.openDrop(bot, box);
+        return;
+      }
+    }
+
+    // 아이템 찾기 (무기·탄약뿐 아니라 조끼와 가방도 챕니다)
+    const wantGear = bot.vest < 3 || bot.bag < 3;
+    if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70) || wantGear) {
+      let target = null, bd = 80 * 80;
       for (const l of game.loots) {
         if (l.dead) continue;
-        if (l.kind === 'ammo' && (!bot.gun || l.gun !== bot.gun)) continue;
-        if (l.kind === 'med' && bot.meds >= 2) continue;
+        if (l.kind === 'ammo' && (bot.guns.indexOf(l.gun) < 0 ||
+            (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
+        if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
+        if (l.kind === 'vest' && bot.vest >= l.level) continue;
+        if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;
         const d = (l.pos.x - bot.pos.x) ** 2 + (l.pos.z - bot.pos.z) ** 2;

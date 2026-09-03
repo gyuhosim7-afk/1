@@ -3,7 +3,8 @@
    ============================================================ */
 const Game = {
   renderer: null, scene: null, camera: null, sun: null,
-  chars: [], loots: [], tracers: [], puffs: [],
+  chars: [], loots: [], tracers: [], puffs: [], vehicles: [], drops: [],
+  dropTimer: 0,
   player: null, zone: null, zoneMesh: null,
   state: 'menu', time: 0, result: null,
   look: { yaw: 0, pitch: -0.06 },      // 목표 시점
@@ -66,8 +67,8 @@ const Game = {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
-    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.42));
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.52));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.20));   // 건물 안이 너무 어둡지 않도록
     this.fill = new THREE.DirectionalLight(0x9fc4ee, 0.55);   // 그림자 없는 보조광
     this.fill.position.set(-60, 40, -70);
     this.scene.add(this.fill);
@@ -205,8 +206,13 @@ const Game = {
     if (this.zoneMesh) this.scene.remove(this.zoneMesh);
     Scenery.dispose(this.scene);
 
+    for (const v of (this.vehicles || [])) this.scene.remove(v.mesh);
+    for (const a of (this.drops || [])) this.scene.remove(a.mesh);
+
     RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
     this.chars = []; this.loots = []; this.feed = []; this.botById = {};
+    this.vehicles = []; this.drops = [];
+    this.dropTimer = CFG.DROP_FIRST;
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
 
@@ -255,6 +261,8 @@ const Game = {
       this.botById[i] = b;
       for (const k of GUN_KEYS) b.reserve[k] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
+      if (Math.random() < 0.30) b.wear('vest', 1);
+      if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
     }
@@ -275,6 +283,7 @@ const Game = {
     }
 
     this.spawnLoot();
+    this.spawnVehicles();
     RNG.end();                            // 여기서부터는 각자의 난수 (조준 흔들림, 봇 판단 등)
     this.buildMinimapImage();
     this.ads = false;
@@ -307,32 +316,73 @@ const Game = {
   },
 
   spawnLoot() {
-    const add = (x, z) => {
-      const roll = Math.random();
+    const add = (x, z, y) => {
+      const roll = rnd();
       let l;
-      if (roll < 0.40) {
-        const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer);
-      } else if (roll < 0.68) {
-        const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5));
-      } else if (roll < 0.85) {
-        const lv = SCOPE_LEVELS[Math.floor(Math.random() * SCOPE_LEVELS.length)];
-        l = new Loot(x, z, 'scope', null, 0, lv);
+      if (roll < 0.34) {
+        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
+        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer, 0, y);
+      } else if (roll < 0.58) {
+        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
+        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5), 0, y);
+      } else if (roll < 0.72) {
+        const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
+        l = new Loot(x, z, 'scope', null, 0, lv, y);
+      } else if (roll < 0.83) {
+        l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.92) {
+        l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else {
-        l = new Loot(x, z, 'med', null, 1);
+        l = new Loot(x, z, 'med', null, 1, 0, y);
       }
       l.id = this.loots.length;
       this.scene.add(l.mesh);
       this.loots.push(l);
     };
+    // 건물 안 (1·2·3층) — 실내 파밍이 기본이 되도록 넉넉하게 깔아 둡니다
+    for (const sp of Scenery.lootSpots) add(sp.x, sp.z, sp.y);
+    // 마을 야외
     for (const t of World.towns) {
-      for (let i = 0; i < 13; i++) {
-        const s = World.freeSpot(1, t, t.r);
-        add(s.x, s.z);
+      for (let i = 0; i < 9; i++) {
+        const sp = World.freeSpot(1, t, t.r);
+        add(sp.x, sp.z);
       }
     }
-    for (let i = 0; i < 55; i++) { const s = World.freeSpot(1); add(s.x, s.z); }
+    // 벌판
+    for (let i = 0; i < 90; i++) { const sp = World.freeSpot(1); add(sp.x, sp.z); }
+  },
+
+  /* 차량을 도로 위와 마을 근처에 놓습니다 */
+  spawnVehicles() {
+    for (const v of this.vehicles) this.scene.remove(v.mesh);
+    this.vehicles = [];
+    const put = (x, z, key) => {
+      if (World.height(x, z) < World.waterY + 1) return;
+      const v = new Vehicle3D(x, z, key);
+      v.pos.y = World.groundY(x, z, v.pos.y + 1);
+      v.sync();
+      this.scene.add(v.mesh);
+      this.vehicles.push(v);
+    };
+    // 도로 위: 일정 간격으로
+    for (const r of World.roads) {
+      const len = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+      const n = Math.max(1, Math.round(len / 130));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n + (rnd() - 0.5) * 0.1;
+        const x = r.x1 + (r.x2 - r.x1) * t + (rnd() - 0.5) * 4;
+        const z = r.z1 + (r.z2 - r.z1) * t + (rnd() - 0.5) * 4;
+        put(x, z, VEHICLE_KEYS[Math.floor(rnd() * VEHICLE_KEYS.length)]);
+      }
+    }
+    // 마을마다 한두 대
+    for (const t of World.towns) {
+      const n = 1 + Math.floor(rnd() * 2);
+      for (let i = 0; i < n; i++) {
+        const sp = World.freeSpot(3, t, t.r);
+        put(sp.x, sp.z, VEHICLE_KEYS[Math.floor(rnd() * VEHICLE_KEYS.length)]);
+      }
+    }
   },
 
   get alive() { return this.chars.reduce((n, c) => n + (c.dead ? 0 : 1), 0); },
@@ -384,6 +434,9 @@ const Game = {
 
       c.syncMesh(dt, c === this.player ? this.ads : !!(c.ai && c.ai.state === 'fight'));
     }
+
+    this.updateDrops(dt);
+    this.updateVehicles(dt);
 
     // 아이템: 멀면 숨기고, 지금 주울 수 있는 것은 강조
     this.highlight = this.player.dead ? null : this.nearestLoot(this.player);
@@ -467,6 +520,24 @@ const Game = {
     input.dx = 0; input.dy = 0;
     p.yaw = this.look.yaw;
     p.pitch = this.look.pitch;
+
+    // ---------- 차량 운전 ----------
+    if (p.vehicle) {
+      const v = p.vehicle;
+      let th = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
+      let st = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
+      th = Math.max(-1, Math.min(1, th));
+      st = Math.max(-1, Math.min(1, st));
+      v.drive(dt, th, st, !!input.crouch);          // C 키가 브레이크
+      // 운전자는 차와 함께 움직입니다
+      p.pos.set(v.pos.x, v.pos.y, v.pos.z);
+      p.speedNow = Math.abs(v.speed);
+      p.crouch = false;
+      this.ads = false;
+      input.fire = false;
+      if (v.dead) { this.pushFeed(v.spec.name + ' 이(가) 파괴되었습니다'); this.exitVehicle(p); }
+      return;
+    }
 
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
@@ -628,6 +699,8 @@ const Game = {
 
   damage(target, amount, src, head, isZone) {
     if (target.dead) return;
+    // 방탄조끼는 몸에 맞은 피해만 줄여 줍니다 (머리와 자기장은 그대로)
+    if (!isZone && !head && target.armor > 0) amount *= (1 - target.armor);
     target.hp -= amount;
     if (!isZone) {
       target.hitFlash = 0.12;
@@ -660,15 +733,23 @@ const Game = {
     c.guns.forEach((key, i) => {
       if (!key) return;
       const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
-                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)));
+                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)), 0, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
       if (c.scopes[i]) {
-        const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i]);
+        const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i], c.pos.y);
         this.scene.add(s.mesh); this.loots.push(s);
       }
     });
     if (c.meds > 0) {
-      const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, 1);
+      const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, c.meds, 0, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.vest) {
+      const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.bag) {
+      const l = new Loot(c.pos.x - 0.4, c.pos.z - 1.4, 'bag', null, 0, c.bag, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
   },
@@ -677,8 +758,11 @@ const Game = {
     if (l.dead) return false;
     if (l.kind === 'gun') {
       if (ch.guns.indexOf(l.gun) >= 0) {          // 이미 가진 총이면 탄약만
-        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
-        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + l.amount);
+        const got = ch.addAmmo(l.gun, l.amount);
+        if (ch === this.player) {
+          this.pushFeed(got > 0 ? GUNS[l.gun].short + ' 탄약 +' + got : '탄약이 가득 찼습니다 (가방을 구하세요)');
+        }
+        if (got <= 0) return false;
       } else if (ch.guns.indexOf(null) >= 0) {    // 빈 칸에 넣기
         const idx = ch.giveGun(l.gun, l.amount);
         if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득 (' + (idx + 1) + '번 칸)');
@@ -686,7 +770,7 @@ const Game = {
         const old = ch.gun, oldAmmo = ch.mag + (ch.reserve[old] || 0);
         ch.guns[ch.slot] = l.gun;
         ch.mags[ch.slot] = GUNS[l.gun].mag;
-        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
+        ch.addAmmo(l.gun, l.amount);
         ch.reserve[old] = 0;
         ch.reloading = 0;
         ch.refreshGuns();
@@ -708,12 +792,37 @@ const Game = {
       }
       if (ch === this.player) this.pushFeed(SCOPES[l.level].name + ' 장착 (' + GUNS[ch.gun].short + ')');
     } else if (l.kind === 'ammo') {
-      if (!ch.gun) return false;
-      ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
-      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + l.amount);
+      if (ch.guns.indexOf(l.gun) < 0) {
+        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 을 쓰는 총이 없습니다');
+        return false;
+      }
+      const got = ch.addAmmo(l.gun, l.amount);
+      if (got <= 0) {
+        if (ch === this.player) this.pushFeed('탄약이 가득 찼습니다 (가방을 구하세요)');
+        return false;
+      }
+      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + got);
+    } else if (l.kind === 'vest' || l.kind === 'bag') {
+      const old = ch.wear(l.kind, l.level);
+      if (old < 0) {
+        if (ch === this.player) this.pushFeed('이미 더 좋은 것을 착용 중입니다');
+        return false;
+      }
+      if (old > 0) {                       // 벗은 것은 바닥에 내려놓습니다
+        const d = new Loot(l.pos.x + 1.1, l.pos.z, l.kind, null, 0, old, l.pos.y);
+        d.id = this.loots.length;
+        this.scene.add(d.mesh); this.loots.push(d);
+      }
+      if (ch === this.player) {
+        this.pushFeed((l.kind === 'vest' ? VESTS : BAGS)[l.level].name + ' 착용');
+      }
     } else {
-      if (ch.meds >= CFG.MAX_MEDS) return false;
-      ch.meds++;
+      const cap = ch.medCap;
+      if (ch.meds >= cap) {
+        if (ch === this.player) this.pushFeed('구급상자를 더 들 수 없습니다 (가방을 구하세요)');
+        return false;
+      }
+      ch.meds = Math.min(cap, ch.meds + Math.max(1, l.amount || 1));
       if (ch === this.player) this.pushFeed('구급상자 획득');
     }
     l.dead = true;
@@ -751,9 +860,20 @@ const Game = {
   tryPickup() {
     const p = this.player;
     if (p.dead) return false;
+    if (p.vehicle) return this.exitVehicle(p);          // 타고 있으면 내립니다
+    if (p.flying) return false;
+
     const l = this.nearestLoot(p);
-    if (!l) { this.pushFeed('주울 물건이 없습니다 — 아이템 가까이 가세요'); return false; }
-    return this.pickUp(p, l);
+    const drop = this.nearestDrop(p);
+    const veh = this.nearestVehicle(p);
+    // 발밑에 아이템이 있으면 그것부터, 없으면 상자 → 차량 순서
+    const lootD = l ? Math.hypot(l.pos.x - p.pos.x, l.pos.z - p.pos.z) : Infinity;
+    if (l && lootD <= CFG.PICK_RANGE) return this.pickUp(p, l);
+    if (drop) return this.openDrop(p, drop);
+    if (veh) return this.enterVehicle(p, veh);
+    if (l) return this.pickUp(p, l);
+    this.pushFeed('주울 물건이 없습니다 — 아이템 가까이 가세요');
+    return false;
   },
 
   /* 낙하: 자유낙하 → 낙하산 → 착지 */
@@ -814,6 +934,17 @@ const Game = {
     const headY = ch.pos.y + (ch.crouch ? 1.35 : CFG.BODY_H);
     const res = World.resolve(nx, nz, CFG.BODY_R, ch.pos.y, headY);
     ch.pos.x = res.x; ch.pos.z = res.z;
+    // 세워 둔 차량은 밀고 지나갈 수 없습니다
+    for (const v of this.vehicles) {
+      if (v.driver === ch) continue;
+      if (Math.abs(v.pos.y - ch.pos.y) > 2.4) continue;
+      const dx = ch.pos.x - v.pos.x, dz = ch.pos.z - v.pos.z;
+      const d = Math.hypot(dx, dz), min = CFG.BODY_R + v.spec.r;
+      if (d < min && d > 1e-4) {
+        ch.pos.x = v.pos.x + dx / d * min;
+        ch.pos.z = v.pos.z + dz / d * min;
+      }
+    }
 
     ch.vy -= CFG.GRAVITY * dt;
     ch.pos.y += ch.vy * dt;
@@ -847,7 +978,8 @@ const Game = {
     ).normalize();
 
     const scoped = this.ads && p.zoom >= 4;
-    const fpv = Settings.data.fpv && !p.flying && !p.victory;
+    const inCar = !!p.vehicle;
+    const fpv = Settings.data.fpv && !p.flying && !p.victory && !inCar;
 
     if (fpv) {                                  // ---------- 1인칭 ----------
       const eyeY = p.pos.y + (p.crouch ? 1.24 : CFG.EYE) + (p.grounded ? Math.sin(p.stepPhase * 2) * 0.022 * Math.min(1, p.speedSmooth / CFG.SPRINT) : 0) - this.landDip;
@@ -876,14 +1008,16 @@ const Game = {
     }
     if (this.viewGun) this.viewGun.visible = false;
 
-    const wantDist = p.flying ? 7.6 : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST));
-    const side = p.flying ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
+    const wantDist = p.flying ? 7.6
+      : (inCar ? CFG.VEH_CAM_DIST : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST)));
+    const side = (p.flying || inCar) ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
     const run = Math.min(1, p.speedNow / CFG.SPRINT);
     if (this.landDip > 0.001) this.landDip *= 0.86; else this.landDip = 0;
     const bob = p.grounded ? Math.sin(p.stepPhase * 2) * 0.028 * run : 0;
-    const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT) + bob - this.landDip;
+    const pivotY = p.pos.y + (inCar ? CFG.VEH_CAM_HEIGHT : (p.crouch ? 1.3 : CFG.CAM_HEIGHT))
+                 + (inCar ? 0 : bob) - this.landDip;
     const right = this._v2.set(-dir.z, 0, dir.x).normalize();
     const px = p.pos.x + right.x * side, pz = p.pos.z + right.z * side;
 
@@ -904,7 +1038,7 @@ const Game = {
     this.camera.rotation.order = 'XYZ';
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
-    const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35 && !p.flying;
+    const sprinting = !this.ads && !inCar && p.speedNow > CFG.WALK * 1.35 && !p.flying;
     const zoom = p.zoom;
     const wantFov = this.ads ? (zoom > 1 ? CFG.FOV / zoom : CFG.ADS_FOV)
                              : CFG.FOV + (sprinting ? 5.5 : 0) + (p.flying ? 8 : 0);
@@ -914,7 +1048,7 @@ const Game = {
     }
 
     // 카메라가 몸에 바짝 붙으면 아예 몸을 감춰 시야를 가리지 않게 합니다
-    p.mesh.visible = dist > 1.25 && !scoped;
+    p.mesh.visible = !inCar && dist > 1.25 && !scoped;
 
     this.camera.updateMatrixWorld();
     this.updateAimDir();
@@ -964,6 +1098,124 @@ const Game = {
     this.viewGun.position.z += (tz - this.viewGun.position.z) * kk;
     this.viewGun.rotation.z += ((this.ads ? 0 : 0.05) - this.viewGun.rotation.z) * kk;
     this.viewGun.rotation.x += ((-p.recoil * 0.25 - reload * 0.5) - this.viewGun.rotation.x) * kk;
+  },
+
+  /* ---------- 공중 보급 ---------- */
+  updateDrops(dt) {
+    this.dropTimer -= dt;
+    if (this.dropTimer <= 0 && this.alive > 1) {
+      this.dropTimer = CFG.DROP_EVERY;
+      this.spawnDrop();
+    }
+    for (const a of this.drops) { if (!a.dead) a.update(dt); }
+  },
+
+  /* 자기장 안쪽 임의 지점에 보급 상자를 떨어뜨립니다 */
+  spawnDrop() {
+    const z = this.zone;
+    let x = z.x, zz = z.z;
+    for (let i = 0; i < 60; i++) {
+      const ang = Math.random() * Math.PI * 2, rad = Math.sqrt(Math.random()) * z.r * 0.8;
+      const tx = z.x + Math.cos(ang) * rad, tz = z.z + Math.sin(ang) * rad;
+      if (Math.abs(tx) > World.half - 20 || Math.abs(tz) > World.half - 20) continue;
+      if (World.height(tx, tz) < World.waterY + 2) continue;
+      x = tx; zz = tz; break;
+    }
+    const a = new Airdrop(x, zz, World.height(x, zz) + CFG.DROP_ALT);
+    this.scene.add(a.mesh);
+    this.drops.push(a);
+    this.pushFeed('보급 상자가 투하되었습니다 — 지도를 확인하세요');
+    Sfx.chute();
+  },
+
+  /* 가장 가까운, 열 수 있는 보급 상자 */
+  nearestDrop(ch) {
+    let best = null, bd = CFG.DROP_OPEN;
+    for (const a of this.drops) {
+      if (!a.landed || a.opened || a.dead) continue;
+      const d = Math.hypot(a.pos.x - ch.pos.x, a.pos.z - ch.pos.z);
+      if (d < bd && Math.abs(a.pos.y - ch.pos.y) < 4) { bd = d; best = a; }
+    }
+    return best;
+  },
+
+  openDrop(ch, a) {
+    if (!a || a.opened) return false;
+    a.opened = true;
+    a.crate.rotation.x = -0.5;             // 뚜껑이 열린 듯 기울입니다
+    a.crate.position.y = 0.1;
+    a.smoke.visible = false;
+    const items = a.contents();
+    items.forEach((it, i) => {
+      const ang = (i / items.length) * Math.PI * 2;
+      const x = a.pos.x + Math.cos(ang) * 1.7, z = a.pos.z + Math.sin(ang) * 1.7;
+      const l = new Loot(x, z, it.kind, it.gun || null, it.amount || 0, it.level || 0,
+                         World.groundY(x, z, a.pos.y + 1));
+      l.id = this.loots.length;
+      this.scene.add(l.mesh);
+      this.loots.push(l);
+    });
+    if (ch === this.player) { this.pushFeed('보급 상자를 열었습니다!'); Sfx.pick(); }
+    return true;
+  },
+
+  /* ---------- 차량 ---------- */
+  updateVehicles(dt) {
+    for (const v of this.vehicles) {
+      if (v.driver === this.player) continue;      // 플레이어 차량은 조작에서 처리
+      if (!v.driver) { v.drive(dt, 0, 0, false); continue; }
+      v.drive(dt, 0, 0, false);
+    }
+    // 달리는 차에 치이면 아픕니다
+    for (const v of this.vehicles) {
+      if (Math.abs(v.speed) < 6) continue;
+      for (const c of this.chars) {
+        if (c.dead || c.flying || c === v.driver) continue;
+        const d = Math.hypot(c.pos.x - v.pos.x, c.pos.z - v.pos.z);
+        if (d > v.spec.r + 1.1) continue;
+        if (Math.abs(c.pos.y - v.pos.y) > 2.2) continue;
+        if ((c.hitByCar || 0) > this.time) continue;
+        c.hitByCar = this.time + 0.7;
+        this.damage(c, 18 + Math.abs(v.speed) * 2.4, v.driver || null, false, false);
+        v.speed *= 0.7;
+      }
+    }
+  },
+
+  nearestVehicle(ch) {
+    let best = null, bd = CFG.VEH_RANGE;
+    for (const v of this.vehicles) {
+      if (v.occupied || v.dead) continue;
+      const d = Math.hypot(v.pos.x - ch.pos.x, v.pos.z - ch.pos.z);
+      if (d < bd && Math.abs(v.pos.y - ch.pos.y) < 3) { bd = d; best = v; }
+    }
+    return best;
+  },
+
+  enterVehicle(ch, v) {
+    if (!v || v.occupied || v.dead) return false;
+    v.driver = ch;
+    ch.vehicle = v;
+    ch.mesh.visible = false;
+    this.ads = false;
+    if (ch === this.player) { this.pushFeed(v.spec.name + ' 탑승 — F 로 내립니다'); Sfx.swap(); }
+    return true;
+  },
+
+  exitVehicle(ch) {
+    const v = ch.vehicle;
+    if (!v) return false;
+    v.driver = null;
+    ch.vehicle = null;
+    // 차 옆으로 내려놓습니다
+    const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw);
+    const ox = v.pos.x + rx * (v.spec.r + 0.9), oz = v.pos.z + rz * (v.spec.r + 0.9);
+    const fix = World.resolve(ox, oz, CFG.BODY_R, v.pos.y, v.pos.y + CFG.BODY_H);
+    ch.pos.set(fix.x, World.groundY(fix.x, fix.z, v.pos.y + 1.5), fix.z);
+    ch.vy = 0;
+    ch.mesh.visible = true;
+    if (ch === this.player) this.pushFeed(v.spec.name + ' 에서 내렸습니다');
+    return true;
   },
 
   /* ---------- 자기장 ---------- */
@@ -1091,7 +1343,7 @@ const Game = {
 
   /* ---------- 미니맵 바탕 그림 ---------- */
   buildMinimapImage() {
-    const S = 256;
+    const S = 384;
     const c = document.createElement('canvas');
     c.width = c.height = S;
     const g = c.getContext('2d');
@@ -1118,6 +1370,16 @@ const Game = {
       }
     }
     g.putImageData(img, 0, 0);
+    // 도로
+    g.strokeStyle = 'rgba(196,180,148,0.9)';
+    g.lineWidth = Math.max(1.6, (7 / World.size) * S);
+    g.lineCap = 'round';
+    for (const r of World.roads) {
+      g.beginPath();
+      g.moveTo(((r.x1 + World.half) / World.size) * S, ((r.z1 + World.half) / World.size) * S);
+      g.lineTo(((r.x2 + World.half) / World.size) * S, ((r.z2 + World.half) / World.size) * S);
+      g.stroke();
+    }
     // 건물 자국
     g.fillStyle = 'rgba(30,32,36,0.85)';
     for (const b of World.boxes) {

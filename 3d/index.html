@@ -45,8 +45,14 @@
       <div id="hpBar"><div id="hp"></div></div>
       <span id="hpText">100</span>
       <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
+      <div id="gear">
+        <span id="vestTag" class="gearTag off"><i class="gi vest"></i><b>-</b></span>
+        <span id="bagTag" class="gearTag off"><i class="gi bag"></i><b>-</b></span>
+      </div>
     </div>
   </div>
+
+  <div id="speedo" class="hidden"><b>0</b><span>km/h</span><em>픽업트럭</em></div>
 
   <div id="gunbox">
     <div id="gunName">맨손</div>
@@ -59,12 +65,13 @@
 
   <div id="keys">
     <span><kbd>WASD</kbd> 이동</span><span><kbd>Shift</kbd> 질주</span><span><kbd>Space</kbd> 점프</span>
-    <span><kbd>C</kbd> 앉기</span><span><kbd>우클릭</kbd> 정조준</span><span><kbd>F</kbd> 줍기</span>
+    <span><kbd>C</kbd> 앉기·브레이크</span><span><kbd>우클릭</kbd> 정조준</span>
+    <span><kbd>F</kbd> 줍기·탑승·상자</span>
     <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span><span><kbd>Tab</kbd> 지도</span>
   </div>
 </div>
 
-<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="620" height="620"></canvas></div>
+<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="760" height="760"></canvas></div>
 
 <div id="pause" class="overlay hidden">
   <div class="pausePanel">
@@ -107,11 +114,12 @@
         <button data-tab="play" class="on">플레이</button>
         <button data-tab="skin">커스터마이징</button>
         <button data-tab="crate">보상</button>
+        <button data-tab="friend">친구</button>
         <button data-tab="stats">전적</button>
       </nav>
       <div class="account">
         <span class="bpTag">BP</span><b id="bp">0</b>
-        <span class="nick">생존자</span>
+        <span class="nick" id="navNick">생존자</span>
       </div>
     </header>
 
@@ -134,7 +142,9 @@
         </div>
       </div>
       <button id="startBtn" class="startBtn">시작</button>
-      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.<br>WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.
+        친구와 따로 접속할 때는 <b>친구</b> 탭의 섬 코드를 쓰세요.<br>
+        WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
     <!-- 보상(상자) -->
@@ -156,6 +166,61 @@
       <div id="skinGrid" class="grid"></div>
       <h3>총기 도장</h3>
       <div id="gunGrid" class="grid"></div>
+    </section>
+
+    <!-- 친구 · 계정 -->
+    <section class="panel sheet hidden" id="tab-friend">
+      <h2>친구 · 계정</h2>
+      <p class="sheetSub">계정은 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 같은 섬 코드로 함께 합니다.</p>
+
+      <h3>내 계정</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>닉네임</span>
+          <input id="acctName" type="text" maxlength="12" placeholder="생존자">
+        </div>
+        <div class="acctRow">
+          <span>내 친구 코드</span>
+          <input id="myCode" type="text" readonly>
+          <button class="mini" id="copyCode">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>저장 코드</span>
+          <input id="saveCode" type="text" readonly>
+          <button class="mini" id="copySave">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 불러오기</span>
+          <input id="loadCode" type="text" placeholder="다른 기기의 저장 코드를 붙여 넣으세요">
+          <button class="mini" id="doLoad">불러오기</button>
+        </div>
+        <p class="acctNote" id="acctNote"></p>
+      </div>
+
+      <h3>친구 목록</h3>
+      <div class="acctRow">
+        <input id="friendCode" type="text" maxlength="8" placeholder="친구 코드 (6자리)">
+        <input id="friendName" type="text" maxlength="12" placeholder="표시할 이름 (선택)">
+        <button class="mini" id="addFriend">친구 추가</button>
+      </div>
+      <div id="friendList" class="friendList"></div>
+
+      <h3>같은 섬에서 함께 하기</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>섬 코드 만들기</span>
+          <input id="islandCode" type="text" readonly>
+          <button class="mini" id="newIsland">새로 만들기</button>
+          <button class="mini" id="copyIsland">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 참가</span>
+          <input id="joinIsland" type="text" maxlength="8" placeholder="친구가 준 8자리 코드">
+          <button class="mini" id="doJoin">이 섬에서 시작</button>
+        </div>
+        <p class="acctNote">같은 코드로 시작하면 지형·건물·아이템·차량·자기장이 완전히 같은 섬이 됩니다.
+          같은 링크를 함께 열어 두면 서로의 캐릭터도 실시간으로 보입니다.</p>
+      </div>
     </section>
 
     <!-- 전적 -->
@@ -191,6 +256,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/profile.js"></script>
+<script src="js/account.js"></script>
 <script src="js/world.js"></script>
 <script src="js/scenery.js"></script>
 <script src="js/entities.js"></script>

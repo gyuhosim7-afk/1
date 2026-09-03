@@ -101,7 +101,8 @@ const UI = {
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
-      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox'];
+      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
+      'gear', 'vestTag', 'bagTag', 'speedo'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -188,7 +189,25 @@ const UI = {
     const scoped = Game.ads && zoom >= 4 && !p.flying;
     this.el.scope.classList.toggle('hidden', !scoped);
     if (scoped) this.el.scope.querySelector('.zoom').textContent = SCOPES[zoom].label;
-    this.el.meds.textContent = p.meds;
+    this.el.meds.textContent = p.meds + ' / ' + p.medCap;
+
+    // 방어구
+    const tag = (el, lv, table) => {
+      el.className = 'gearTag' + (lv ? ' lv' + lv : ' off');
+      el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
+      el.title = lv ? table[lv].name : '없음';
+    };
+    tag(this.el.vestTag, p.vest, VESTS);
+    tag(this.el.bagTag, p.bag, BAGS);
+
+    // 속도계 (차량 탑승 중에만)
+    if (p.vehicle) {
+      this.el.speedo.classList.remove('hidden');
+      this.el.speedo.querySelector('b').textContent = Math.round(Math.abs(p.vehicle.speed) * 3.6);
+      this.el.speedo.querySelector('em').textContent =
+        p.vehicle.spec.name + ' · ' + Math.max(0, Math.round(p.vehicle.hp));
+    } else this.el.speedo.classList.add('hidden');
+
     this.el.alive.textContent = g.alive;
     this.el.kills.textContent = p.kills;
 
@@ -200,10 +219,23 @@ const UI = {
     this.el.feed.innerHTML = g.feed.map(f =>
       '<div style="opacity:' + Math.max(0, Math.min(1, f.life)) + '">' + f.text + '</div>').join('');
 
-    const near = g.nearestLoot(p);
-    if (near && !p.dead) {
+    let hint = null;
+    if (!p.dead && !p.flying) {
+      if (p.vehicle) hint = p.vehicle.spec.name + ' 에서 내리기';
+      else {
+        const near = g.nearestLoot(p);
+        const lootD = near ? Math.hypot(near.pos.x - p.pos.x, near.pos.z - p.pos.z) : Infinity;
+        const drop = g.nearestDrop(p);
+        const veh = g.nearestVehicle(p);
+        if (near && lootD <= CFG.PICK_RANGE) hint = near.label;
+        else if (drop) hint = '보급 상자 열기';
+        else if (veh) hint = veh.spec.name + ' 탑승';
+        else if (near) hint = near.label;
+      }
+    }
+    if (hint) {
       this.el.prompt.classList.remove('hidden');
-      this.el.prompt.innerHTML = '<kbd>F</kbd> ' + near.label;
+      this.el.prompt.innerHTML = '<kbd>F</kbd> ' + hint;
     } else this.el.prompt.classList.add('hidden');
 
     // 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점
@@ -263,7 +295,7 @@ const UI = {
 
   drawMinimap(g) {
     const c = this.mctx, S = this.el.minimap.width;
-    const span = 210;                                   // 미니맵에 보이는 실제 거리(m)
+    const span = 280;                                   // 미니맵에 보이는 실제 거리(m)
     const p = g.player;
     const src = g.minimapImg;
     const scale = src.width / World.size;
@@ -294,10 +326,26 @@ const UI = {
       c.setLineDash([]);
     }
 
+    // 차량
+    for (const v of g.vehicles) {
+      if (v.dead) continue;
+      const q = toPx(v.pos.x, v.pos.z);
+      if (q[0] < -6 || q[0] > S + 6 || q[1] < -6 || q[1] > S + 6) continue;
+      c.fillStyle = v.occupied ? '#ffd166' : '#9fd3ff';
+      c.fillRect(q[0] - 2.2, q[1] - 2.2, 4.4, 4.4);
+    }
+
+    // 보급 상자
+    for (const a of g.drops) {
+      if (a.dead || a.opened) continue;
+      const q = toPx(a.pos.x, a.pos.z);
+      this.dropMark(c, q[0], q[1], a.landed, 7);
+    }
+
     // 근처 적
     for (const ch of g.chars) {
       if (ch.dead || ch.isPlayer) continue;
-      if (p.pos.distanceTo(ch.pos) > 70) continue;
+      if (p.pos.distanceTo(ch.pos) > 80) continue;
       const q = toPx(ch.pos.x, ch.pos.z);
       c.fillStyle = '#ff6b6b';
       c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI * 2); c.fill();
@@ -309,6 +357,19 @@ const UI = {
     c.rotate(Math.PI - Game.look.yaw);   // 지도 위쪽이 북이므로 시선 방향으로 돌립니다
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
+    c.restore();
+  },
+
+  /* 보급 상자 표시: 낙하 중이면 속이 빈 원, 착지하면 채운 낙하산 표식 */
+  dropMark(c, x, y, landed, r) {
+    c.save();
+    c.strokeStyle = '#ff5a4a'; c.lineWidth = 2;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+    if (landed) { c.fillStyle = 'rgba(255,90,74,0.55)'; c.fill(); }
+    c.stroke();
+    c.fillStyle = '#fff';
+    c.fillRect(x - r * 0.32, y - 1.2, r * 0.64, 2.4);
+    c.fillRect(x - 1.2, y - r * 0.32, 2.4, r * 0.64);
     c.restore();
   },
 
@@ -330,6 +391,17 @@ const UI = {
       c.beginPath(); c.arc(tc[0], tc[1], (z.tr / World.size) * S, 0, Math.PI * 2);
       c.strokeStyle = '#fff'; c.lineWidth = 1.6; c.stroke();
       c.setLineDash([]);
+    }
+    for (const v of g.vehicles) {
+      if (v.dead) continue;
+      const q = toPx(v.pos.x, v.pos.z);
+      c.fillStyle = v.occupied ? '#ffd166' : '#9fd3ff';
+      c.fillRect(q[0] - 2, q[1] - 2, 4, 4);
+    }
+    for (const a of g.drops) {
+      if (a.dead || a.opened) continue;
+      const q = toPx(a.pos.x, a.pos.z);
+      this.dropMark(c, q[0], q[1], a.landed, 10);
     }
     c.font = '600 12px "IBM Plex Sans KR", system-ui, sans-serif';
     c.fillStyle = 'rgba(255,255,255,0.8)';
@@ -488,12 +560,15 @@ const Main = {
     Settings.load();
     Settings.bind();
     Profile.load();
+    Account.load();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);
     Lobby.init();
     Lobby.refresh();
     Net.connect().then(ok => { if (ok) Lobby.onNetReady(); });
+    // db 기능이 켜져 있으면 친구 접속 상태까지 실시간으로 보여 줍니다 (없으면 조용히 넘어감)
+    Account.connect().then(ok => { if (ok) Lobby.renderFriends(); });
     window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());

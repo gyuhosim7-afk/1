@@ -570,3 +570,96 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 #rewardBox .row b { color: var(--text); font-variant-numeric: tabular-nums; }
 #rewardBox .total { border-top: 1px solid rgba(255,255,255,.1); margin-top: 6px; padding-top: 8px; font-size: 14px; color: var(--text); }
 #rewardBox .total b { color: #f0c674; font-size: 17px; }
+
+/* ============================================================
+   방어구 표시와 속도계
+   ============================================================ */
+#gear { display: flex; gap: 6px; }
+.gearTag {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px 9px; font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.gearTag b { font-weight: 700; }
+.gearTag.off { opacity: .38; }
+.gearTag.lv1 { border-color: rgba(159,176,192,.7); }
+.gearTag.lv2 { border-color: rgba(88,166,255,.8); }
+.gearTag.lv3 { border-color: rgba(240,198,116,.85); }
+.gi { display: inline-block; width: 13px; height: 14px; position: relative; }
+.gi.vest {
+  background: #9fb0c0; border-radius: 2px 2px 3px 3px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+}
+.gi.vest::before, .gi.vest::after {
+  content: ''; position: absolute; top: 0; width: 3px; height: 6px; background: #2a2d33;
+}
+.gi.vest::before { left: 2px; }
+.gi.vest::after { right: 2px; }
+.gi.bag {
+  background: #c7a86b; border-radius: 3px 3px 2px 2px; height: 13px; margin-top: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
+}
+.gi.bag::before {
+  content: ''; position: absolute; left: 3px; right: 3px; top: 4px; height: 3px;
+  background: rgba(0,0,0,.35); border-radius: 1px;
+}
+
+#speedo {
+  position: absolute; right: 18px; bottom: 122px; text-align: right;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 15px; backdrop-filter: blur(3px); z-index: 9;
+}
+#speedo b { font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+#speedo span { font-size: 11px; color: var(--muted); margin-left: 4px; }
+#speedo em { display: block; font-style: normal; font-size: 11px; color: var(--accent); }
+
+/* ============================================================
+   친구 · 계정 화면
+   ============================================================ */
+.acctBox {
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.acctRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acctRow > span {
+  flex: 0 0 116px; font-size: 11px; color: var(--muted); letter-spacing: .04em;
+}
+.acctRow input {
+  flex: 1 1 150px; min-width: 0; padding: 7px 10px; font-size: 12px; font-family: inherit;
+  background: #0d1117; border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+}
+.acctRow input[readonly] { color: #f0c453; letter-spacing: .04em; }
+button.mini {
+  width: auto; flex: 0 0 auto; padding: 7px 12px; font-size: 12px; font-weight: 600;
+  background: rgba(255, 255, 255, .08); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--text);
+}
+button.mini:hover { filter: brightness(1.25); }
+button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color: #1a1405; border: 0; }
+.acctNote { font-size: 11px; color: rgba(255, 255, 255, .5); line-height: 1.6; }
+.acctNote.ok { color: #7ee787; }
+.acctNote.bad { color: #ff8a80; }
+
+.friendList { display: flex; flex-direction: column; gap: 6px; }
+.friendRow {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; font-size: 13px;
+}
+.friendRow b { flex: 1 1 auto; }
+.friendRow .fcode { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.friendRow .fstate { font-size: 11px; }
+.friendRow .fstate.lobby { color: #7ee787; }
+.friendRow .fstate.match { color: #f0c453; }
+.friendRow .fstate.offline { color: rgba(255, 255, 255, .35); }
+.friendRow .fstate.unknown { color: rgba(255, 255, 255, .35); }
+.friendRow .del {
+  width: auto; padding: 4px 9px; font-size: 11px; background: rgba(255, 255, 255, .07);
+  border: 1px solid var(--line); border-radius: 5px; color: var(--muted);
+}
+.friendEmpty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+
+/* 시트 안 내용은 왼쪽 정렬이 읽기 편합니다 */
+.sheet { text-align: left; }
+.sheet h2, .sheet .sheetSub, .sheet h3 { text-align: left; }

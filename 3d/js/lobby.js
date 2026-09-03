@@ -148,8 +148,20 @@ const Lobby = {
       peerList: document.getElementById('peerList'),
       modeName: document.getElementById('modeName'),
       nick: document.getElementById('nickInput'),
-      revealCard: document.getElementById('revealCard')
+      revealCard: document.getElementById('revealCard'),
+      acctName: document.getElementById('acctName'),
+      myCode: document.getElementById('myCode'),
+      saveCode: document.getElementById('saveCode'),
+      loadCode: document.getElementById('loadCode'),
+      acctNote: document.getElementById('acctNote'),
+      friendCode: document.getElementById('friendCode'),
+      friendName: document.getElementById('friendName'),
+      friendList: document.getElementById('friendList'),
+      islandCode: document.getElementById('islandCode'),
+      joinIsland: document.getElementById('joinIsland'),
+      navNick: document.getElementById('navNick')
     };
+    this.bindAccount();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
@@ -168,13 +180,127 @@ const Lobby = {
     this.el.nick.value = Profile.data.name || '';
     this.el.nick.addEventListener('input', () => {
       Profile.setName(this.el.nick.value);
+      if (this.el.acctName) this.el.acctName.value = Profile.data.name || '';
       if (Net.online) Net.push({ name: Profile.nickname() });
       this.showPeers(Net.lobbyPeers);
+      this.refreshAccount();
     });
 
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
+  },
+
+  /* ---------- 친구 · 계정 ---------- */
+  bindAccount() {
+    const e = this.el;
+    const note = (msg, kind) => {
+      e.acctNote.textContent = msg || '';
+      e.acctNote.className = 'acctNote' + (kind ? ' ' + kind : '');
+    };
+    // 클립보드가 막힌 환경에서도 복사되도록 두 가지 방법을 씁니다
+    const copy = (input, label) => {
+      input.removeAttribute('readonly');
+      input.select(); input.setSelectionRange(0, 99999);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      input.setAttribute('readonly', '');
+      if (!ok && navigator.clipboard) {
+        navigator.clipboard.writeText(input.value).then(() => this.toast(label + ' 복사됨')).catch(() => {});
+        return;
+      }
+      this.toast(ok ? label + ' 복사됨' : '길게 눌러 직접 복사하세요');
+    };
+
+    e.acctName.value = Profile.data.name || '';
+    e.acctName.addEventListener('input', () => {
+      Profile.setName(e.acctName.value);
+      if (this.el.nick) this.el.nick.value = Profile.data.name || '';
+      if (Net.online) Net.push({ name: Profile.nickname() });
+      this.refreshAccount();
+    });
+
+    document.getElementById('copyCode').addEventListener('click', () => copy(e.myCode, '친구 코드'));
+    document.getElementById('copySave').addEventListener('click', () => copy(e.saveCode, '저장 코드'));
+    document.getElementById('copyIsland').addEventListener('click', () => copy(e.islandCode, '섬 코드'));
+
+    document.getElementById('doLoad').addEventListener('click', () => {
+      const res = Account.importCode(e.loadCode.value);
+      if (!res.ok) { note(res.why, 'bad'); return; }
+      note('불러왔습니다 — BP ' + Profile.data.bp.toLocaleString() + ', 스킨 ' + Profile.data.owned.skin.length + '개', 'ok');
+      e.loadCode.value = '';
+      e.acctName.value = Profile.data.name || '';
+      if (this.el.nick) this.el.nick.value = Profile.data.name || '';
+      this.refresh();
+      this.refreshUI();
+      this.refreshAccount();
+      Sfx.pick();
+    });
+
+    document.getElementById('addFriend').addEventListener('click', () => {
+      const res = Account.addFriend(e.friendCode.value, e.friendName.value);
+      if (!res.ok) { note(res.why, 'bad'); return; }
+      e.friendCode.value = ''; e.friendName.value = '';
+      note('친구를 등록했습니다', 'ok');
+      this.renderFriends();
+    });
+
+    document.getElementById('newIsland').addEventListener('click', () => {
+      this.islandSeed = (Math.random() * 0x3fffffff) | 0;
+      this.refreshAccount();
+      note('친구에게 이 섬 코드를 보내세요', 'ok');
+    });
+
+    document.getElementById('doJoin').addEventListener('click', () => {
+      const info = Account.parseIslandCode(e.joinIsland.value);
+      if (!info) { note('섬 코드가 올바르지 않습니다 (8자리)', 'bad'); return; }
+      Main.beginMatch(info.bots, { seed: info.seed });
+    });
+
+    this.refreshAccount();
+    this.renderFriends();
+  },
+
+  refreshAccount() {
+    const e = this.el;
+    if (!e || !e.myCode) return;
+    e.myCode.value = Account.data.id;
+    e.saveCode.value = Account.exportCode();
+    if (e.navNick) e.navNick.textContent = Profile.nickname();
+    if (e.acctName && document.activeElement !== e.acctName) e.acctName.value = Profile.data.name || '';
+    if (this.islandSeed == null) this.islandSeed = (Math.random() * 0x3fffffff) | 0;
+    const bots = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    e.islandCode.value = Account.makeIslandCode(this.islandSeed, bots);
+  },
+
+  renderFriends() {
+    const e = this.el;
+    if (!e || !e.friendList) return;
+    const list = Account.data.friends;
+    if (!list.length) {
+      e.friendList.innerHTML = '<p class="friendEmpty">아직 등록한 친구가 없습니다. 친구의 6자리 코드를 받아 추가하세요.</p>';
+      return;
+    }
+    const label = { lobby: '● 로비', match: '● 매치 중', offline: '○ 오프라인', unknown: '· 코드 등록됨' };
+    e.friendList.innerHTML = list.map(f => {
+      const st = Account.friendState(f.id);
+      return '<div class="friendRow" data-id="' + f.id + '">' +
+        '<b>' + this.esc(f.name) + '</b>' +
+        '<span class="fcode">' + f.id + '</span>' +
+        '<span class="fstate ' + st + '">' + label[st] + '</span>' +
+        '<button class="del">삭제</button></div>';
+    }).join('');
+    e.friendList.querySelectorAll('.friendRow').forEach(row => {
+      row.querySelector('.del').addEventListener('click', () => {
+        Account.removeFriend(row.dataset.id);
+        this.renderFriends();
+      });
+    });
+  },
+
+  esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   },
 
   syncView() {
@@ -185,6 +311,7 @@ const Lobby = {
   tab(name) {
     this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
+    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); }
   },
 
   buildCrates() {
@@ -268,6 +395,7 @@ const Lobby = {
   refreshUI() {
     const d = Profile.data;
     this.el.bp.textContent = d.bp.toLocaleString();
+    this.refreshAccount();          // 저장 코드는 진행 상황이 바뀌면 같이 갱신
 
     const card = (type, key, name, rarity) => {
       const owned = Profile.owns(type, key);

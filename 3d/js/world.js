@@ -66,6 +66,8 @@ const World = {
   boxes: [],        // 충돌 상자 { x,y,z, hx,hy,hz, yaw, cos,sin, top, bottom }
   cyls: [],         // 충돌 원기둥 { x,z,r,top }
   towns: [],
+  buildings: [],    // { x, z, kind, r } — 실내 파밍용 건물 목록
+  roads: [],        // { x1,z1,x2,z2,w } — 차량이 달리는 도로
   grid: null,       // 브로드페이즈 격자
   cell: 40,
   group: null,
@@ -112,6 +114,48 @@ const World = {
         this.heights[k] = this.heights[k] * t + target * (1 - t);
       }
     }
+  },
+
+  /* 도로를 놓을 자리를 선처럼 평탄하게 만듭니다 (양 끝 높이를 잇는 경사로) */
+  flattenLine(x1, z1, x2, z2, radius) {
+    const n = this.seg + 1;
+    const h1 = this.height(x1, z1), h2 = this.height(x2, z2);
+    const dx = x2 - x1, dz = z2 - z1;
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1) return;
+    const i0 = Math.max(0, Math.floor((Math.min(x1, x2) - radius + this.half) / this.step));
+    const i1 = Math.min(n - 1, Math.ceil((Math.max(x1, x2) + radius + this.half) / this.step));
+    const j0 = Math.max(0, Math.floor((Math.min(z1, z2) - radius + this.half) / this.step));
+    const j1 = Math.min(n - 1, Math.ceil((Math.max(z1, z2) + radius + this.half) / this.step));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const x = -this.half + i * this.step, z = -this.half + j * this.step;
+        let t = ((x - x1) * dx + (z - z1) * dz) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const px = x1 + dx * t, pz = z1 + dz * t;
+        const d = Math.hypot(x - px, z - pz);
+        if (d > radius) continue;
+        const target = h1 + (h2 - h1) * t;
+        const k = smooth(Math.min(1, d / radius));
+        const idx = j * n + i;
+        this.heights[idx] = this.heights[idx] * k + target * (1 - k);
+      }
+    }
+  },
+
+  /* 가장 가까운 도로 중심선까지의 거리 (지형 색을 칠할 때 씁니다) */
+  roadDist(x, z) {
+    let best = 1e9;
+    for (const r of this.roads) {
+      const dx = r.x2 - r.x1, dz = r.z2 - r.z1;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1) continue;
+      let t = ((x - r.x1) * dx + (z - r.z1) * dz) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(x - (r.x1 + dx * t), z - (r.z1 + dz * t)) - r.w / 2;
+      if (d < best) best = d;
+    }
+    return best;
   },
 
   /* 임의 지점 높이 (이중선형 보간) */
@@ -206,6 +250,7 @@ const World = {
           if (d < min && d > 1e-4) { x = o.x + dx / d * min; z = o.z + dz / d * min; }
           continue;
         }
+        if (o.ramp) continue;                                      // 계단은 밀어내지 않습니다
         if (o.top <= feetY + 0.55 || o.bottom >= headY) continue;  // 넘어가거나 밑을 지남
         // 상자 로컬 좌표에서 밀어내기
         const dx = x - o.x, dz = z - o.z;
@@ -302,6 +347,7 @@ const World = {
       else { const lim = this.half * 0.72; x = (rnd() * 2 - 1) * lim; z = (rnd() * 2 - 1) * lim; }
       const y = this.height(x, z);
       if (y < this.waterY + 0.6) continue;
+      if (this.roadDist(x, z) < minR + 2) continue;      // 도로 위에는 놓지 않습니다
       const list = this.near(x, z, x, z, minR + 2);
       let ok = true;
       for (const o of list) {

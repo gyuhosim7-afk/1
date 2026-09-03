@@ -4,11 +4,11 @@
    ============================================================ */
 
 const CFG = {
-  MAP: 620,             // 맵 한 변 (m)
-  SEG: 160,             // 지형 격자 해상도
-  BOTS: 29,
-  FOG_NEAR: 60,
-  FOG_FAR: 340,
+  MAP: 1100,            // 맵 한 변 (m)
+  SEG: 224,             // 지형 격자 해상도
+  BOTS: 39,
+  FOG_NEAR: 70,
+  FOG_FAR: 420,
   FOV: 72,
   ADS_FOV: 42,
 
@@ -40,9 +40,22 @@ const CFG = {
   AIM_PICK: 9.0,          // 조준선이 향한 아이템은 이 거리까지 주울 수 있음
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
-  MAX_MEDS: 5,
-  BOT_VISION: 150,      // 봇 시야 거리 (m)
-  MAX_DT: 0.05
+  MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
+  BASE_AMMO_CAP: 180,     // 가방이 없을 때 총별 예비 탄약 한도
+  BOT_VISION: 165,        // 봇 시야 거리 (m)
+  MAX_DT: 0.05,
+
+  /* ---------- 차량 ---------- */
+  VEH_RANGE: 4.6,         // 이 거리 안에서 탈 수 있습니다
+  VEH_CAM_DIST: 9.6,
+  VEH_CAM_HEIGHT: 3.5,
+
+  /* ---------- 공중 보급 ---------- */
+  DROP_FIRST: 90,         // 첫 보급까지 (초)
+  DROP_EVERY: 130,        // 이후 보급 간격 (초)
+  DROP_ALT: 190,          // 보급 상자가 나타나는 고도
+  DROP_FALL: 9.5,         // 보급 상자 낙하 속도 (m/s)
+  DROP_OPEN: 4.0          // 보급 상자를 열 수 있는 거리
 };
 
 /* 무기: dmg 발당 피해, rpm 분당 발사수, spread 탄퍼짐(rad),
@@ -69,15 +82,53 @@ const SCOPES = {
 };
 const SCOPE_LEVELS = [2, 2, 2, 4, 4, 8];
 
-/* 자기장 단계 */
+/* ============================================================
+   방어구: 조끼는 받는 피해를 줄이고, 가방은 챙길 수 있는 양을 늘립니다.
+   ============================================================ */
+const VESTS = {
+  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
+  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
+  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+};
+const BAGS = {
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, color: 0x4a5539 },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, color: 0x2f3a2a }
+};
+/* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
+const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
+
+/* ============================================================
+   차량: 넓은 맵을 빠르게 이동하는 수단
+   accel 가속(m/s^2), max 최고 속도(m/s), turn 조향(rad/s)
+   ============================================================ */
+const VEHICLES = {
+  truck: { name: '픽업트럭', accel: 11, max: 25, rev: 8,  turn: 1.35, brake: 20,
+           hp: 900, r: 1.55, seatH: 1.15, mass: 1, color: 0x8a6a3c },
+  buggy: { name: '버기',     accel: 14, max: 28, rev: 9,  turn: 1.75, brake: 24,
+           hp: 620, r: 1.30, seatH: 0.95, mass: 0.8, color: 0xb9773c },
+  bike:  { name: '오토바이', accel: 17, max: 31, rev: 6,  turn: 2.35, brake: 26,
+           hp: 340, r: 0.85, seatH: 0.95, mass: 0.5, color: 0x3f6b8a }
+};
+const VEHICLE_KEYS = Object.keys(VEHICLES);
+
+/* 보급 상자에 들어 있는 것 — 좋은 무기와 최고 등급 방어구 */
+const DROP_TABLE = {
+  guns: ['sniper', 'dmr', 'rifle'],
+  scopes: [8, 8, 4],
+  vest: 3, bag: 3, meds: 2
+};
+
+/* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.
+   축소 시간이 길어야 자기장 벽이 밀려오는 속도가 걸어서 따라갈 만합니다. */
 const PHASES = [
-  { wait:40, shrink:45, f:0.60, dps:1  },
-  { wait:34, shrink:40, f:0.42, dps:2  },
-  { wait:30, shrink:34, f:0.29, dps:4  },
-  { wait:26, shrink:30, f:0.19, dps:6  },
-  { wait:22, shrink:26, f:0.11, dps:9  },
-  { wait:18, shrink:22, f:0.055,dps:13 },
-  { wait:15, shrink:18, f:0.018,dps:20 }
+  { wait:78, shrink:72, f:0.62, dps:1  },
+  { wait:64, shrink:64, f:0.44, dps:2  },
+  { wait:56, shrink:56, f:0.31, dps:3  },
+  { wait:48, shrink:48, f:0.20, dps:5  },
+  { wait:40, shrink:40, f:0.12, dps:8  },
+  { wait:32, shrink:32, f:0.06, dps:12 },
+  { wait:25, shrink:27, f:0.02, dps:18 }
 ];
 
 const NAMES = [

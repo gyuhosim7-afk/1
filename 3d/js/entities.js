@@ -207,6 +207,8 @@ const LootArt = {
       if (kind === 'gun') this.cache[key] = GunArt.geo(gun, 0);
       else if (kind === 'ammo') this.cache[key] = Build.merge(this.ammoParts(gun));
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
+      else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
+      else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
     return this.cache[key];
@@ -248,6 +250,36 @@ const LootArt = {
     ];
   },
 
+  /* 바닥에 떨어진 방탄조끼 */
+  vestParts(level) {
+    const B = Build, c = VESTS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
+    const parts = [
+      B.box(0.34, 0.40, 0.16, c, 0, 0.30, 0),              // 몸판
+      B.box(0.40, 0.13, 0.15, c, 0, 0.38, 0),              // 어깨 부분
+      B.box(0.09, 0.42, 0.03, strap, -0.12, 0.30, 0.09),   // 앞 끈
+      B.box(0.09, 0.42, 0.03, strap, 0.12, 0.30, 0.09),
+      B.box(0.36, 0.07, 0.03, strap, 0, 0.16, 0.09),
+      B.box(0.13, 0.10, 0.05, strap, 0, 0.30, 0.10)        // 탄창 주머니
+    ];
+    for (let i = 0; i < level; i++) parts.push(B.box(0.05, 0.05, 0.02, tag, -0.12 + i * 0.06, 0.47, 0.085));
+    return parts;
+  },
+
+  /* 바닥에 떨어진 가방 */
+  bagParts(level) {
+    const B = Build, c = BAGS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
+    const w = 0.30 + level * 0.045, h = 0.30 + level * 0.06, dz = 0.20 + level * 0.03;
+    const parts = [
+      B.box(w, h, dz, c, 0, h / 2 + 0.02, 0),
+      B.box(w * 0.9, h * 0.34, dz * 0.5, c, 0, h * 0.72, dz * 0.5),   // 위 주머니
+      B.box(0.07, h * 0.9, 0.04, strap, -w * 0.28, h / 2, -dz / 2 - 0.02),
+      B.box(0.07, h * 0.9, 0.04, strap, w * 0.28, h / 2, -dz / 2 - 0.02),
+      B.box(w * 0.75, 0.06, 0.03, strap, 0, h * 0.42, dz / 2 + 0.01)
+    ];
+    for (let i = 0; i < level; i++) parts.push(B.box(0.045, 0.045, 0.02, tag, -0.09 + i * 0.07, h + 0.01, dz / 2));
+    return parts;
+  },
+
   medParts() {
     const B = Build;
     const white = 0xeef1f2, gray = 0xb9c0c4, red = 0xd23b32;
@@ -269,18 +301,22 @@ const LootArt = {
 };
 
 class Loot {
-  constructor(x, z, kind, gun, amount, level) {
-    const y = World.height(x, z);
+  /* fixedY 를 주면 그 높이에 그대로 놓습니다 (건물 2·3층 파밍용) */
+  constructor(x, z, kind, gun, amount, level, fixedY) {
+    const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
-    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope'
+    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
     this.gun = gun || null;
     this.amount = amount || 0;
-    this.level = level || 0;          // 조준경 배율
+    this.level = level || 0;          // 조준경 배율 / 방어구 등급
     this.dead = false;
     this.spin = Math.random() * Math.PI * 2;
 
     const color = kind === 'gun' ? GUNS[gun].color
-      : (kind === 'ammo' ? 0xf2cc60 : (kind === 'scope' ? SCOPES[this.level].color : 0xff6b6b));
+      : (kind === 'ammo' ? 0xf2cc60
+      : (kind === 'scope' ? SCOPES[this.level].color
+      : (kind === 'vest' ? 0x9ecbff
+      : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -303,6 +339,8 @@ class Loot {
     if (this.kind === 'gun') return GUNS[this.gun].name + ' · ' + GUNS[this.gun].short;
     if (this.kind === 'ammo') return GUNS[this.gun].short + ' 탄약 ' + this.amount + '발';
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
+    if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
+    if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
     return '구급상자';
   }
 
@@ -497,6 +535,9 @@ class Char3D {
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
+    this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
+    this.bag = 0;                  // 가방 등급 (0 = 없음)
+    this.vehicle = null;           // 타고 있는 차량
     this.reloading = 0;
     this.cooldown = 0;
     this.healing = 0;
@@ -583,6 +624,65 @@ class Char3D {
   get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
   get eyeY() { return this.pos.y + (this.crouch ? 0.98 : CFG.EYE); }
 
+  /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
+  get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
+  get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
+  /* 조끼가 막아 주는 피해 비율 */
+  get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
+
+  /* 탄약을 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
+  addAmmo(key, n) {
+    const have = this.reserve[key] || 0;
+    const room = Math.max(0, this.ammoCap - have);
+    const take = Math.min(n, room);
+    this.reserve[key] = have + take;
+    return take;
+  }
+
+  /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
+  wear(kind, level) {
+    const cur = kind === 'vest' ? this.vest : this.bag;
+    if (cur >= level) return -1;
+    if (kind === 'vest') this.vest = level; else this.bag = level;
+    this.refreshGear();
+    return cur;
+  }
+
+  /* 조끼와 가방을 몸에 붙입니다 */
+  refreshGear() {
+    const B = Build, mat = Mats.vc({ roughness: 0.7, metalness: 0.05 });
+    if (this.vestMesh) { this.hips.remove(this.vestMesh); this.vestMesh = null; }
+    if (this.bagMesh) { this.hips.remove(this.bagMesh); this.bagMesh = null; }
+    if (this.vest) {
+      const c = VESTS[this.vest].color;
+      const parts = [
+        B.sphere(0.362, c, 0, 0.48, 0, 1.0, 0.62, 0.98, 20),          // 몸판
+        B.sphere(0.345, 0x2a2d33, 0, 0.30, 0, 1.02, 0.16, 1.0, 18),   // 아래 띠
+        B.box(0.10, 0.30, 0.05, 0x2a2d33, -0.13, 0.55, 0.29),         // 어깨 끈
+        B.box(0.10, 0.30, 0.05, 0x2a2d33, 0.13, 0.55, 0.29),
+        B.box(0.15, 0.11, 0.06, 0x2a2d33, 0, 0.42, 0.31)              // 탄창 주머니
+      ];
+      for (let i = 0; i < this.vest; i++) {
+        parts.push(B.box(0.045, 0.045, 0.02, 0xf0c453, -0.05 + i * 0.05, 0.62, 0.33));
+      }
+      this.vestMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.vestMesh.castShadow = true;
+      this.hips.add(this.vestMesh);
+    }
+    if (this.bag) {
+      const c = BAGS[this.bag].color;
+      const w = 0.34 + this.bag * 0.05, h = 0.34 + this.bag * 0.07, dz = 0.16 + this.bag * 0.035;
+      const parts = [
+        B.box(w, h, dz, c, 0, 0.44, -0.30 - dz / 2),
+        B.box(w * 0.86, h * 0.32, dz * 0.6, c, 0, 0.44 + h * 0.24, -0.30 - dz * 0.9),
+        B.box(w * 0.7, 0.05, 0.03, 0x2a2d33, 0, 0.40, -0.30 - dz - 0.01)
+      ];
+      this.bagMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.bagMesh.castShadow = true;
+      this.hips.add(this.bagMesh);
+    }
+  }
+
   forward(out) {
     return (out || new THREE.Vector3()).set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
   }
@@ -595,7 +695,7 @@ class Char3D {
     this.mags[idx] = GUNS[key].mag;
     this.scopes[idx] = 0;
     this.scopeOff[idx] = false;
-    this.reserve[key] = (this.reserve[key] || 0) + (ammo == null ? GUNS[key].ammoPer : ammo);
+    this.addAmmo(key, ammo == null ? GUNS[key].ammoPer : ammo);
     this.reloading = 0;
     this.slot = idx;
     this.refreshGuns();
@@ -816,5 +916,351 @@ class Char3D {
     // 총구는 팔 회전을 상쇄해 늘 앞을 봅니다
     this.gunMount.rotation.x = -this.armR.rotation.x - this.pitch * 0.8 - 0.06 + p.gunX;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
+  }
+}
+
+/* ============================================================
+   차량: 넓어진 맵을 빠르게 이동하는 수단
+   바퀴는 따로 두어 굴러가고 앞바퀴가 조향합니다.
+   ============================================================ */
+const VehicleArt = {
+  cache: {},
+
+  get(key) {
+    if (!this.cache[key]) this.cache[key] = this.build(key);
+    return this.cache[key];
+  },
+
+  build(key) {
+    const B = Build;
+    const spec = VEHICLES[key];
+    const body = spec.color, dark = 0x24272d, glass = 0x5b7d94, metal = 0x9aa3ab;
+    let parts, wheels;
+
+    if (key === 'bike') {
+      parts = [
+        B.box(0.30, 0.22, 1.55, body, 0, 0.62, 0),               // 프레임
+        B.box(0.44, 0.16, 0.55, dark, 0, 0.78, -0.20),           // 안장
+        B.box(0.34, 0.30, 0.30, body, 0, 0.80, 0.55),            // 연료탱크
+        B.box(0.62, 0.06, 0.10, dark, 0, 0.96, 0.72),            // 핸들
+        B.box(0.16, 0.34, 0.10, glass, 0, 1.06, 0.80),           // 바람막이
+        B.box(0.10, 0.42, 0.10, metal, 0, 0.72, 0.74, 0.35),     // 앞 포크
+        B.box(0.24, 0.20, 0.36, dark, 0, 0.50, -0.62)            // 뒤 짐받이
+      ];
+      wheels = [{ x: 0, y: 0.42, z: 0.78, r: 0.42, w: 0.16, steer: true },
+                { x: 0, y: 0.42, z: -0.70, r: 0.42, w: 0.20, steer: false }];
+    } else if (key === 'buggy') {
+      parts = [
+        B.box(1.70, 0.42, 3.00, body, 0, 0.66, 0),               // 차대
+        B.box(1.40, 0.44, 1.10, dark, 0, 1.05, -0.30),           // 좌석
+        B.box(1.55, 0.10, 1.20, dark, 0, 1.62, -0.30),           // 롤케이지 지붕
+        B.box(0.10, 0.90, 0.10, metal, -0.72, 1.20, 0.25),
+        B.box(0.10, 0.90, 0.10, metal, 0.72, 1.20, 0.25),
+        B.box(0.10, 0.90, 0.10, metal, -0.72, 1.20, -0.85),
+        B.box(0.10, 0.90, 0.10, metal, 0.72, 1.20, -0.85),
+        B.box(1.30, 0.30, 0.24, dark, 0, 0.92, 1.42),            // 앞 범퍼
+        B.box(0.30, 0.20, 0.14, 0xfff0c0, -0.48, 0.92, 1.52),    // 전조등
+        B.box(0.30, 0.20, 0.14, 0xfff0c0, 0.48, 0.92, 1.52),
+        B.box(1.20, 0.36, 0.60, dark, 0, 0.86, -1.30)            // 엔진
+      ];
+      wheels = [{ x: -0.95, y: 0.50, z: 1.05, r: 0.50, w: 0.30, steer: true },
+                { x: 0.95, y: 0.50, z: 1.05, r: 0.50, w: 0.30, steer: true },
+                { x: -0.95, y: 0.50, z: -1.10, r: 0.52, w: 0.34, steer: false },
+                { x: 0.95, y: 0.50, z: -1.10, r: 0.52, w: 0.34, steer: false }];
+    } else {                                                     // 픽업트럭
+      parts = [
+        B.box(1.95, 0.55, 4.40, body, 0, 0.78, 0),               // 차체
+        B.box(1.85, 0.80, 1.90, body, 0, 1.42, 0.35),            // 운전실
+        B.box(1.70, 0.62, 0.10, glass, 0, 1.48, 1.28),           // 앞 유리
+        B.box(0.10, 0.60, 1.70, glass, -0.90, 1.46, 0.30),       // 측면 유리
+        B.box(0.10, 0.60, 1.70, glass, 0.90, 1.46, 0.30),
+        B.box(1.85, 0.10, 1.85, dark, 0, 1.84, 0.35),            // 지붕
+        B.box(1.90, 0.55, 1.90, dark, 0, 1.08, -1.35),           // 짐칸
+        B.box(1.90, 0.12, 0.12, dark, 0, 1.36, -2.24),
+        B.box(1.75, 0.34, 0.26, dark, 0, 0.78, 2.16),            // 앞 범퍼
+        B.box(0.34, 0.22, 0.14, 0xfff0c0, -0.62, 0.92, 2.24),    // 전조등
+        B.box(0.34, 0.22, 0.14, 0xfff0c0, 0.62, 0.92, 2.24),
+        B.box(0.26, 0.16, 0.12, 0xc23b32, -0.72, 0.92, -2.24),   // 후미등
+        B.box(0.26, 0.16, 0.12, 0xc23b32, 0.72, 0.92, -2.24),
+        B.box(0.70, 0.50, 0.12, metal, 0, 1.10, -2.30)           // 예비 타이어 거치
+      ];
+      wheels = [{ x: -1.02, y: 0.55, z: 1.52, r: 0.55, w: 0.34, steer: true },
+                { x: 1.02, y: 0.55, z: 1.52, r: 0.55, w: 0.34, steer: true },
+                { x: -1.02, y: 0.55, z: -1.48, r: 0.55, w: 0.34, steer: false },
+                { x: 1.02, y: 0.55, z: -1.48, r: 0.55, w: 0.34, steer: false }];
+    }
+    return { body: B.merge(parts), wheels };
+  },
+
+  wheelGeo(r, w) {
+    const key = 'w' + r + ':' + w;
+    if (!this.cache[key]) {
+      const g = new THREE.CylinderGeometry(r, r, w, 12);
+      g.rotateZ(Math.PI / 2);                                    // 축이 x 를 향하도록
+      const hub = new THREE.BoxGeometry(w + 0.03, r * 0.5, r * 0.5);
+      const parts = [
+        { geo: g, color: 0x22252a, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+        { geo: hub, color: 0x9aa3ab, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 }
+      ];
+      this.cache[key] = Build.merge(parts);
+    }
+    return this.cache[key];
+  }
+};
+
+class Vehicle3D {
+  constructor(x, z, key) {
+    this.key = key;
+    this.spec = VEHICLES[key];
+    this.pos = new THREE.Vector3(x, World.height(x, z), z);
+    this.yaw = Math.random() * Math.PI * 2;
+    this.speed = 0;
+    this.steer = 0;
+    this.hp = this.spec.hp;
+    this.dead = false;
+    this.driver = null;
+    this.spin = 0;
+    this.pitch = 0; this.roll = 0;
+
+    const art = VehicleArt.get(key);
+    const mat = Mats.vc({ roughness: 0.62, metalness: 0.22 });
+    this.mesh = new THREE.Group();
+    this.tilt = new THREE.Group();                 // 지형 기울기용
+    this.mesh.add(this.tilt);
+    const bodyMesh = new THREE.Mesh(art.body, mat);
+    bodyMesh.castShadow = true;
+    this.tilt.add(bodyMesh);
+
+    this.wheels = art.wheels.map(w => {
+      const m = new THREE.Mesh(VehicleArt.wheelGeo(w.r, w.w), mat);
+      m.castShadow = true;
+      m.position.set(w.x, w.y, w.z);
+      m.userData.steer = w.steer;
+      this.tilt.add(m);
+      return m;
+    });
+
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+    // 충돌: 차량도 장애물로 등록하지 않고, 캐릭터와는 게임 쪽에서 따로 판정합니다
+  }
+
+  get occupied() { return !!this.driver; }
+  get seatY() { return this.spec.seatH; }
+
+  /* 입력에 따라 굴러갑니다. throttle -1~1, steer -1~1 */
+  drive(dt, throttle, steer, brake) {
+    const sp = this.spec;
+    if (this.dead) throttle = 0;
+    if (brake) {
+      const s = Math.sign(this.speed);
+      this.speed -= s * sp.brake * dt;
+      if (Math.sign(this.speed) !== s) this.speed = 0;
+    } else if (throttle > 0.05) {
+      this.speed += sp.accel * throttle * dt * (this.speed < 0 ? 2.2 : 1);
+    } else if (throttle < -0.05) {
+      this.speed += sp.accel * throttle * dt * (this.speed > 0 ? 2.2 : 0.7);
+    } else {
+      this.speed *= Math.max(0, 1 - dt * 1.1);     // 관성 주행
+      if (Math.abs(this.speed) < 0.15) this.speed = 0;
+    }
+    this.speed = Math.max(-sp.rev, Math.min(sp.max, this.speed));
+
+    // 조향은 속도가 있어야 듣습니다
+    this.steer += (steer - this.steer) * Math.min(1, dt * 9);
+    const grip = Math.min(1, Math.abs(this.speed) / 5.5);
+    this.yaw -= this.steer * sp.turn * dt * grip * Math.sign(this.speed || 1);
+
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const nx = this.pos.x + fx * this.speed * dt;
+    const nz = this.pos.z + fz * this.speed * dt;
+
+    // 장애물: 밀려난 거리가 크면 부딪힌 것으로 봅니다
+    const res = World.resolve(nx, nz, sp.r, this.pos.y + 0.4, this.pos.y + 1.6);
+    const pushed = Math.hypot(res.x - nx, res.z - nz);
+    this.pos.x = res.x; this.pos.z = res.z;
+    if (pushed > 0.06) {
+      const impact = Math.abs(this.speed);
+      this.speed *= 0.25;
+      if (impact > 9) this.damage(impact * 3.5);
+    }
+
+    // 지형 따라가기 + 기울기
+    const g = World.groundY(this.pos.x, this.pos.z, this.pos.y + 0.6);
+    this.pos.y += (g - this.pos.y) * Math.min(1, dt * 12);
+    const ahead = 1.6;
+    const hF = World.height(this.pos.x + fx * ahead, this.pos.z + fz * ahead);
+    const hB = World.height(this.pos.x - fx * ahead, this.pos.z - fz * ahead);
+    const rx = -fz, rz = fx;
+    const hR = World.height(this.pos.x + rx * ahead, this.pos.z + rz * ahead);
+    const hL = World.height(this.pos.x - rx * ahead, this.pos.z - rz * ahead);
+    const wantPitch = Math.atan2(hB - hF, ahead * 2);
+    const wantRoll = Math.atan2(hR - hL, ahead * 2);
+    this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 6);
+    this.roll += (wantRoll - this.roll) * Math.min(1, dt * 6);
+
+    // 바퀴 회전
+    this.spin += this.speed * dt / 0.5;
+    for (const w of this.wheels) {
+      w.rotation.x = this.spin;
+      w.rotation.y = w.userData.steer ? -this.steer * 0.5 : 0;
+    }
+    this.sync();
+  }
+
+  sync() {
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+    this.tilt.rotation.set(this.pitch, 0, this.roll);
+  }
+
+  damage(n) {
+    if (this.dead) return;
+    this.hp -= n;
+    if (this.hp <= 0) { this.hp = 0; this.dead = true; }
+  }
+}
+
+/* ============================================================
+   공중 보급: 비행기가 떨어뜨린 상자
+   낙하산을 달고 내려와 착지하면 연기를 피우고, F 로 열 수 있습니다.
+   ============================================================ */
+const CrateArt = {
+  geo: null, chuteGeo: null,
+
+  crate() {
+    if (this.geo) return this.geo;
+    const B = Build;
+    const red = 0xc23b32, white = 0xe8e4da, dark = 0x2a2d33, tan = 0x9a7a4a;
+    this.geo = B.merge([
+      B.box(1.60, 1.10, 1.60, tan, 0, 0.55, 0),
+      B.box(1.66, 0.16, 1.66, red, 0, 1.05, 0),          // 뚜껑 테두리
+      B.box(1.68, 0.26, 0.30, red, 0, 0.62, 0),          // 붉은 띠
+      B.box(0.30, 0.26, 1.68, red, 0, 0.62, 0),
+      B.box(1.66, 0.10, 0.14, dark, 0, 0.16, 0.80),      // 아래 보강대
+      B.box(1.66, 0.10, 0.14, dark, 0, 0.16, -0.80),
+      B.box(0.44, 0.44, 0.06, white, 0, 0.62, 0.82),     // 표식
+      B.box(0.30, 0.10, 0.02, red, 0, 0.62, 0.86),
+      B.box(0.10, 0.30, 0.02, red, 0, 0.62, 0.86),
+      B.box(0.26, 0.12, 0.26, dark, 0, 1.18, 0)          // 고리
+    ]);
+    return this.geo;
+  },
+
+  chute() {
+    if (this.chuteGeo) return this.chuteGeo;
+    const dome = new THREE.SphereGeometry(2.3, 14, 7, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    dome.scale(1, 0.6, 1);
+    const nd = dome.index ? dome.toNonIndexed() : dome;
+    const pos = nd.attributes.position, nor = nd.attributes.normal;
+    const positions = [], normals = [], colors = [];
+    const a = new THREE.Color(0xc23b32).convertSRGBToLinear();
+    const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
+    for (let i = 0; i < pos.count; i += 3) {
+      let mx = 0, mz = 0;
+      for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
+      const ang = Math.atan2(mz / 3, mx / 3);
+      const c = Math.floor((ang + Math.PI) / (Math.PI * 2) * 8) % 2 ? a : b;
+      for (let k = 0; k < 3; k++) {
+        positions.push(pos.getX(i + k), pos.getY(i + k) + 3.4, pos.getZ(i + k));
+        normals.push(nor.getX(i + k), nor.getY(i + k), nor.getZ(i + k));
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+    dome.dispose(); if (nd !== dome) nd.dispose();
+    const lines = Build.merge([0, 1, 2, 3].map(i => {
+      const ang = (i / 4) * Math.PI * 2 + 0.4;
+      const x = Math.cos(ang) * 1.1, z = Math.sin(ang) * 1.1;
+      return Build.box(0.05, 3.1, 0.05, 0xd8d4c8, x, 1.8, z,
+                       Math.atan2(z, 1.8) * 0.5, 0, -Math.atan2(x, 1.8) * 0.5);
+    }));
+    const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
+    for (let i = 0; i < lp.count; i++) {
+      positions.push(lp.getX(i), lp.getY(i), lp.getZ(i));
+      normals.push(ln.getX(i), ln.getY(i), ln.getZ(i));
+      colors.push(lc.getX(i), lc.getY(i), lc.getZ(i));
+    }
+    lines.dispose();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeBoundingSphere();
+    this.chuteGeo = geo;
+    return geo;
+  },
+
+  smokeGeo: null,
+  smoke() {
+    if (!this.smokeGeo) this.smokeGeo = new THREE.CylinderGeometry(1.1, 2.6, 34, 12, 1, true);
+    return this.smokeGeo;
+  }
+};
+
+class Airdrop {
+  constructor(x, z, y) {
+    this.pos = new THREE.Vector3(x, y, z);
+    this.landed = false;
+    this.opened = false;
+    this.dead = false;
+    this.drift = (Math.random() - 0.5) * 1.6;
+    this.spin = Math.random() * Math.PI;
+
+    this.mesh = new THREE.Group();
+    this.crate = new THREE.Mesh(CrateArt.crate(), Mats.vc({ roughness: 0.7, metalness: 0.1 }));
+    this.crate.castShadow = true;
+    this.mesh.add(this.crate);
+
+    this.chute = new THREE.Mesh(CrateArt.chute(), Mats.vc({ roughness: 0.9, side: THREE.DoubleSide }));
+    this.chute.position.y = 1.2;
+    this.mesh.add(this.chute);
+
+    this.smoke = new THREE.Mesh(CrateArt.smoke(), new THREE.MeshBasicMaterial({
+      color: srgb(0xff5a4a), transparent: true, opacity: 0.16,
+      depthWrite: false, side: THREE.DoubleSide
+    }));
+    this.smoke.position.y = 17;
+    this.smoke.visible = false;
+    this.mesh.add(this.smoke);
+
+    this.mesh.position.copy(this.pos);
+  }
+
+  update(dt) {
+    this.spin += dt * 0.35;
+    if (!this.landed) {
+      this.pos.y -= CFG.DROP_FALL * dt;
+      this.pos.x += Math.sin(this.spin) * this.drift * dt;
+      this.pos.z += Math.cos(this.spin * 0.8) * this.drift * dt;
+      const g = World.groundY(this.pos.x, this.pos.z, this.pos.y);
+      if (this.pos.y <= g) {
+        this.pos.y = g;
+        this.landed = true;
+        this.chute.visible = false;
+        this.smoke.visible = true;
+        World.addCyl({ x: this.pos.x, z: this.pos.z, r: 1.15, top: this.pos.y + 1.15, h: 1.3 });
+      } else {
+        this.chute.rotation.z = Math.sin(this.spin) * 0.06;
+      }
+    } else {
+      this.smoke.material.opacity = 0.13 + Math.sin(this.spin * 3) * 0.03;
+      this.smoke.rotation.y = this.spin * 0.4;
+    }
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.landed ? this.mesh.rotation.y : this.spin * 0.5;
+  }
+
+  /* 상자를 엽니다: 안에 든 것이 주변에 흩어집니다 */
+  contents() {
+    const t = DROP_TABLE;
+    const gun = t.guns[Math.floor(Math.random() * t.guns.length)];
+    const scope = t.scopes[Math.floor(Math.random() * t.scopes.length)];
+    return [
+      { kind: 'gun', gun, amount: GUNS[gun].ammoPer },
+      { kind: 'scope', level: scope },
+      { kind: 'vest', level: t.vest },
+      { kind: 'bag', level: t.bag },
+      { kind: 'med', amount: t.meds }
+    ];
   }
 }

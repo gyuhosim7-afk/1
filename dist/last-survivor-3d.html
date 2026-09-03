@@ -573,6 +573,99 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 #rewardBox .total { border-top: 1px solid rgba(255,255,255,.1); margin-top: 6px; padding-top: 8px; font-size: 14px; color: var(--text); }
 #rewardBox .total b { color: #f0c674; font-size: 17px; }
 
+/* ============================================================
+   방어구 표시와 속도계
+   ============================================================ */
+#gear { display: flex; gap: 6px; }
+.gearTag {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px 9px; font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.gearTag b { font-weight: 700; }
+.gearTag.off { opacity: .38; }
+.gearTag.lv1 { border-color: rgba(159,176,192,.7); }
+.gearTag.lv2 { border-color: rgba(88,166,255,.8); }
+.gearTag.lv3 { border-color: rgba(240,198,116,.85); }
+.gi { display: inline-block; width: 13px; height: 14px; position: relative; }
+.gi.vest {
+  background: #9fb0c0; border-radius: 2px 2px 3px 3px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+}
+.gi.vest::before, .gi.vest::after {
+  content: ''; position: absolute; top: 0; width: 3px; height: 6px; background: #2a2d33;
+}
+.gi.vest::before { left: 2px; }
+.gi.vest::after { right: 2px; }
+.gi.bag {
+  background: #c7a86b; border-radius: 3px 3px 2px 2px; height: 13px; margin-top: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
+}
+.gi.bag::before {
+  content: ''; position: absolute; left: 3px; right: 3px; top: 4px; height: 3px;
+  background: rgba(0,0,0,.35); border-radius: 1px;
+}
+
+#speedo {
+  position: absolute; right: 18px; bottom: 122px; text-align: right;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 15px; backdrop-filter: blur(3px); z-index: 9;
+}
+#speedo b { font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+#speedo span { font-size: 11px; color: var(--muted); margin-left: 4px; }
+#speedo em { display: block; font-style: normal; font-size: 11px; color: var(--accent); }
+
+/* ============================================================
+   친구 · 계정 화면
+   ============================================================ */
+.acctBox {
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.acctRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acctRow > span {
+  flex: 0 0 116px; font-size: 11px; color: var(--muted); letter-spacing: .04em;
+}
+.acctRow input {
+  flex: 1 1 150px; min-width: 0; padding: 7px 10px; font-size: 12px; font-family: inherit;
+  background: #0d1117; border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+}
+.acctRow input[readonly] { color: #f0c453; letter-spacing: .04em; }
+button.mini {
+  width: auto; flex: 0 0 auto; padding: 7px 12px; font-size: 12px; font-weight: 600;
+  background: rgba(255, 255, 255, .08); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--text);
+}
+button.mini:hover { filter: brightness(1.25); }
+button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color: #1a1405; border: 0; }
+.acctNote { font-size: 11px; color: rgba(255, 255, 255, .5); line-height: 1.6; }
+.acctNote.ok { color: #7ee787; }
+.acctNote.bad { color: #ff8a80; }
+
+.friendList { display: flex; flex-direction: column; gap: 6px; }
+.friendRow {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 12px; font-size: 13px;
+}
+.friendRow b { flex: 1 1 auto; }
+.friendRow .fcode { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.friendRow .fstate { font-size: 11px; }
+.friendRow .fstate.lobby { color: #7ee787; }
+.friendRow .fstate.match { color: #f0c453; }
+.friendRow .fstate.offline { color: rgba(255, 255, 255, .35); }
+.friendRow .fstate.unknown { color: rgba(255, 255, 255, .35); }
+.friendRow .del {
+  width: auto; padding: 4px 9px; font-size: 11px; background: rgba(255, 255, 255, .07);
+  border: 1px solid var(--line); border-radius: 5px; color: var(--muted);
+}
+.friendEmpty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+
+/* 시트 안 내용은 왼쪽 정렬이 읽기 편합니다 */
+.sheet { text-align: left; }
+.sheet h2, .sheet .sheetSub, .sheet h3 { text-align: left; }
+
 </style>
 
 <canvas id="scene"></canvas>
@@ -613,8 +706,14 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
       <div id="hpBar"><div id="hp"></div></div>
       <span id="hpText">100</span>
       <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
+      <div id="gear">
+        <span id="vestTag" class="gearTag off"><i class="gi vest"></i><b>-</b></span>
+        <span id="bagTag" class="gearTag off"><i class="gi bag"></i><b>-</b></span>
+      </div>
     </div>
   </div>
+
+  <div id="speedo" class="hidden"><b>0</b><span>km/h</span><em>픽업트럭</em></div>
 
   <div id="gunbox">
     <div id="gunName">맨손</div>
@@ -627,12 +726,13 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 
   <div id="keys">
     <span><kbd>WASD</kbd> 이동</span><span><kbd>Shift</kbd> 질주</span><span><kbd>Space</kbd> 점프</span>
-    <span><kbd>C</kbd> 앉기</span><span><kbd>우클릭</kbd> 정조준</span><span><kbd>F</kbd> 줍기</span>
+    <span><kbd>C</kbd> 앉기·브레이크</span><span><kbd>우클릭</kbd> 정조준</span>
+    <span><kbd>F</kbd> 줍기·탑승·상자</span>
     <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span><span><kbd>Tab</kbd> 지도</span>
   </div>
 </div>
 
-<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="620" height="620"></canvas></div>
+<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="760" height="760"></canvas></div>
 
 <div id="pause" class="overlay hidden">
   <div class="pausePanel">
@@ -675,11 +775,12 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
         <button data-tab="play" class="on">플레이</button>
         <button data-tab="skin">커스터마이징</button>
         <button data-tab="crate">보상</button>
+        <button data-tab="friend">친구</button>
         <button data-tab="stats">전적</button>
       </nav>
       <div class="account">
         <span class="bpTag">BP</span><b id="bp">0</b>
-        <span class="nick">생존자</span>
+        <span class="nick" id="navNick">생존자</span>
       </div>
     </header>
 
@@ -702,7 +803,9 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
         </div>
       </div>
       <button id="startBtn" class="startBtn">시작</button>
-      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.<br>WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.
+        친구와 따로 접속할 때는 <b>친구</b> 탭의 섬 코드를 쓰세요.<br>
+        WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
     <!-- 보상(상자) -->
@@ -724,6 +827,61 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
       <div id="skinGrid" class="grid"></div>
       <h3>총기 도장</h3>
       <div id="gunGrid" class="grid"></div>
+    </section>
+
+    <!-- 친구 · 계정 -->
+    <section class="panel sheet hidden" id="tab-friend">
+      <h2>친구 · 계정</h2>
+      <p class="sheetSub">계정은 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 같은 섬 코드로 함께 합니다.</p>
+
+      <h3>내 계정</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>닉네임</span>
+          <input id="acctName" type="text" maxlength="12" placeholder="생존자">
+        </div>
+        <div class="acctRow">
+          <span>내 친구 코드</span>
+          <input id="myCode" type="text" readonly>
+          <button class="mini" id="copyCode">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>저장 코드</span>
+          <input id="saveCode" type="text" readonly>
+          <button class="mini" id="copySave">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 불러오기</span>
+          <input id="loadCode" type="text" placeholder="다른 기기의 저장 코드를 붙여 넣으세요">
+          <button class="mini" id="doLoad">불러오기</button>
+        </div>
+        <p class="acctNote" id="acctNote"></p>
+      </div>
+
+      <h3>친구 목록</h3>
+      <div class="acctRow">
+        <input id="friendCode" type="text" maxlength="8" placeholder="친구 코드 (6자리)">
+        <input id="friendName" type="text" maxlength="12" placeholder="표시할 이름 (선택)">
+        <button class="mini" id="addFriend">친구 추가</button>
+      </div>
+      <div id="friendList" class="friendList"></div>
+
+      <h3>같은 섬에서 함께 하기</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>섬 코드 만들기</span>
+          <input id="islandCode" type="text" readonly>
+          <button class="mini" id="newIsland">새로 만들기</button>
+          <button class="mini" id="copyIsland">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 참가</span>
+          <input id="joinIsland" type="text" maxlength="8" placeholder="친구가 준 8자리 코드">
+          <button class="mini" id="doJoin">이 섬에서 시작</button>
+        </div>
+        <p class="acctNote">같은 코드로 시작하면 지형·건물·아이템·차량·자기장이 완전히 같은 섬이 됩니다.
+          같은 링크를 함께 열어 두면 서로의 캐릭터도 실시간으로 보입니다.</p>
+      </div>
     </section>
 
     <!-- 전적 -->
@@ -764,11 +922,11 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
    ============================================================ */
 
 const CFG = {
-  MAP: 620,             // 맵 한 변 (m)
-  SEG: 160,             // 지형 격자 해상도
-  BOTS: 29,
-  FOG_NEAR: 60,
-  FOG_FAR: 340,
+  MAP: 1100,            // 맵 한 변 (m)
+  SEG: 224,             // 지형 격자 해상도
+  BOTS: 39,
+  FOG_NEAR: 70,
+  FOG_FAR: 420,
   FOV: 72,
   ADS_FOV: 42,
 
@@ -800,9 +958,22 @@ const CFG = {
   AIM_PICK: 9.0,          // 조준선이 향한 아이템은 이 거리까지 주울 수 있음
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
-  MAX_MEDS: 5,
-  BOT_VISION: 150,      // 봇 시야 거리 (m)
-  MAX_DT: 0.05
+  MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
+  BASE_AMMO_CAP: 180,     // 가방이 없을 때 총별 예비 탄약 한도
+  BOT_VISION: 165,        // 봇 시야 거리 (m)
+  MAX_DT: 0.05,
+
+  /* ---------- 차량 ---------- */
+  VEH_RANGE: 4.6,         // 이 거리 안에서 탈 수 있습니다
+  VEH_CAM_DIST: 9.6,
+  VEH_CAM_HEIGHT: 3.5,
+
+  /* ---------- 공중 보급 ---------- */
+  DROP_FIRST: 90,         // 첫 보급까지 (초)
+  DROP_EVERY: 130,        // 이후 보급 간격 (초)
+  DROP_ALT: 190,          // 보급 상자가 나타나는 고도
+  DROP_FALL: 9.5,         // 보급 상자 낙하 속도 (m/s)
+  DROP_OPEN: 4.0          // 보급 상자를 열 수 있는 거리
 };
 
 /* 무기: dmg 발당 피해, rpm 분당 발사수, spread 탄퍼짐(rad),
@@ -829,15 +1000,53 @@ const SCOPES = {
 };
 const SCOPE_LEVELS = [2, 2, 2, 4, 4, 8];
 
-/* 자기장 단계 */
+/* ============================================================
+   방어구: 조끼는 받는 피해를 줄이고, 가방은 챙길 수 있는 양을 늘립니다.
+   ============================================================ */
+const VESTS = {
+  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
+  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
+  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+};
+const BAGS = {
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, color: 0x4a5539 },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, color: 0x2f3a2a }
+};
+/* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
+const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
+
+/* ============================================================
+   차량: 넓은 맵을 빠르게 이동하는 수단
+   accel 가속(m/s^2), max 최고 속도(m/s), turn 조향(rad/s)
+   ============================================================ */
+const VEHICLES = {
+  truck: { name: '픽업트럭', accel: 11, max: 25, rev: 8,  turn: 1.35, brake: 20,
+           hp: 900, r: 1.55, seatH: 1.15, mass: 1, color: 0x8a6a3c },
+  buggy: { name: '버기',     accel: 14, max: 28, rev: 9,  turn: 1.75, brake: 24,
+           hp: 620, r: 1.30, seatH: 0.95, mass: 0.8, color: 0xb9773c },
+  bike:  { name: '오토바이', accel: 17, max: 31, rev: 6,  turn: 2.35, brake: 26,
+           hp: 340, r: 0.85, seatH: 0.95, mass: 0.5, color: 0x3f6b8a }
+};
+const VEHICLE_KEYS = Object.keys(VEHICLES);
+
+/* 보급 상자에 들어 있는 것 — 좋은 무기와 최고 등급 방어구 */
+const DROP_TABLE = {
+  guns: ['sniper', 'dmr', 'rifle'],
+  scopes: [8, 8, 4],
+  vest: 3, bag: 3, meds: 2
+};
+
+/* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.
+   축소 시간이 길어야 자기장 벽이 밀려오는 속도가 걸어서 따라갈 만합니다. */
 const PHASES = [
-  { wait:40, shrink:45, f:0.60, dps:1  },
-  { wait:34, shrink:40, f:0.42, dps:2  },
-  { wait:30, shrink:34, f:0.29, dps:4  },
-  { wait:26, shrink:30, f:0.19, dps:6  },
-  { wait:22, shrink:26, f:0.11, dps:9  },
-  { wait:18, shrink:22, f:0.055,dps:13 },
-  { wait:15, shrink:18, f:0.018,dps:20 }
+  { wait:78, shrink:72, f:0.62, dps:1  },
+  { wait:64, shrink:64, f:0.44, dps:2  },
+  { wait:56, shrink:56, f:0.31, dps:3  },
+  { wait:48, shrink:48, f:0.20, dps:5  },
+  { wait:40, shrink:40, f:0.12, dps:8  },
+  { wait:32, shrink:32, f:0.06, dps:12 },
+  { wait:25, shrink:27, f:0.02, dps:18 }
 ];
 
 const NAMES = [
@@ -1008,6 +1217,241 @@ const Profile = {
 };
 
 /* ============================================================
+   계정 · 친구 · 같은 섬 코드
+
+   서버 없이 동작하도록 만들었습니다.
+   - 계정: 진행 상황(BP·스킨·전적)을 짧은 '저장 코드' 한 줄로 옮깁니다.
+           다른 기기에서 그 코드를 붙여 넣으면 그대로 이어서 합니다.
+   - 친구: 상대의 '친구 코드'를 등록해 목록으로 관리합니다.
+   - 같은 섬 코드: 섬과 봇 수를 담은 코드입니다. 친구가 같은 코드로 시작하면
+                   지형·건물·아이템·자기장이 완전히 같은 섬에서 플레이합니다.
+
+   claude 의 db 기능이 켜져 있으면(공개 공유를 끄고 조직 전용으로 바꾼 경우)
+   접속 상태와 초대까지 실시간으로 동작하도록 아래 db 경로가 살아납니다.
+   꺼져 있으면 조용히 로컬 모드로만 동작합니다.
+   ============================================================ */
+
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';   // 헷갈리는 I, L, O, U 제외
+
+const Account = {
+  KEY: 'lastSurvivor3d.account',
+  data: { id: '', friends: [] },      // id: 내 친구 코드, friends: [{ id, name }]
+  db: null,                           // db 기능이 있을 때만 채워집니다
+  online: false,
+  peers: {},                          // 친구 코드 -> { at, state, name }
+  _saveT: 0,
+
+  /* ---------- 저장소 ---------- */
+  load() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (typeof d.id === 'string') this.data.id = d.id.slice(0, 8);
+        if (Array.isArray(d.friends)) {
+          this.data.friends = d.friends
+            .filter(f => f && typeof f.id === 'string')
+            .slice(0, 30)
+            .map(f => ({ id: f.id.slice(0, 8), name: String(f.name || '생존자').slice(0, 12) }));
+        }
+      }
+    } catch (e) { /* 저장소를 못 쓰면 기본값 */ }
+    if (!this.data.id) { this.data.id = this.newId(); this.save(); }
+  },
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+
+  newId() {
+    let s = '';
+    for (let i = 0; i < 6; i++) s += B32[Math.floor(Math.random() * 32)];
+    return s;
+  },
+
+  /* ---------- 저장 코드 (기기 사이 진행 상황 옮기기) ----------
+     사람이 손으로 옮기는 코드이므로 짧게 만듭니다.
+     형식: LS1|bp|보유스킨비트|보유도장비트|장착스킨|장착도장|전적|닉네임|검사값 */
+  exportCode() {
+    const d = Profile.data;
+    const skinKeys = Object.keys(SKINS), gunKeys = Object.keys(GUN_SKINS);
+    const bits = (keys, owned) => {
+      let n = 0;
+      keys.forEach((k, i) => { if (owned.indexOf(k) >= 0) n |= (1 << i); });
+      return n.toString(32);
+    };
+    const s = d.stats;
+    const body = [
+      'LS1',
+      Math.min(9999999, d.bp).toString(32),
+      bits(skinKeys, d.owned.skin),
+      bits(gunKeys, d.owned.gun),
+      skinKeys.indexOf(d.equipped.skin).toString(32),
+      gunKeys.indexOf(d.equipped.gun).toString(32),
+      [s.matches | 0, s.wins | 0, s.kills | 0, s.best | 0, s.bestKills | 0, s.opened | 0]
+        .map(n => Math.min(99999, n).toString(32)).join('.'),
+      this.data.id,
+      encodeURIComponent(Profile.nickname())
+    ].join('|');
+    return body + '|' + this.sum(body).toString(32);
+  },
+
+  /* 붙여 넣은 코드를 검사하고 그대로 반영합니다. 성공하면 true */
+  importCode(text) {
+    const raw = String(text || '').trim().replace(/\s+/g, '');
+    const parts = raw.split('|');
+    if (parts.length !== 10 || parts[0] !== 'LS1') return { ok: false, why: '코드 형식이 맞지 않습니다' };
+    const body = parts.slice(0, 9).join('|');
+    if (this.sum(body).toString(32) !== parts[9]) return { ok: false, why: '코드가 손상되었습니다' };
+
+    const skinKeys = Object.keys(SKINS), gunKeys = Object.keys(GUN_SKINS);
+    const unbits = (keys, str) => {
+      const n = parseInt(str, 32) || 0;
+      return keys.filter((k, i) => n & (1 << i));
+    };
+    const st = parts[6].split('.').map(v => parseInt(v, 32) || 0);
+    const d = Profile.data;
+    d.bp = Math.max(0, parseInt(parts[1], 32) || 0);
+    d.owned.skin = unbits(skinKeys, parts[2]);
+    d.owned.gun = unbits(gunKeys, parts[3]);
+    if (d.owned.skin.indexOf('recruit') < 0) d.owned.skin.push('recruit');
+    if (d.owned.gun.indexOf('stock') < 0) d.owned.gun.push('stock');
+    d.equipped.skin = skinKeys[parseInt(parts[4], 32)] || 'recruit';
+    d.equipped.gun = gunKeys[parseInt(parts[5], 32)] || 'stock';
+    if (d.owned.skin.indexOf(d.equipped.skin) < 0) d.equipped.skin = 'recruit';
+    if (d.owned.gun.indexOf(d.equipped.gun) < 0) d.equipped.gun = 'stock';
+    d.stats = { matches: st[0] || 0, wins: st[1] || 0, kills: st[2] || 0,
+                best: st[3] || 99, bestKills: st[4] || 0, opened: st[5] || 0 };
+    d.name = decodeURIComponent(parts[8] || '').slice(0, 12);
+    Profile.save();
+
+    this.data.id = (parts[7] || '').slice(0, 8) || this.data.id;
+    this.save();
+    return { ok: true };
+  },
+
+  sum(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return h % 1000003;
+  },
+
+  /* ---------- 친구 ---------- */
+  addFriend(code, name) {
+    const id = String(code || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 8);
+    if (id.length < 4) return { ok: false, why: '친구 코드는 6자리입니다' };
+    if (id === this.data.id) return { ok: false, why: '내 코드입니다' };
+    if (this.data.friends.some(f => f.id === id)) return { ok: false, why: '이미 등록된 친구입니다' };
+    if (this.data.friends.length >= 30) return { ok: false, why: '친구는 30명까지 등록됩니다' };
+    this.data.friends.push({ id, name: String(name || '').trim().slice(0, 12) || id });
+    this.save();
+    this.watchFriends();
+    return { ok: true };
+  },
+
+  removeFriend(id) {
+    this.data.friends = this.data.friends.filter(f => f.id !== id);
+    this.save();
+    return true;
+  },
+
+  renameFriend(id, name) {
+    const f = this.data.friends.find(f => f.id === id);
+    if (f) { f.name = String(name || '').slice(0, 12) || id; this.save(); }
+  },
+
+  /* 친구 상태: db 가 없으면 '알 수 없음' 으로 표시합니다 */
+  friendState(id) {
+    if (!this.online) return 'unknown';
+    const p = this.peers[id];
+    if (!p || Date.now() - p.at > 70000) return 'offline';
+    return p.state === 'match' ? 'match' : 'lobby';
+  },
+
+  /* ---------- 같은 섬 코드 ----------
+     섬 씨앗(30비트) + 봇 수(6비트) 를 base32 로 8글자에 담습니다. */
+  makeIslandCode(seed, bots) {
+    const s = (seed >>> 0) % 0x40000000;                 // 30비트
+    const n = Math.max(0, Math.min(59, bots | 0));
+    let v = s * 64 + n;                                  // 36비트 → 8글자
+    let out = '';
+    for (let i = 0; i < 8; i++) { out = B32[v % 32] + out; v = Math.floor(v / 32); }
+    return out;
+  },
+
+  parseIslandCode(text) {
+    const s = String(text || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
+    if (s.length !== 8) return null;
+    let v = 0;
+    for (const ch of s) {
+      const i = B32.indexOf(ch);
+      if (i < 0) return null;
+      v = v * 32 + i;
+    }
+    const bots = v % 64, seed = Math.floor(v / 64);
+    if (seed <= 0) return null;
+    return { seed, bots };
+  },
+
+  /* ---------- db 가 켜져 있을 때만 쓰는 실시간 부분 ---------- */
+  async connect() {
+    if (!window.claude || !window.claude.use) return false;
+    let db = null;
+    try { db = await window.claude.use('db'); } catch (e) { db = null; }
+    if (!db) return false;
+    this.db = db;
+    this.online = true;
+    this.beat();
+    this._beat = setInterval(() => this.beat(), 25000);
+    this.watchFriends();
+    return true;
+  },
+
+  /* 내 접속 상태를 알립니다 */
+  beat() {
+    if (!this.online) return;
+    const state = Game && Game.state === 'playing' ? 'match' : 'lobby';
+    this.db.doc('presence/' + this.data.id)
+      .set({ name: Profile.nickname(), at: Date.now(), state })
+      .catch(() => {});
+  },
+
+  /* 친구들의 접속 상태를 지켜봅니다 */
+  watchFriends() {
+    if (!this.online) return;
+    for (const un of (this._unsub || [])) { try { un(); } catch (e) { /* 무시 */ } }
+    this._unsub = [];
+    for (const f of this.data.friends) {
+      try {
+        const un = this.db.doc('presence/' + f.id).onSnapshot(snap => {
+          this.peers[f.id] = snap && snap.exists ? snap.data : null;
+          if (typeof Lobby !== 'undefined' && Lobby.renderFriends) Lobby.renderFriends();
+        }, () => {});
+        this._unsub.push(un);
+      } catch (e) { /* 무시 */ }
+    }
+  },
+
+  /* 친구를 초대합니다 (db 가 있을 때만) */
+  invite(code, bots) {
+    if (!this.online) return false;
+    this.db.doc('party/' + this.data.id)
+      .set({ code, bots, host: this.data.id, name: Profile.nickname(), at: Date.now() })
+      .catch(() => {});
+    return true;
+  },
+
+  /* 친구가 보낸 초대를 읽습니다 */
+  async fetchInvite(friendId) {
+    if (!this.online) return null;
+    try {
+      const snap = await this.db.doc('party/' + friendId).get();
+      if (!snap || !snap.exists) return null;
+      const d = snap.data || {};
+      if (!d.code || Date.now() - (d.at || 0) > 300000) return null;
+      return d;
+    } catch (e) { return null; }
+  }
+};
+
+/* ============================================================
    월드: 지형(높이맵), 건물·나무·바위, 충돌 및 레이캐스트
    충돌 판정은 three.js Raycaster 대신 자체 해석식으로 처리해
    나무 수천 그루에서도 가볍게 동작합니다.
@@ -1075,6 +1519,8 @@ const World = {
   boxes: [],        // 충돌 상자 { x,y,z, hx,hy,hz, yaw, cos,sin, top, bottom }
   cyls: [],         // 충돌 원기둥 { x,z,r,top }
   towns: [],
+  buildings: [],    // { x, z, kind, r } — 실내 파밍용 건물 목록
+  roads: [],        // { x1,z1,x2,z2,w } — 차량이 달리는 도로
   grid: null,       // 브로드페이즈 격자
   cell: 40,
   group: null,
@@ -1121,6 +1567,48 @@ const World = {
         this.heights[k] = this.heights[k] * t + target * (1 - t);
       }
     }
+  },
+
+  /* 도로를 놓을 자리를 선처럼 평탄하게 만듭니다 (양 끝 높이를 잇는 경사로) */
+  flattenLine(x1, z1, x2, z2, radius) {
+    const n = this.seg + 1;
+    const h1 = this.height(x1, z1), h2 = this.height(x2, z2);
+    const dx = x2 - x1, dz = z2 - z1;
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1) return;
+    const i0 = Math.max(0, Math.floor((Math.min(x1, x2) - radius + this.half) / this.step));
+    const i1 = Math.min(n - 1, Math.ceil((Math.max(x1, x2) + radius + this.half) / this.step));
+    const j0 = Math.max(0, Math.floor((Math.min(z1, z2) - radius + this.half) / this.step));
+    const j1 = Math.min(n - 1, Math.ceil((Math.max(z1, z2) + radius + this.half) / this.step));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const x = -this.half + i * this.step, z = -this.half + j * this.step;
+        let t = ((x - x1) * dx + (z - z1) * dz) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const px = x1 + dx * t, pz = z1 + dz * t;
+        const d = Math.hypot(x - px, z - pz);
+        if (d > radius) continue;
+        const target = h1 + (h2 - h1) * t;
+        const k = smooth(Math.min(1, d / radius));
+        const idx = j * n + i;
+        this.heights[idx] = this.heights[idx] * k + target * (1 - k);
+      }
+    }
+  },
+
+  /* 가장 가까운 도로 중심선까지의 거리 (지형 색을 칠할 때 씁니다) */
+  roadDist(x, z) {
+    let best = 1e9;
+    for (const r of this.roads) {
+      const dx = r.x2 - r.x1, dz = r.z2 - r.z1;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1) continue;
+      let t = ((x - r.x1) * dx + (z - r.z1) * dz) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const d = Math.hypot(x - (r.x1 + dx * t), z - (r.z1 + dz * t)) - r.w / 2;
+      if (d < best) best = d;
+    }
+    return best;
   },
 
   /* 임의 지점 높이 (이중선형 보간) */
@@ -1215,6 +1703,7 @@ const World = {
           if (d < min && d > 1e-4) { x = o.x + dx / d * min; z = o.z + dz / d * min; }
           continue;
         }
+        if (o.ramp) continue;                                      // 계단은 밀어내지 않습니다
         if (o.top <= feetY + 0.55 || o.bottom >= headY) continue;  // 넘어가거나 밑을 지남
         // 상자 로컬 좌표에서 밀어내기
         const dx = x - o.x, dz = z - o.z;
@@ -1311,6 +1800,7 @@ const World = {
       else { const lim = this.half * 0.72; x = (rnd() * 2 - 1) * lim; z = (rnd() * 2 - 1) * lim; }
       const y = this.height(x, z);
       if (y < this.waterY + 0.6) continue;
+      if (this.roadDist(x, z) < minR + 2) continue;      // 도로 위에는 놓지 않습니다
       const list = this.near(x, z, x, z, minR + 2);
       let ok = true;
       for (const o of list) {
@@ -1334,62 +1824,92 @@ const Scenery = {
 
   build(scene) {
     this.boxDefs = []; this.trees = []; this.rocks = []; this.bushes = []; this.grass = [];
+    this.lootSpots = []; this.stairSpots = [];
     World.resetColliders();
+    World.buildings = [];
+    World.roads = [];
     World.buildHeights();
 
     // --- 마을 자리 선정 후 평탄화 ---
     const towns = [];
-    const lim = World.half * 0.62;
-    const names = ['소치', '게오르고폴', '포친키', '야스나야', '로조크', '프리모스크', '밀타 베이스'];
-    for (let i = 0; i < 7; i++) {
-      for (let t = 0; t < 300; t++) {
+    const lim = World.half * 0.68;
+    const names = ['소치', '게오르고폴', '포친키', '야스나야', '로조크', '프리모스크',
+                   '밀타 베이스', '스톨니', '리포프카', '가트카', '마일타', '셰프카'];
+    for (let i = 0; i < names.length; i++) {
+      for (let t = 0; t < 400; t++) {
         const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
         if (World.height(x, z) < World.waterY + 2.5) continue;
-        if (towns.some(o => Math.hypot(o.x - x, o.z - z) < 115)) continue;
-        towns.push({ x, z, name: names[i], r: 34 + rnd() * 16 });
+        if (towns.some(o => Math.hypot(o.x - x, o.z - z) < 150)) continue;
+        towns.push({ x, z, name: names[i], r: 46 + rnd() * 22 });
         break;
       }
     }
-    for (const t of towns) World.flatten(t.x, t.z, t.r + 22);
+    for (const t of towns) World.flatten(t.x, t.z, t.r + 26);
     World.towns = towns;
+
+    // --- 도로: 마을을 최소 신장 트리로 이어 줍니다 (차량 이동로) ---
+    this.layRoads(towns);
 
     this.buildTerrain(scene);
     this.buildWater(scene);
 
     // --- 마을 건물 ---
     for (const t of towns) {
-      const count = 4 + Math.floor(rnd() * 4);
+      const count = 6 + Math.floor(rnd() * 5);
       const placed = [];
+      let bigOne = rnd() < 0.7;                  // 마을마다 아파트 한 채
       for (let i = 0; i < count; i++) {
-        for (let a = 0; a < 40; a++) {
+        for (let a = 0; a < 50; a++) {
           const ang = rnd() * Math.PI * 2, rad = rnd() * t.r;
           const x = t.x + Math.cos(ang) * rad, z = t.z + Math.sin(ang) * rad;
-          if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 20)) continue;
+          if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 32)) continue;
           placed.push({ x, z });
-          const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.25;
+          const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.2;
+          if (bigOne) { bigOne = false; this.apartment(x, z, yaw); break; }
           const roll = rnd();
-          if (roll < 0.34) this.warehouse(x, z, yaw);
-          else if (roll < 0.78) this.house(x, z, yaw);
+          if (roll < 0.30) this.warehouse(x, z, yaw);
+          else if (roll < 0.80) this.house(x, z, yaw);
           else this.shed(x, z, yaw);
           break;
         }
       }
-      // 컨테이너와 담장으로 엄폐물 추가
-      for (let i = 0; i < 5; i++) {
+      // 컨테이너로 엄폐물 추가
+      for (let i = 0; i < 6; i++) {
         const ang = rnd() * Math.PI * 2, rad = t.r * (0.4 + rnd() * 0.7);
         this.container(t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI);
       }
     }
 
-    // --- 벌판의 외딴 창고와 컨테이너 ---
-    for (let i = 0; i < 16; i++) {
-      const s = World.freeSpot(14);
-      if (rnd() < 0.5) this.shed(s.x, s.z, rnd() * Math.PI * 2);
+    // --- 벌판의 외딴 건물 ---
+    for (let i = 0; i < 30; i++) {
+      const s = World.freeSpot(20);
+      const r = rnd();
+      if (r < 0.42) this.shed(s.x, s.z, rnd() * Math.PI * 2);
+      else if (r < 0.60) this.house(s.x, s.z, rnd() * Math.PI * 2);
+      else if (r < 0.72) this.warehouse(s.x, s.z, rnd() * Math.PI * 2);
       else this.container(s.x, s.z, rnd() * Math.PI * 2);
     }
 
     this.scatterNature(towns);
     this.buildInstances(scene);
+  },
+
+  /* 마을을 잇는 도로. 가장 가까운 마을끼리 차례로 연결합니다(프림 알고리즘). */
+  layRoads(towns) {
+    if (towns.length < 2) return;
+    const inTree = [0], rest = towns.map((_, i) => i).slice(1);
+    while (rest.length) {
+      let bi = 0, bj = 0, bd = Infinity;
+      for (const i of inTree) for (let k = 0; k < rest.length; k++) {
+        const j = rest[k];
+        const d = Math.hypot(towns[i].x - towns[j].x, towns[i].z - towns[j].z);
+        if (d < bd) { bd = d; bi = i; bj = k; }
+      }
+      const j = rest.splice(bj, 1)[0];
+      World.roads.push({ x1: towns[bi].x, z1: towns[bi].z, x2: towns[j].x, z2: towns[j].z, w: 7 });
+      inTree.push(j);
+    }
+    for (const r of World.roads) World.flattenLine(r.x1, r.z1, r.x2, r.z2, r.w + 5);
   },
 
   /* ---------- 지형 메시 ---------- */
@@ -1400,7 +1920,7 @@ const Scenery = {
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     const cGrass = srgb(0x53713a), cGrass2 = srgb(0x6c8447);
-    const cRock = srgb(0x6d6a63), cSand = srgb(0xb9ac86);
+    const cRock = srgb(0x6d6a63), cSand = srgb(0xb9ac86), cRoad = srgb(0x8a7f6b);
     const tmp = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
@@ -1414,6 +1934,9 @@ const Scenery = {
       tmp.copy(cGrass).lerp(cGrass2, v1 * 0.75 + v2 * 0.25);
       tmp.multiplyScalar(0.88 + v2 * 0.26);
       if (slope > 0.42) tmp.lerp(cRock, Math.min(1, (slope - 0.42) / 0.4));
+      // 도로: 중심선 근처는 흙길 색으로 덮습니다
+      const rd = World.roadDist(x, z);
+      if (rd < 3.5) tmp.lerp(cRoad, 1 - Math.max(0, rd) / 3.5);
       if (h < World.waterY + 1.6) tmp.lerp(cSand, Math.min(1, (World.waterY + 1.6 - h) / 2.2));
       // (색은 이미 선형 공간)
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
@@ -1465,13 +1988,16 @@ const Scenery = {
   },
 
   /* ---------- 건물 조각 ---------- */
-  box(x, y, z, sx, sy, sz, yaw, color, solid) {
+  /* ramp 가 true 면 '올라설 수만 있는' 조각이 됩니다.
+     계단은 벽처럼 밀어내면 오를 수 없으므로 밀어내기 판정에서 빼고,
+     발밑 지지(groundY)와 총알 판정에서만 씁니다. */
+  box(x, y, z, sx, sy, sz, yaw, color, solid, ramp) {
     this.boxDefs.push({ x, y, z, sx, sy, sz, yaw, color, solid: solid !== false });
     if (solid !== false) {
       World.addBox({
         x, y, z, hx: sx / 2, hy: sy / 2, hz: sz / 2, yaw,
         cos: Math.cos(yaw), sin: Math.sin(yaw),
-        top: y + sy / 2, bottom: y - sy / 2
+        top: y + sy / 2, bottom: y - sy / 2, ramp: !!ramp
       });
     }
   },
@@ -1481,91 +2007,305 @@ const Scenery = {
     return [cx + lx * Math.cos(yaw) - lz * Math.sin(yaw), cz + lx * Math.sin(yaw) + lz * Math.cos(yaw)];
   },
 
-  /* 사방 벽 + 정면 출입구 */
-  walls(cx, cz, yaw, w, d, h, thick, base, color) {
-    const doorW = 1.9;
-    const seg = (w - doorW) / 2;
-    // 앞벽 (출입구 양옆)
-    for (const s of [-1, 1]) {
-      const [x, z] = this.local(cx, cz, yaw, s * (doorW / 2 + seg / 2), -d / 2);
-      this.box(x, base + h / 2, z, seg, h, thick, yaw, color);
-    }
-    // 뒷벽
-    let p = this.local(cx, cz, yaw, 0, d / 2);
-    this.box(p[0], base + h / 2, p[1], w, h, thick, yaw, color);
-    // 좌우벽
-    for (const s of [-1, 1]) {
-      p = this.local(cx, cz, yaw, s * w / 2, 0);
-      this.box(p[0], base + h / 2, p[1], thick, h, d, yaw, color);
-    }
+  /* 사방 벽. doors 에 적은 면은 가운데를 비워 출입구로 만듭니다.
+     면 이름: 'front'(-z) 'back'(+z) 'left'(-x) 'right'(+x) */
+  walls(cx, cz, yaw, w, d, h, thick, base, color, doors, doorW) {
+    doors = doors || ['front'];
+    doorW = doorW || 2.2;
+    const wallRun = (lx, lz, len, along, hasDoor) => {
+      // along: 'x' 면 벽이 x 축으로 뻗고, 'z' 면 z 축으로 뻗습니다
+      if (!hasDoor) {
+        const [x, z] = this.local(cx, cz, yaw, lx, lz);
+        if (along === 'x') this.box(x, base + h / 2, z, len, h, thick, yaw, color);
+        else this.box(x, base + h / 2, z, thick, h, len, yaw, color);
+        return;
+      }
+      const seg = (len - doorW) / 2;
+      if (seg <= 0.2) return;
+      for (const s of [-1, 1]) {
+        const ox = along === 'x' ? s * (doorW / 2 + seg / 2) : 0;
+        const oz = along === 'x' ? 0 : s * (doorW / 2 + seg / 2);
+        const [x, z] = this.local(cx, cz, yaw, lx + ox, lz + oz);
+        if (along === 'x') this.box(x, base + h / 2, z, seg, h, thick, yaw, color);
+        else this.box(x, base + h / 2, z, thick, h, seg, yaw, color);
+      }
+      // 문 위 인방
+      const lintel = h - 2.35;
+      if (lintel > 0.25) {
+        const [x, z] = this.local(cx, cz, yaw, lx, lz);
+        if (along === 'x') this.box(x, base + h - lintel / 2, z, doorW, lintel, thick, yaw, color);
+        else this.box(x, base + h - lintel / 2, z, thick, lintel, doorW, yaw, color);
+      }
+    };
+    wallRun(0, -d / 2, w, 'x', doors.indexOf('front') >= 0);
+    wallRun(0,  d / 2, w, 'x', doors.indexOf('back') >= 0);
+    wallRun(-w / 2, 0, d, 'z', doors.indexOf('left') >= 0);
+    wallRun( w / 2, 0, d, 'z', doors.indexOf('right') >= 0);
   },
 
-  /* 벽면에 창문과 문틀 같은 장식을 붙입니다 (충돌 없음) */
+  /* 벽면 장식 (충돌 없음) */
   trim(cx, cz, yaw, lx, ly, lz, w, h, thick, color) {
     const [x, z] = this.local(cx, cz, yaw, lx, lz);
     this.boxDefs.push({ x, y: ly, z, sx: w, sy: h, sz: thick, yaw, color, solid: false });
   },
 
+  /* 좌우·뒷벽에 창문을 냅니다 (yOff 는 바닥에서 창 중심까지 높이) */
   windows(cx, cz, yaw, w, d, h, base, count, yOff) {
     const frame = 0x6f7378, glass = 0x38505e;
     for (let i = 0; i < count; i++) {
       const t = (i + 1) / (count + 1) - 0.5;
       for (const side of [-1, 1]) {
-        // 좌우 벽
         const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.02), t * d * 0.8);
-        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 0.9, sz: 1.2, yaw, color: glass, solid: false });
-        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.08, sy: 1.05, sz: 1.35, yaw, color: frame, solid: false });
+        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 0.95, sz: 1.25, yaw, color: glass, solid: false });
+        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.08, sy: 1.1, sz: 1.4, yaw, color: frame, solid: false });
       }
-      // 뒷벽
       const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.02);
-      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.2, sy: 0.9, sz: 0.12, yaw, color: glass, solid: false });
-      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.35, sy: 1.05, sz: 0.08, yaw, color: frame, solid: false });
+      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.25, sy: 0.95, sz: 0.12, yaw, color: glass, solid: false });
+      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.4, sy: 1.1, sz: 0.08, yaw, color: frame, solid: false });
     }
   },
 
+  /* 바닥판. 윗면이 정확히 y 가 되도록 놓습니다 (그 위를 걸어 다닐 수 있습니다) */
+  slab(cx, cz, yaw, lx, lz, w, d, y, color, thick) {
+    thick = thick || 0.30;
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.box(x, y - thick / 2, z, w, thick, d, yaw, color);
+  },
+
+  /* 계단. 로컬 (lx,lz) 에서 시작해 dir(+1: +z, -1: -z) 방향으로 올라갑니다.
+     한 칸 높이를 0.42m 로 잡아 캐릭터가 걸어서 오를 수 있게 합니다. */
+  stairs(cx, cz, yaw, lx, lz, fromY, toY, width, dir, color) {
+    const rise = 0.42, run = 0.62;
+    const n = Math.max(1, Math.round((toY - fromY) / rise));
+    const step = (toY - fromY) / n;
+    // 계단 위치를 기록해 두면 봇이 위층으로 올라갈 때 길잡이로 쓸 수 있습니다
+    const b0 = this.local(cx, cz, yaw, lx, lz);
+    const b1 = this.local(cx, cz, yaw, lx, lz + dir * run * n);
+    this.stairSpots.push({ x0: b0[0], z0: b0[1], x1: b1[0], z1: b1[1], y0: fromY, y1: toY });
+    for (let i = 0; i < n; i++) {
+      const top = fromY + step * (i + 1);
+      const lzz = lz + dir * (run * (i + 0.5));
+      const [x, z] = this.local(cx, cz, yaw, lx, lzz);
+      // 각 단은 바닥까지 채워 옆에서 봐도 계단처럼 보입니다
+      this.box(x, (fromY + top) / 2, z, width, top - fromY, run, yaw, color, true, true);
+    }
+    return { len: run * n };
+  },
+
+  /* 난간 (충돌 있음 — 2층에서 떨어지지 않도록) */
+  rail(cx, cz, yaw, lx, lz, w, d, y, color) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.box(x, y + 0.5, z, w, 1.0, d, yaw, color);
+  },
+
+  /* 실내 아이템 자리 */
+  lootSpot(cx, cz, yaw, lx, lz, y) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.lootSpots.push({ x, y, z });
+  },
+
+  /* 실내 잡동사니: 나무 상자, 선반, 드럼통 (엄폐물이면서 올라설 수 있습니다) */
+  crateStack(cx, cz, yaw, lx, lz, base) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    const n = 1 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const s = 0.95 - i * 0.08;
+      this.box(x + (rnd() - 0.5) * 0.2, base + 0.5 + i * 0.92, z + (rnd() - 0.5) * 0.2,
+               s, 0.9, s, yaw + (rnd() - 0.5) * 0.5, rnd() < 0.5 ? 0x8a6a42 : 0x9a7a4a);
+    }
+  },
+  shelf(cx, cz, yaw, lx, lz, base, len) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.box(x, base + 1.1, z, len, 2.2, 0.55, yaw, 0x585c5f);
+    for (const h of [0.55, 1.25, 1.95]) {
+      this.trim(cx, cz, yaw, lx, base + h, lz, len + 0.1, 0.07, 0.66, 0x7c8288);
+    }
+  },
+  drum(cx, cz, yaw, lx, lz, base) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.box(x, base + 0.55, z, 0.72, 1.1, 0.72, yaw, rnd() < 0.5 ? 0xb2553f : 0x4a6b3a);
+  },
+
+  /* ---------- 큰 창고: 2층 통로가 있고 안에서 파밍할 수 있습니다 ---------- */
   warehouse(cx, cz, yaw) {
     const base = World.height(cx, cz);
-    const w = 16, d = 11, h = 5.2;
-    const wall = 0xb9b2a3;
-    this.walls(cx, cz, yaw, w, d, h, 0.34, base, wall);
-    this.windows(cx, cz, yaw, w, d, h, base, 3, 3.4);
-    this.trim(cx, cz, yaw, 0, base + h * 0.5, -d / 2 - 0.02, 2.4, h - 0.3, 0.1, 0x5c5f63);  // 출입구 틀
-    this.box(cx, base + h + 0.22, cz, w + 0.6, 0.44, d + 0.6, yaw, 0x8a5b47);   // 지붕 (올라설 수 있음)
-    this.trim(cx, cz, yaw, 0, base + h + 0.52, 0, w + 0.7, 0.16, d + 0.7, 0x6d4638);       // 처마
-    // 내부 기둥
+    const w = 26, d = 18, fh = 4.6;            // 층높이
+    const wall = 0xb9b2a3, floorC = 0x8d8577, steel = 0x6f7378;
+    const y2 = base + fh;
+
+    this.walls(cx, cz, yaw, w, d, fh * 2, 0.36, base, wall, ['front', 'back'], 3.4);
+    this.windows(cx, cz, yaw, w, d, fh, base, 4, 3.2);
+    this.windows(cx, cz, yaw, w, d, fh, base, 4, fh + 3.2);
+    this.trim(cx, cz, yaw, 0, base + 1.6, -d / 2 - 0.03, 3.6, 3.2, 0.1, 0x5c5f63);
+
+    // 2층 통로: 뒤쪽 절반을 덮고, 가운데 계단이 올라오는 자리만 비워 둡니다
+    const mezD = d * 0.46;
+    const mezFront = d / 2 - mezD;                  // 통로 앞쪽 끝 (z)
+    this.slab(cx, cz, yaw, 0, d / 2 - mezD / 2, w - 0.7, mezD, y2, floorC, 0.34);
+    // 앞쪽 난간 — 계단이 닿는 가운데 3.4m 는 열어 둡니다
     for (const s of [-1, 1]) {
-      const [x, z] = this.local(cx, cz, yaw, s * 4.6, 0);
-      this.box(x, base + h / 2, z, 0.5, h, 0.5, yaw, 0xa79f92);
+      const seg = (w - 0.7 - 3.4) / 2;
+      this.rail(cx, cz, yaw, s * (3.4 / 2 + seg / 2), mezFront - 0.1, seg, 0.16, y2, steel);
     }
+    // 좌우로 이어지는 좁은 통로
+    for (const s of [-1, 1]) {
+      this.slab(cx, cz, yaw, s * (w / 2 - 1.6), 0, 3.0, d - 0.7, y2, floorC, 0.34);
+      this.rail(cx, cz, yaw, s * (w / 2 - 3.2), 0, 0.16, d - 0.7, y2, steel);
+    }
+
+    // 계단: 정면 출입구에서 가운데로 곧장 올라갑니다 (위에 아무것도 없어야 걸리지 않습니다)
+    const st = this.stairs(cx, cz, yaw, 0, -d / 2 + 1.2, base, y2, 2.6, 1, 0xa79f92);
+    const topZ = -d / 2 + 1.2 + st.len;             // 마지막 단이 끝나는 z
+    this.slab(cx, cz, yaw, 0, (topZ + mezFront + 0.2) / 2, 3.2,
+              Math.max(1.2, mezFront + 0.2 - topZ), y2, floorC, 0.32);   // 계단 참
+
+    // 지붕
+    this.box(cx, base + fh * 2 + 0.25, cz, w + 0.7, 0.5, d + 0.7, yaw, 0x8a5b47);
+    this.trim(cx, cz, yaw, 0, base + fh * 2 + 0.6, 0, w + 0.8, 0.18, d + 0.8, 0x6d4638);
+
+    // 기둥
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const [x, z] = this.local(cx, cz, yaw, sx * 7.5, sz * 4.6);
+      this.box(x, base + fh, z, 0.55, fh * 2, 0.55, yaw, 0xa79f92);
+    }
+
+    // 실내 배치와 아이템 자리
+    this.shelf(cx, cz, yaw, -w / 2 + 5.5, d / 2 - 1.1, base, 8);
+    this.shelf(cx, cz, yaw, w / 2 - 5.5, d / 2 - 1.1, base, 8);
+    for (let i = 0; i < 5; i++) {
+      const lx = (rnd() < 0.5 ? -1 : 1) * (2.6 + rnd() * (w / 2 - 4.5));
+      this.crateStack(cx, cz, yaw, lx, (rnd() - 0.5) * (d - 7), base);
+    }
+    for (let i = 0; i < 3; i++) {
+      const lx = (rnd() < 0.5 ? -1 : 1) * (2.6 + rnd() * (w / 2 - 4));
+      this.drum(cx, cz, yaw, lx, (rnd() - 0.5) * (d - 5), base);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * (w - 5), (rnd() - 0.5) * (d - 5), base + 0.05);
+    }
+    for (let i = 0; i < 3; i++) {
+      this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * (w - 6), d / 2 - 1.5 - rnd() * (mezD - 2), y2 + 0.05);
+    }
+    World.buildings.push({ x: cx, z: cz, kind: 'warehouse', r: Math.max(w, d) / 2 });
   },
 
+  /* ---------- 2층 주택 ---------- */
   house(cx, cz, yaw) {
     const base = World.height(cx, cz);
-    const w = 9.5, d = 7.5, h = 3.4;
+    const w = 14, d = 11, fh = 2.95;
     const wall = rnd() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
-    this.walls(cx, cz, yaw, w, d, h, 0.3, base, wall);
-    this.windows(cx, cz, yaw, w, d, h, base, 2, 2.0);
-    this.trim(cx, cz, yaw, 0, base + h * 0.45, -d / 2 - 0.02, 2.2, h * 0.9, 0.1, 0x6b5a48);
-    this.box(cx, base + h + 0.15, cz, w + 0.4, 0.3, d + 0.4, yaw, 0x8f6b52);
-    // 박공 지붕 (장식, 충돌 없음)
+    const floorC = 0x9a8b74;
+    const y2 = base + fh;
+
+    this.walls(cx, cz, yaw, w, d, fh * 2, 0.32, base, wall, ['front', 'right'], 2.1);
+    this.windows(cx, cz, yaw, w, d, fh, base, 3, 1.9);
+    this.windows(cx, cz, yaw, w, d, fh, base, 3, fh + 1.9);
+    this.trim(cx, cz, yaw, 0, base + 1.15, -d / 2 - 0.03, 2.3, 2.3, 0.1, 0x6b5a48);
+
+    // 1층 칸막이 (가운데에 문 하나)
+    for (const s of [-1, 1]) {
+      const seg = (d - 2.2) / 2;
+      const [x, z] = this.local(cx, cz, yaw, 1.2, s * (1.1 + seg / 2));
+      this.box(x, base + fh / 2, z, 0.26, fh, seg, yaw, wall);
+    }
+
+    // 2층 바닥 — 왼쪽 앞의 계단실만 비워 둡니다
+    const holeW = 3.4, holeD = 5.4;
+    this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW - 0.3, d - 0.6, y2, floorC, 0.30);
+    this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + holeD + (d - holeD) / 2, holeW, d - holeD, y2, floorC, 0.30);
+
+    // 계단 (왼쪽 앞에서 뒤로 올라갑니다)
+    this.stairs(cx, cz, yaw, -w / 2 + 1.6, -d / 2 + 0.9, base, y2, 2.0, 1, 0xa08a6c);
+    this.rail(cx, cz, yaw, -w / 2 + holeW + 0.1, -d / 2 + 1.2, 0.16, holeD - 1.2, y2, wall);
+
+    // 지붕
+    this.box(cx, base + fh * 2 + 0.16, cz, w + 0.5, 0.32, d + 0.5, yaw, 0x8f6b52);
     const roof = 0x7d4b3a;
     for (const s of [-1, 1]) {
       const [x, z] = this.local(cx, cz, yaw, 0, s * d / 4);
       this.boxDefs.push({
-        x, y: base + h + 0.95, z, sx: w + 0.7, sy: 0.26, sz: d / 2 + 0.5,
+        x, y: base + fh * 2 + 1.05, z, sx: w + 0.8, sy: 0.28, sz: d / 2 + 0.6,
         yaw, color: roof, solid: false, tilt: -s * 0.62
       });
     }
-    // 굴뚝
     const [px, pz] = this.local(cx, cz, yaw, w * 0.3, 0);
-    this.box(px, base + h + 1.6, pz, 0.7, 1.6, 0.7, yaw, 0x8b7f70);
+    this.box(px, base + fh * 2 + 1.7, pz, 0.7, 1.7, 0.7, yaw, 0x8b7f70);
+
+    // 가구와 아이템
+    this.crateStack(cx, cz, yaw, w / 2 - 2.5, -d / 2 + 2.2, base);
+    this.shelf(cx, cz, yaw, w / 2 - 1.0, 2.0, base, 4);
+    for (let i = 0; i < 3; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.4) * (w - 5), (rnd() - 0.5) * (d - 4), base + 0.05);
+    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, holeW + rnd() * (w - holeW - 3) - w / 2 + 1.5, (rnd() - 0.5) * (d - 4), y2 + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'house', r: Math.max(w, d) / 2 });
+  },
+
+  /* ---------- 3층 아파트: 마을의 랜드마크 ---------- */
+  apartment(cx, cz, yaw) {
+    const base = World.height(cx, cz);
+    const w = 19, d = 14, fh = 3.0;
+    const wall = 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
+    const holeW = 3.6;
+
+    this.walls(cx, cz, yaw, w, d, fh * 3, 0.34, base, wall, ['front', 'back'], 2.4);
+    for (let f = 0; f < 3; f++) this.windows(cx, cz, yaw, w, d, fh, base, 4, fh * f + 1.9);
+    this.trim(cx, cz, yaw, 0, base + 1.2, -d / 2 - 0.03, 2.6, 2.4, 0.1, 0x5c5f63);
+
+    /* 계단실: 반 층씩 올라가 뒤쪽 참에서 꺾어 앞쪽으로 다시 올라옵니다.
+       올라온 자리(앞쪽)에는 층마다 발판을 두고, 그 사이는 위아래로 통해 있습니다. */
+    const runLen = 0.62 * 4;                           // 반 층 = 4단
+    const laneA = -w / 2 + holeW * 0.27, laneB = -w / 2 + holeW * 0.73;
+    const zA = -d / 2 + 0.7;
+    const zB = zA + runLen + 1.6;                      // 뒤쪽 참을 지난 자리
+    const stairEnd = zB + 0.5 + d / 2;                 // 앞벽에서 계단실 끝까지의 깊이
+    const frontD = 1.9;                                // 층마다 앞쪽 발판 깊이
+    for (let f = 0; f < 3; f++) {
+      const y = base + fh * f, mid = y + fh / 2, top = y + fh;
+      this.stairs(cx, cz, yaw, laneA, zA, y, mid, holeW * 0.42, 1, 0xa79f92);
+      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, zA + runLen + 0.8, holeW, 1.7, mid, floorC, 0.30);
+      this.stairs(cx, cz, yaw, laneB, zB, mid, top, holeW * 0.42, -1, 0xa79f92);
+    }
+    /* 층 바닥: 오른쪽 큰 판 + 계단실 앞 발판 + 계단실 뒤 바닥.
+       f = 3 은 옥상 바닥이 됩니다 (계단실은 뚫려 있어 계단으로 올라옵니다). */
+    for (let f = 1; f <= 3; f++) {
+      const y = base + fh * f;
+      const c = f === 3 ? 0x8a8578 : floorC;
+      this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW + 0.4, d + 0.4, y, c, 0.34);
+      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + frontD / 2, holeW + 0.4, frontD, y, c, 0.34);
+      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd + (d - stairEnd) / 2,
+                holeW + 0.4, d - stairEnd + 0.2, y, c, 0.34);
+      this.rail(cx, cz, yaw, -w / 2 + holeW + 0.15, -d / 2 + stairEnd / 2, 0.16, stairEnd - 0.6, y, steel);
+    }
+
+    // 옥상 난간과 처마
+    const ry = base + fh * 3;
+    for (const s of [-1, 1]) {
+      this.rail(cx, cz, yaw, s * (w / 2 + 0.12), 0, 0.22, d + 0.7, ry, steel);
+      this.rail(cx, cz, yaw, 0, s * (d / 2 + 0.12), w + 0.7, 0.22, ry, steel);
+    }
+    this.trim(cx, cz, yaw, 0, ry - 0.28, 0, w + 0.9, 0.2, d + 0.9, 0x6f6a60);
+
+    for (let f = 0; f < 3; f++) {
+      const y = base + fh * f + 0.05;
+      if (f === 0) {
+        this.shelf(cx, cz, yaw, w / 2 - 1.2, 0, base, 6);
+        for (let i = 0; i < 2; i++) this.crateStack(cx, cz, yaw, (rnd() - 0.3) * (w - 8), (rnd() - 0.5) * (d - 5), base);
+      }
+      for (let i = 0; i < 3; i++) {
+        this.lootSpot(cx, cz, yaw, holeW + 1 - w / 2 + rnd() * (w - holeW - 3), (rnd() - 0.5) * (d - 4), y);
+      }
+    }
+    World.buildings.push({ x: cx, z: cz, kind: 'apartment', r: Math.max(w, d) / 2 });
   },
 
   shed(cx, cz, yaw) {
     const base = World.height(cx, cz);
-    const w = 5.6, d = 4.6, h = 2.9;
-    this.walls(cx, cz, yaw, w, d, h, 0.26, base, 0xa9a294);
-    this.box(cx, base + h + 0.14, cz, w + 0.35, 0.28, d + 0.35, yaw, 0x6f6a60);
+    const w = 7.4, d = 6.2, h = 3.1;
+    this.walls(cx, cz, yaw, w, d, h, 0.26, base, 0xa9a294, ['front'], 2.0);
+    this.box(cx, base + h + 0.14, cz, w + 0.4, 0.3, d + 0.4, yaw, 0x6f6a60);
+    if (rnd() < 0.6) this.crateStack(cx, cz, yaw, w / 2 - 1.4, d / 2 - 1.4, base);
+    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * (w - 3), (rnd() - 0.5) * (d - 3), base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'shed', r: Math.max(w, d) / 2 });
   },
 
   container(cx, cz, yaw) {
@@ -1576,18 +2316,23 @@ const Scenery = {
     if (rnd() < 0.3) {
       this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (rnd() - 0.5) * 0.2, color);
     }
+    if (rnd() < 0.4) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 5, 2.2, base + 2.65);
   },
-
   /* ---------- 자연물 ---------- */
   scatterNature(towns) {
     const nearTown = (x, z, pad) => towns.some(t => Math.hypot(t.x - x, t.z - z) < t.r + pad);
+    // 벌판에 홀로 선 건물 안이나 문 앞에 나무가 자라지 않도록
+    const nearBuilding = (x, z, pad) =>
+      World.buildings.some(b => Math.hypot(b.x - x, b.z - z) < b.r + pad);
 
     const density = Game.low ? 0.6 : 1;
-    for (let i = 0; i < Math.round(1100 * density); i++) {
+    for (let i = 0; i < Math.round(4400 * density); i++) {
       const lim = World.half * 0.95;
       const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 1.2 || nearTown(x, z, 8)) continue;
+      if (World.roadDist(x, z) < 4) continue;               // 도로는 비워 둡니다
+      if (nearBuilding(x, z, 7)) continue;
       // 숲은 뭉쳐서 자라도록 노이즈로 밀도 조절
       if (valueNoise(x / 55 + 11, z / 55 + 7) < 0.42) continue;
       const pine = rnd() < 0.55;
@@ -1596,7 +2341,7 @@ const Scenery = {
       World.addCyl({ x, z, r: 0.5 * s, top: y + 8 * s, h: 8 * s });
     }
 
-    for (let i = 0; i < 420; i++) {
+    for (let i = 0; i < 850; i++) {
       const s0 = World.freeSpot(3);
       const s = 0.7 + rnd() * 1.5;
       this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: rnd() * Math.PI * 2 });
@@ -1604,11 +2349,13 @@ const Scenery = {
       World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
     }
 
-    for (let i = 0; i < Math.round(2600 * density); i++) {
+    for (let i = 0; i < Math.round(7000 * density); i++) {
       const lim = World.half * 0.95;
       const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 0.8) continue;
+      if (World.roadDist(x, z) < 3) continue;
+      if (nearBuilding(x, z, 3)) continue;
       const r = rnd();
       const s = r < 0.6 ? 0.22 + rnd() * 0.28      // 잡초
                         : 0.6 + rnd() * 0.85;      // 수풀
@@ -1941,6 +2688,8 @@ const LootArt = {
       if (kind === 'gun') this.cache[key] = GunArt.geo(gun, 0);
       else if (kind === 'ammo') this.cache[key] = Build.merge(this.ammoParts(gun));
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
+      else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
+      else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
     return this.cache[key];
@@ -1982,6 +2731,36 @@ const LootArt = {
     ];
   },
 
+  /* 바닥에 떨어진 방탄조끼 */
+  vestParts(level) {
+    const B = Build, c = VESTS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
+    const parts = [
+      B.box(0.34, 0.40, 0.16, c, 0, 0.30, 0),              // 몸판
+      B.box(0.40, 0.13, 0.15, c, 0, 0.38, 0),              // 어깨 부분
+      B.box(0.09, 0.42, 0.03, strap, -0.12, 0.30, 0.09),   // 앞 끈
+      B.box(0.09, 0.42, 0.03, strap, 0.12, 0.30, 0.09),
+      B.box(0.36, 0.07, 0.03, strap, 0, 0.16, 0.09),
+      B.box(0.13, 0.10, 0.05, strap, 0, 0.30, 0.10)        // 탄창 주머니
+    ];
+    for (let i = 0; i < level; i++) parts.push(B.box(0.05, 0.05, 0.02, tag, -0.12 + i * 0.06, 0.47, 0.085));
+    return parts;
+  },
+
+  /* 바닥에 떨어진 가방 */
+  bagParts(level) {
+    const B = Build, c = BAGS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
+    const w = 0.30 + level * 0.045, h = 0.30 + level * 0.06, dz = 0.20 + level * 0.03;
+    const parts = [
+      B.box(w, h, dz, c, 0, h / 2 + 0.02, 0),
+      B.box(w * 0.9, h * 0.34, dz * 0.5, c, 0, h * 0.72, dz * 0.5),   // 위 주머니
+      B.box(0.07, h * 0.9, 0.04, strap, -w * 0.28, h / 2, -dz / 2 - 0.02),
+      B.box(0.07, h * 0.9, 0.04, strap, w * 0.28, h / 2, -dz / 2 - 0.02),
+      B.box(w * 0.75, 0.06, 0.03, strap, 0, h * 0.42, dz / 2 + 0.01)
+    ];
+    for (let i = 0; i < level; i++) parts.push(B.box(0.045, 0.045, 0.02, tag, -0.09 + i * 0.07, h + 0.01, dz / 2));
+    return parts;
+  },
+
   medParts() {
     const B = Build;
     const white = 0xeef1f2, gray = 0xb9c0c4, red = 0xd23b32;
@@ -2003,18 +2782,22 @@ const LootArt = {
 };
 
 class Loot {
-  constructor(x, z, kind, gun, amount, level) {
-    const y = World.height(x, z);
+  /* fixedY 를 주면 그 높이에 그대로 놓습니다 (건물 2·3층 파밍용) */
+  constructor(x, z, kind, gun, amount, level, fixedY) {
+    const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
-    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope'
+    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
     this.gun = gun || null;
     this.amount = amount || 0;
-    this.level = level || 0;          // 조준경 배율
+    this.level = level || 0;          // 조준경 배율 / 방어구 등급
     this.dead = false;
     this.spin = Math.random() * Math.PI * 2;
 
     const color = kind === 'gun' ? GUNS[gun].color
-      : (kind === 'ammo' ? 0xf2cc60 : (kind === 'scope' ? SCOPES[this.level].color : 0xff6b6b));
+      : (kind === 'ammo' ? 0xf2cc60
+      : (kind === 'scope' ? SCOPES[this.level].color
+      : (kind === 'vest' ? 0x9ecbff
+      : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -2037,6 +2820,8 @@ class Loot {
     if (this.kind === 'gun') return GUNS[this.gun].name + ' · ' + GUNS[this.gun].short;
     if (this.kind === 'ammo') return GUNS[this.gun].short + ' 탄약 ' + this.amount + '발';
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
+    if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
+    if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
     return '구급상자';
   }
 
@@ -2231,6 +3016,9 @@ class Char3D {
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
+    this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
+    this.bag = 0;                  // 가방 등급 (0 = 없음)
+    this.vehicle = null;           // 타고 있는 차량
     this.reloading = 0;
     this.cooldown = 0;
     this.healing = 0;
@@ -2317,6 +3105,65 @@ class Char3D {
   get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
   get eyeY() { return this.pos.y + (this.crouch ? 0.98 : CFG.EYE); }
 
+  /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
+  get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
+  get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
+  /* 조끼가 막아 주는 피해 비율 */
+  get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
+
+  /* 탄약을 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
+  addAmmo(key, n) {
+    const have = this.reserve[key] || 0;
+    const room = Math.max(0, this.ammoCap - have);
+    const take = Math.min(n, room);
+    this.reserve[key] = have + take;
+    return take;
+  }
+
+  /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
+  wear(kind, level) {
+    const cur = kind === 'vest' ? this.vest : this.bag;
+    if (cur >= level) return -1;
+    if (kind === 'vest') this.vest = level; else this.bag = level;
+    this.refreshGear();
+    return cur;
+  }
+
+  /* 조끼와 가방을 몸에 붙입니다 */
+  refreshGear() {
+    const B = Build, mat = Mats.vc({ roughness: 0.7, metalness: 0.05 });
+    if (this.vestMesh) { this.hips.remove(this.vestMesh); this.vestMesh = null; }
+    if (this.bagMesh) { this.hips.remove(this.bagMesh); this.bagMesh = null; }
+    if (this.vest) {
+      const c = VESTS[this.vest].color;
+      const parts = [
+        B.sphere(0.362, c, 0, 0.48, 0, 1.0, 0.62, 0.98, 20),          // 몸판
+        B.sphere(0.345, 0x2a2d33, 0, 0.30, 0, 1.02, 0.16, 1.0, 18),   // 아래 띠
+        B.box(0.10, 0.30, 0.05, 0x2a2d33, -0.13, 0.55, 0.29),         // 어깨 끈
+        B.box(0.10, 0.30, 0.05, 0x2a2d33, 0.13, 0.55, 0.29),
+        B.box(0.15, 0.11, 0.06, 0x2a2d33, 0, 0.42, 0.31)              // 탄창 주머니
+      ];
+      for (let i = 0; i < this.vest; i++) {
+        parts.push(B.box(0.045, 0.045, 0.02, 0xf0c453, -0.05 + i * 0.05, 0.62, 0.33));
+      }
+      this.vestMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.vestMesh.castShadow = true;
+      this.hips.add(this.vestMesh);
+    }
+    if (this.bag) {
+      const c = BAGS[this.bag].color;
+      const w = 0.34 + this.bag * 0.05, h = 0.34 + this.bag * 0.07, dz = 0.16 + this.bag * 0.035;
+      const parts = [
+        B.box(w, h, dz, c, 0, 0.44, -0.30 - dz / 2),
+        B.box(w * 0.86, h * 0.32, dz * 0.6, c, 0, 0.44 + h * 0.24, -0.30 - dz * 0.9),
+        B.box(w * 0.7, 0.05, 0.03, 0x2a2d33, 0, 0.40, -0.30 - dz - 0.01)
+      ];
+      this.bagMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.bagMesh.castShadow = true;
+      this.hips.add(this.bagMesh);
+    }
+  }
+
   forward(out) {
     return (out || new THREE.Vector3()).set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
   }
@@ -2329,7 +3176,7 @@ class Char3D {
     this.mags[idx] = GUNS[key].mag;
     this.scopes[idx] = 0;
     this.scopeOff[idx] = false;
-    this.reserve[key] = (this.reserve[key] || 0) + (ammo == null ? GUNS[key].ammoPer : ammo);
+    this.addAmmo(key, ammo == null ? GUNS[key].ammoPer : ammo);
     this.reloading = 0;
     this.slot = idx;
     this.refreshGuns();
@@ -2554,6 +3401,352 @@ class Char3D {
 }
 
 /* ============================================================
+   차량: 넓어진 맵을 빠르게 이동하는 수단
+   바퀴는 따로 두어 굴러가고 앞바퀴가 조향합니다.
+   ============================================================ */
+const VehicleArt = {
+  cache: {},
+
+  get(key) {
+    if (!this.cache[key]) this.cache[key] = this.build(key);
+    return this.cache[key];
+  },
+
+  build(key) {
+    const B = Build;
+    const spec = VEHICLES[key];
+    const body = spec.color, dark = 0x24272d, glass = 0x5b7d94, metal = 0x9aa3ab;
+    let parts, wheels;
+
+    if (key === 'bike') {
+      parts = [
+        B.box(0.30, 0.22, 1.55, body, 0, 0.62, 0),               // 프레임
+        B.box(0.44, 0.16, 0.55, dark, 0, 0.78, -0.20),           // 안장
+        B.box(0.34, 0.30, 0.30, body, 0, 0.80, 0.55),            // 연료탱크
+        B.box(0.62, 0.06, 0.10, dark, 0, 0.96, 0.72),            // 핸들
+        B.box(0.16, 0.34, 0.10, glass, 0, 1.06, 0.80),           // 바람막이
+        B.box(0.10, 0.42, 0.10, metal, 0, 0.72, 0.74, 0.35),     // 앞 포크
+        B.box(0.24, 0.20, 0.36, dark, 0, 0.50, -0.62)            // 뒤 짐받이
+      ];
+      wheels = [{ x: 0, y: 0.42, z: 0.78, r: 0.42, w: 0.16, steer: true },
+                { x: 0, y: 0.42, z: -0.70, r: 0.42, w: 0.20, steer: false }];
+    } else if (key === 'buggy') {
+      parts = [
+        B.box(1.70, 0.42, 3.00, body, 0, 0.66, 0),               // 차대
+        B.box(1.40, 0.44, 1.10, dark, 0, 1.05, -0.30),           // 좌석
+        B.box(1.55, 0.10, 1.20, dark, 0, 1.62, -0.30),           // 롤케이지 지붕
+        B.box(0.10, 0.90, 0.10, metal, -0.72, 1.20, 0.25),
+        B.box(0.10, 0.90, 0.10, metal, 0.72, 1.20, 0.25),
+        B.box(0.10, 0.90, 0.10, metal, -0.72, 1.20, -0.85),
+        B.box(0.10, 0.90, 0.10, metal, 0.72, 1.20, -0.85),
+        B.box(1.30, 0.30, 0.24, dark, 0, 0.92, 1.42),            // 앞 범퍼
+        B.box(0.30, 0.20, 0.14, 0xfff0c0, -0.48, 0.92, 1.52),    // 전조등
+        B.box(0.30, 0.20, 0.14, 0xfff0c0, 0.48, 0.92, 1.52),
+        B.box(1.20, 0.36, 0.60, dark, 0, 0.86, -1.30)            // 엔진
+      ];
+      wheels = [{ x: -0.95, y: 0.50, z: 1.05, r: 0.50, w: 0.30, steer: true },
+                { x: 0.95, y: 0.50, z: 1.05, r: 0.50, w: 0.30, steer: true },
+                { x: -0.95, y: 0.50, z: -1.10, r: 0.52, w: 0.34, steer: false },
+                { x: 0.95, y: 0.50, z: -1.10, r: 0.52, w: 0.34, steer: false }];
+    } else {                                                     // 픽업트럭
+      parts = [
+        B.box(1.95, 0.55, 4.40, body, 0, 0.78, 0),               // 차체
+        B.box(1.85, 0.80, 1.90, body, 0, 1.42, 0.35),            // 운전실
+        B.box(1.70, 0.62, 0.10, glass, 0, 1.48, 1.28),           // 앞 유리
+        B.box(0.10, 0.60, 1.70, glass, -0.90, 1.46, 0.30),       // 측면 유리
+        B.box(0.10, 0.60, 1.70, glass, 0.90, 1.46, 0.30),
+        B.box(1.85, 0.10, 1.85, dark, 0, 1.84, 0.35),            // 지붕
+        B.box(1.90, 0.55, 1.90, dark, 0, 1.08, -1.35),           // 짐칸
+        B.box(1.90, 0.12, 0.12, dark, 0, 1.36, -2.24),
+        B.box(1.75, 0.34, 0.26, dark, 0, 0.78, 2.16),            // 앞 범퍼
+        B.box(0.34, 0.22, 0.14, 0xfff0c0, -0.62, 0.92, 2.24),    // 전조등
+        B.box(0.34, 0.22, 0.14, 0xfff0c0, 0.62, 0.92, 2.24),
+        B.box(0.26, 0.16, 0.12, 0xc23b32, -0.72, 0.92, -2.24),   // 후미등
+        B.box(0.26, 0.16, 0.12, 0xc23b32, 0.72, 0.92, -2.24),
+        B.box(0.70, 0.50, 0.12, metal, 0, 1.10, -2.30)           // 예비 타이어 거치
+      ];
+      wheels = [{ x: -1.02, y: 0.55, z: 1.52, r: 0.55, w: 0.34, steer: true },
+                { x: 1.02, y: 0.55, z: 1.52, r: 0.55, w: 0.34, steer: true },
+                { x: -1.02, y: 0.55, z: -1.48, r: 0.55, w: 0.34, steer: false },
+                { x: 1.02, y: 0.55, z: -1.48, r: 0.55, w: 0.34, steer: false }];
+    }
+    return { body: B.merge(parts), wheels };
+  },
+
+  wheelGeo(r, w) {
+    const key = 'w' + r + ':' + w;
+    if (!this.cache[key]) {
+      const g = new THREE.CylinderGeometry(r, r, w, 12);
+      g.rotateZ(Math.PI / 2);                                    // 축이 x 를 향하도록
+      const hub = new THREE.BoxGeometry(w + 0.03, r * 0.5, r * 0.5);
+      const parts = [
+        { geo: g, color: 0x22252a, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 },
+        { geo: hub, color: 0x9aa3ab, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 }
+      ];
+      this.cache[key] = Build.merge(parts);
+    }
+    return this.cache[key];
+  }
+};
+
+class Vehicle3D {
+  constructor(x, z, key) {
+    this.key = key;
+    this.spec = VEHICLES[key];
+    this.pos = new THREE.Vector3(x, World.height(x, z), z);
+    this.yaw = Math.random() * Math.PI * 2;
+    this.speed = 0;
+    this.steer = 0;
+    this.hp = this.spec.hp;
+    this.dead = false;
+    this.driver = null;
+    this.spin = 0;
+    this.pitch = 0; this.roll = 0;
+
+    const art = VehicleArt.get(key);
+    const mat = Mats.vc({ roughness: 0.62, metalness: 0.22 });
+    this.mesh = new THREE.Group();
+    this.tilt = new THREE.Group();                 // 지형 기울기용
+    this.mesh.add(this.tilt);
+    const bodyMesh = new THREE.Mesh(art.body, mat);
+    bodyMesh.castShadow = true;
+    this.tilt.add(bodyMesh);
+
+    this.wheels = art.wheels.map(w => {
+      const m = new THREE.Mesh(VehicleArt.wheelGeo(w.r, w.w), mat);
+      m.castShadow = true;
+      m.position.set(w.x, w.y, w.z);
+      m.userData.steer = w.steer;
+      this.tilt.add(m);
+      return m;
+    });
+
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+    // 충돌: 차량도 장애물로 등록하지 않고, 캐릭터와는 게임 쪽에서 따로 판정합니다
+  }
+
+  get occupied() { return !!this.driver; }
+  get seatY() { return this.spec.seatH; }
+
+  /* 입력에 따라 굴러갑니다. throttle -1~1, steer -1~1 */
+  drive(dt, throttle, steer, brake) {
+    const sp = this.spec;
+    if (this.dead) throttle = 0;
+    if (brake) {
+      const s = Math.sign(this.speed);
+      this.speed -= s * sp.brake * dt;
+      if (Math.sign(this.speed) !== s) this.speed = 0;
+    } else if (throttle > 0.05) {
+      this.speed += sp.accel * throttle * dt * (this.speed < 0 ? 2.2 : 1);
+    } else if (throttle < -0.05) {
+      this.speed += sp.accel * throttle * dt * (this.speed > 0 ? 2.2 : 0.7);
+    } else {
+      this.speed *= Math.max(0, 1 - dt * 1.1);     // 관성 주행
+      if (Math.abs(this.speed) < 0.15) this.speed = 0;
+    }
+    this.speed = Math.max(-sp.rev, Math.min(sp.max, this.speed));
+
+    // 조향은 속도가 있어야 듣습니다
+    this.steer += (steer - this.steer) * Math.min(1, dt * 9);
+    const grip = Math.min(1, Math.abs(this.speed) / 5.5);
+    this.yaw -= this.steer * sp.turn * dt * grip * Math.sign(this.speed || 1);
+
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const nx = this.pos.x + fx * this.speed * dt;
+    const nz = this.pos.z + fz * this.speed * dt;
+
+    // 장애물: 밀려난 거리가 크면 부딪힌 것으로 봅니다
+    const res = World.resolve(nx, nz, sp.r, this.pos.y + 0.4, this.pos.y + 1.6);
+    const pushed = Math.hypot(res.x - nx, res.z - nz);
+    this.pos.x = res.x; this.pos.z = res.z;
+    if (pushed > 0.06) {
+      const impact = Math.abs(this.speed);
+      this.speed *= 0.25;
+      if (impact > 9) this.damage(impact * 3.5);
+    }
+
+    // 지형 따라가기 + 기울기
+    const g = World.groundY(this.pos.x, this.pos.z, this.pos.y + 0.6);
+    this.pos.y += (g - this.pos.y) * Math.min(1, dt * 12);
+    const ahead = 1.6;
+    const hF = World.height(this.pos.x + fx * ahead, this.pos.z + fz * ahead);
+    const hB = World.height(this.pos.x - fx * ahead, this.pos.z - fz * ahead);
+    const rx = -fz, rz = fx;
+    const hR = World.height(this.pos.x + rx * ahead, this.pos.z + rz * ahead);
+    const hL = World.height(this.pos.x - rx * ahead, this.pos.z - rz * ahead);
+    const wantPitch = Math.atan2(hB - hF, ahead * 2);
+    const wantRoll = Math.atan2(hR - hL, ahead * 2);
+    this.pitch += (wantPitch - this.pitch) * Math.min(1, dt * 6);
+    this.roll += (wantRoll - this.roll) * Math.min(1, dt * 6);
+
+    // 바퀴 회전
+    this.spin += this.speed * dt / 0.5;
+    for (const w of this.wheels) {
+      w.rotation.x = this.spin;
+      w.rotation.y = w.userData.steer ? -this.steer * 0.5 : 0;
+    }
+    this.sync();
+  }
+
+  sync() {
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+    this.tilt.rotation.set(this.pitch, 0, this.roll);
+  }
+
+  damage(n) {
+    if (this.dead) return;
+    this.hp -= n;
+    if (this.hp <= 0) { this.hp = 0; this.dead = true; }
+  }
+}
+
+/* ============================================================
+   공중 보급: 비행기가 떨어뜨린 상자
+   낙하산을 달고 내려와 착지하면 연기를 피우고, F 로 열 수 있습니다.
+   ============================================================ */
+const CrateArt = {
+  geo: null, chuteGeo: null,
+
+  crate() {
+    if (this.geo) return this.geo;
+    const B = Build;
+    const red = 0xc23b32, white = 0xe8e4da, dark = 0x2a2d33, tan = 0x9a7a4a;
+    this.geo = B.merge([
+      B.box(1.60, 1.10, 1.60, tan, 0, 0.55, 0),
+      B.box(1.66, 0.16, 1.66, red, 0, 1.05, 0),          // 뚜껑 테두리
+      B.box(1.68, 0.26, 0.30, red, 0, 0.62, 0),          // 붉은 띠
+      B.box(0.30, 0.26, 1.68, red, 0, 0.62, 0),
+      B.box(1.66, 0.10, 0.14, dark, 0, 0.16, 0.80),      // 아래 보강대
+      B.box(1.66, 0.10, 0.14, dark, 0, 0.16, -0.80),
+      B.box(0.44, 0.44, 0.06, white, 0, 0.62, 0.82),     // 표식
+      B.box(0.30, 0.10, 0.02, red, 0, 0.62, 0.86),
+      B.box(0.10, 0.30, 0.02, red, 0, 0.62, 0.86),
+      B.box(0.26, 0.12, 0.26, dark, 0, 1.18, 0)          // 고리
+    ]);
+    return this.geo;
+  },
+
+  chute() {
+    if (this.chuteGeo) return this.chuteGeo;
+    const dome = new THREE.SphereGeometry(2.3, 14, 7, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    dome.scale(1, 0.6, 1);
+    const nd = dome.index ? dome.toNonIndexed() : dome;
+    const pos = nd.attributes.position, nor = nd.attributes.normal;
+    const positions = [], normals = [], colors = [];
+    const a = new THREE.Color(0xc23b32).convertSRGBToLinear();
+    const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
+    for (let i = 0; i < pos.count; i += 3) {
+      let mx = 0, mz = 0;
+      for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
+      const ang = Math.atan2(mz / 3, mx / 3);
+      const c = Math.floor((ang + Math.PI) / (Math.PI * 2) * 8) % 2 ? a : b;
+      for (let k = 0; k < 3; k++) {
+        positions.push(pos.getX(i + k), pos.getY(i + k) + 3.4, pos.getZ(i + k));
+        normals.push(nor.getX(i + k), nor.getY(i + k), nor.getZ(i + k));
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+    dome.dispose(); if (nd !== dome) nd.dispose();
+    const lines = Build.merge([0, 1, 2, 3].map(i => {
+      const ang = (i / 4) * Math.PI * 2 + 0.4;
+      const x = Math.cos(ang) * 1.1, z = Math.sin(ang) * 1.1;
+      return Build.box(0.05, 3.1, 0.05, 0xd8d4c8, x, 1.8, z,
+                       Math.atan2(z, 1.8) * 0.5, 0, -Math.atan2(x, 1.8) * 0.5);
+    }));
+    const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
+    for (let i = 0; i < lp.count; i++) {
+      positions.push(lp.getX(i), lp.getY(i), lp.getZ(i));
+      normals.push(ln.getX(i), ln.getY(i), ln.getZ(i));
+      colors.push(lc.getX(i), lc.getY(i), lc.getZ(i));
+    }
+    lines.dispose();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeBoundingSphere();
+    this.chuteGeo = geo;
+    return geo;
+  },
+
+  smokeGeo: null,
+  smoke() {
+    if (!this.smokeGeo) this.smokeGeo = new THREE.CylinderGeometry(1.1, 2.6, 34, 12, 1, true);
+    return this.smokeGeo;
+  }
+};
+
+class Airdrop {
+  constructor(x, z, y) {
+    this.pos = new THREE.Vector3(x, y, z);
+    this.landed = false;
+    this.opened = false;
+    this.dead = false;
+    this.drift = (Math.random() - 0.5) * 1.6;
+    this.spin = Math.random() * Math.PI;
+
+    this.mesh = new THREE.Group();
+    this.crate = new THREE.Mesh(CrateArt.crate(), Mats.vc({ roughness: 0.7, metalness: 0.1 }));
+    this.crate.castShadow = true;
+    this.mesh.add(this.crate);
+
+    this.chute = new THREE.Mesh(CrateArt.chute(), Mats.vc({ roughness: 0.9, side: THREE.DoubleSide }));
+    this.chute.position.y = 1.2;
+    this.mesh.add(this.chute);
+
+    this.smoke = new THREE.Mesh(CrateArt.smoke(), new THREE.MeshBasicMaterial({
+      color: srgb(0xff5a4a), transparent: true, opacity: 0.16,
+      depthWrite: false, side: THREE.DoubleSide
+    }));
+    this.smoke.position.y = 17;
+    this.smoke.visible = false;
+    this.mesh.add(this.smoke);
+
+    this.mesh.position.copy(this.pos);
+  }
+
+  update(dt) {
+    this.spin += dt * 0.35;
+    if (!this.landed) {
+      this.pos.y -= CFG.DROP_FALL * dt;
+      this.pos.x += Math.sin(this.spin) * this.drift * dt;
+      this.pos.z += Math.cos(this.spin * 0.8) * this.drift * dt;
+      const g = World.groundY(this.pos.x, this.pos.z, this.pos.y);
+      if (this.pos.y <= g) {
+        this.pos.y = g;
+        this.landed = true;
+        this.chute.visible = false;
+        this.smoke.visible = true;
+        World.addCyl({ x: this.pos.x, z: this.pos.z, r: 1.15, top: this.pos.y + 1.15, h: 1.3 });
+      } else {
+        this.chute.rotation.z = Math.sin(this.spin) * 0.06;
+      }
+    } else {
+      this.smoke.material.opacity = 0.13 + Math.sin(this.spin * 3) * 0.03;
+      this.smoke.rotation.y = this.spin * 0.4;
+    }
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.landed ? this.mesh.rotation.y : this.spin * 0.5;
+  }
+
+  /* 상자를 엽니다: 안에 든 것이 주변에 흩어집니다 */
+  contents() {
+    const t = DROP_TABLE;
+    const gun = t.guns[Math.floor(Math.random() * t.guns.length)];
+    const scope = t.scopes[Math.floor(Math.random() * t.scopes.length)];
+    return [
+      { kind: 'gun', gun, amount: GUNS[gun].ammoPer },
+      { kind: 'scope', level: scope },
+      { kind: 'vest', level: t.vest },
+      { kind: 'bag', level: t.bag },
+      { kind: 'med', amount: t.meds }
+    ];
+  }
+}
+
+/* ============================================================
    봇 인공지능 (3D)
    무거운 판단은 0.1~0.2초마다, 이동과 사격은 매 프레임 처리합니다.
    ============================================================ */
@@ -2688,13 +3881,33 @@ const AI = {
       return;
     }
 
-    // 아이템 찾기
-    if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70)) {
-      let target = null, bd = 70 * 70;
+    // 착지한 보급 상자가 가까우면 챙기러 갑니다
+    if (!enemy) {
+      let box = null, bxd = 130 * 130;
+      for (const dr of game.drops) {
+        if (!dr.landed || dr.opened || dr.dead) continue;
+        const d = (dr.pos.x - bot.pos.x) ** 2 + (dr.pos.z - bot.pos.z) ** 2;
+        if (d < bxd) { bxd = d; box = dr; }
+      }
+      if (box) {
+        a.state = 'loot';
+        a.dest = { x: box.pos.x, z: box.pos.z };
+        if (bxd < CFG.DROP_OPEN * CFG.DROP_OPEN) game.openDrop(bot, box);
+        return;
+      }
+    }
+
+    // 아이템 찾기 (무기·탄약뿐 아니라 조끼와 가방도 챕니다)
+    const wantGear = bot.vest < 3 || bot.bag < 3;
+    if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70) || wantGear) {
+      let target = null, bd = 80 * 80;
       for (const l of game.loots) {
         if (l.dead) continue;
-        if (l.kind === 'ammo' && (!bot.gun || l.gun !== bot.gun)) continue;
-        if (l.kind === 'med' && bot.meds >= 2) continue;
+        if (l.kind === 'ammo' && (bot.guns.indexOf(l.gun) < 0 ||
+            (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
+        if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
+        if (l.kind === 'vest' && bot.vest >= l.level) continue;
+        if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;
         const d = (l.pos.x - bot.pos.x) ** 2 + (l.pos.z - bot.pos.z) ** 2;
@@ -2778,7 +3991,8 @@ const AI = {
    ============================================================ */
 const Game = {
   renderer: null, scene: null, camera: null, sun: null,
-  chars: [], loots: [], tracers: [], puffs: [],
+  chars: [], loots: [], tracers: [], puffs: [], vehicles: [], drops: [],
+  dropTimer: 0,
   player: null, zone: null, zoneMesh: null,
   state: 'menu', time: 0, result: null,
   look: { yaw: 0, pitch: -0.06 },      // 목표 시점
@@ -2841,8 +4055,8 @@ const Game = {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
-    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.42));
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.52));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.20));   // 건물 안이 너무 어둡지 않도록
     this.fill = new THREE.DirectionalLight(0x9fc4ee, 0.55);   // 그림자 없는 보조광
     this.fill.position.set(-60, 40, -70);
     this.scene.add(this.fill);
@@ -2980,8 +4194,13 @@ const Game = {
     if (this.zoneMesh) this.scene.remove(this.zoneMesh);
     Scenery.dispose(this.scene);
 
+    for (const v of (this.vehicles || [])) this.scene.remove(v.mesh);
+    for (const a of (this.drops || [])) this.scene.remove(a.mesh);
+
     RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
     this.chars = []; this.loots = []; this.feed = []; this.botById = {};
+    this.vehicles = []; this.drops = [];
+    this.dropTimer = CFG.DROP_FIRST;
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
 
@@ -3030,6 +4249,8 @@ const Game = {
       this.botById[i] = b;
       for (const k of GUN_KEYS) b.reserve[k] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
+      if (Math.random() < 0.30) b.wear('vest', 1);
+      if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
     }
@@ -3050,6 +4271,7 @@ const Game = {
     }
 
     this.spawnLoot();
+    this.spawnVehicles();
     RNG.end();                            // 여기서부터는 각자의 난수 (조준 흔들림, 봇 판단 등)
     this.buildMinimapImage();
     this.ads = false;
@@ -3082,32 +4304,73 @@ const Game = {
   },
 
   spawnLoot() {
-    const add = (x, z) => {
-      const roll = Math.random();
+    const add = (x, z, y) => {
+      const roll = rnd();
       let l;
-      if (roll < 0.40) {
-        const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer);
-      } else if (roll < 0.68) {
-        const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5));
-      } else if (roll < 0.85) {
-        const lv = SCOPE_LEVELS[Math.floor(Math.random() * SCOPE_LEVELS.length)];
-        l = new Loot(x, z, 'scope', null, 0, lv);
+      if (roll < 0.34) {
+        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
+        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer, 0, y);
+      } else if (roll < 0.58) {
+        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
+        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5), 0, y);
+      } else if (roll < 0.72) {
+        const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
+        l = new Loot(x, z, 'scope', null, 0, lv, y);
+      } else if (roll < 0.83) {
+        l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.92) {
+        l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else {
-        l = new Loot(x, z, 'med', null, 1);
+        l = new Loot(x, z, 'med', null, 1, 0, y);
       }
       l.id = this.loots.length;
       this.scene.add(l.mesh);
       this.loots.push(l);
     };
+    // 건물 안 (1·2·3층) — 실내 파밍이 기본이 되도록 넉넉하게 깔아 둡니다
+    for (const sp of Scenery.lootSpots) add(sp.x, sp.z, sp.y);
+    // 마을 야외
     for (const t of World.towns) {
-      for (let i = 0; i < 13; i++) {
-        const s = World.freeSpot(1, t, t.r);
-        add(s.x, s.z);
+      for (let i = 0; i < 9; i++) {
+        const sp = World.freeSpot(1, t, t.r);
+        add(sp.x, sp.z);
       }
     }
-    for (let i = 0; i < 55; i++) { const s = World.freeSpot(1); add(s.x, s.z); }
+    // 벌판
+    for (let i = 0; i < 90; i++) { const sp = World.freeSpot(1); add(sp.x, sp.z); }
+  },
+
+  /* 차량을 도로 위와 마을 근처에 놓습니다 */
+  spawnVehicles() {
+    for (const v of this.vehicles) this.scene.remove(v.mesh);
+    this.vehicles = [];
+    const put = (x, z, key) => {
+      if (World.height(x, z) < World.waterY + 1) return;
+      const v = new Vehicle3D(x, z, key);
+      v.pos.y = World.groundY(x, z, v.pos.y + 1);
+      v.sync();
+      this.scene.add(v.mesh);
+      this.vehicles.push(v);
+    };
+    // 도로 위: 일정 간격으로
+    for (const r of World.roads) {
+      const len = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+      const n = Math.max(1, Math.round(len / 130));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n + (rnd() - 0.5) * 0.1;
+        const x = r.x1 + (r.x2 - r.x1) * t + (rnd() - 0.5) * 4;
+        const z = r.z1 + (r.z2 - r.z1) * t + (rnd() - 0.5) * 4;
+        put(x, z, VEHICLE_KEYS[Math.floor(rnd() * VEHICLE_KEYS.length)]);
+      }
+    }
+    // 마을마다 한두 대
+    for (const t of World.towns) {
+      const n = 1 + Math.floor(rnd() * 2);
+      for (let i = 0; i < n; i++) {
+        const sp = World.freeSpot(3, t, t.r);
+        put(sp.x, sp.z, VEHICLE_KEYS[Math.floor(rnd() * VEHICLE_KEYS.length)]);
+      }
+    }
   },
 
   get alive() { return this.chars.reduce((n, c) => n + (c.dead ? 0 : 1), 0); },
@@ -3159,6 +4422,9 @@ const Game = {
 
       c.syncMesh(dt, c === this.player ? this.ads : !!(c.ai && c.ai.state === 'fight'));
     }
+
+    this.updateDrops(dt);
+    this.updateVehicles(dt);
 
     // 아이템: 멀면 숨기고, 지금 주울 수 있는 것은 강조
     this.highlight = this.player.dead ? null : this.nearestLoot(this.player);
@@ -3242,6 +4508,24 @@ const Game = {
     input.dx = 0; input.dy = 0;
     p.yaw = this.look.yaw;
     p.pitch = this.look.pitch;
+
+    // ---------- 차량 운전 ----------
+    if (p.vehicle) {
+      const v = p.vehicle;
+      let th = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
+      let st = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
+      th = Math.max(-1, Math.min(1, th));
+      st = Math.max(-1, Math.min(1, st));
+      v.drive(dt, th, st, !!input.crouch);          // C 키가 브레이크
+      // 운전자는 차와 함께 움직입니다
+      p.pos.set(v.pos.x, v.pos.y, v.pos.z);
+      p.speedNow = Math.abs(v.speed);
+      p.crouch = false;
+      this.ads = false;
+      input.fire = false;
+      if (v.dead) { this.pushFeed(v.spec.name + ' 이(가) 파괴되었습니다'); this.exitVehicle(p); }
+      return;
+    }
 
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
@@ -3403,6 +4687,8 @@ const Game = {
 
   damage(target, amount, src, head, isZone) {
     if (target.dead) return;
+    // 방탄조끼는 몸에 맞은 피해만 줄여 줍니다 (머리와 자기장은 그대로)
+    if (!isZone && !head && target.armor > 0) amount *= (1 - target.armor);
     target.hp -= amount;
     if (!isZone) {
       target.hitFlash = 0.12;
@@ -3435,15 +4721,23 @@ const Game = {
     c.guns.forEach((key, i) => {
       if (!key) return;
       const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
-                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)));
+                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)), 0, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
       if (c.scopes[i]) {
-        const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i]);
+        const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i], c.pos.y);
         this.scene.add(s.mesh); this.loots.push(s);
       }
     });
     if (c.meds > 0) {
-      const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, 1);
+      const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, c.meds, 0, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.vest) {
+      const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.bag) {
+      const l = new Loot(c.pos.x - 0.4, c.pos.z - 1.4, 'bag', null, 0, c.bag, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
   },
@@ -3452,8 +4746,11 @@ const Game = {
     if (l.dead) return false;
     if (l.kind === 'gun') {
       if (ch.guns.indexOf(l.gun) >= 0) {          // 이미 가진 총이면 탄약만
-        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
-        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + l.amount);
+        const got = ch.addAmmo(l.gun, l.amount);
+        if (ch === this.player) {
+          this.pushFeed(got > 0 ? GUNS[l.gun].short + ' 탄약 +' + got : '탄약이 가득 찼습니다 (가방을 구하세요)');
+        }
+        if (got <= 0) return false;
       } else if (ch.guns.indexOf(null) >= 0) {    // 빈 칸에 넣기
         const idx = ch.giveGun(l.gun, l.amount);
         if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득 (' + (idx + 1) + '번 칸)');
@@ -3461,7 +4758,7 @@ const Game = {
         const old = ch.gun, oldAmmo = ch.mag + (ch.reserve[old] || 0);
         ch.guns[ch.slot] = l.gun;
         ch.mags[ch.slot] = GUNS[l.gun].mag;
-        ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
+        ch.addAmmo(l.gun, l.amount);
         ch.reserve[old] = 0;
         ch.reloading = 0;
         ch.refreshGuns();
@@ -3483,12 +4780,37 @@ const Game = {
       }
       if (ch === this.player) this.pushFeed(SCOPES[l.level].name + ' 장착 (' + GUNS[ch.gun].short + ')');
     } else if (l.kind === 'ammo') {
-      if (!ch.gun) return false;
-      ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
-      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + l.amount);
+      if (ch.guns.indexOf(l.gun) < 0) {
+        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 을 쓰는 총이 없습니다');
+        return false;
+      }
+      const got = ch.addAmmo(l.gun, l.amount);
+      if (got <= 0) {
+        if (ch === this.player) this.pushFeed('탄약이 가득 찼습니다 (가방을 구하세요)');
+        return false;
+      }
+      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + got);
+    } else if (l.kind === 'vest' || l.kind === 'bag') {
+      const old = ch.wear(l.kind, l.level);
+      if (old < 0) {
+        if (ch === this.player) this.pushFeed('이미 더 좋은 것을 착용 중입니다');
+        return false;
+      }
+      if (old > 0) {                       // 벗은 것은 바닥에 내려놓습니다
+        const d = new Loot(l.pos.x + 1.1, l.pos.z, l.kind, null, 0, old, l.pos.y);
+        d.id = this.loots.length;
+        this.scene.add(d.mesh); this.loots.push(d);
+      }
+      if (ch === this.player) {
+        this.pushFeed((l.kind === 'vest' ? VESTS : BAGS)[l.level].name + ' 착용');
+      }
     } else {
-      if (ch.meds >= CFG.MAX_MEDS) return false;
-      ch.meds++;
+      const cap = ch.medCap;
+      if (ch.meds >= cap) {
+        if (ch === this.player) this.pushFeed('구급상자를 더 들 수 없습니다 (가방을 구하세요)');
+        return false;
+      }
+      ch.meds = Math.min(cap, ch.meds + Math.max(1, l.amount || 1));
       if (ch === this.player) this.pushFeed('구급상자 획득');
     }
     l.dead = true;
@@ -3526,9 +4848,20 @@ const Game = {
   tryPickup() {
     const p = this.player;
     if (p.dead) return false;
+    if (p.vehicle) return this.exitVehicle(p);          // 타고 있으면 내립니다
+    if (p.flying) return false;
+
     const l = this.nearestLoot(p);
-    if (!l) { this.pushFeed('주울 물건이 없습니다 — 아이템 가까이 가세요'); return false; }
-    return this.pickUp(p, l);
+    const drop = this.nearestDrop(p);
+    const veh = this.nearestVehicle(p);
+    // 발밑에 아이템이 있으면 그것부터, 없으면 상자 → 차량 순서
+    const lootD = l ? Math.hypot(l.pos.x - p.pos.x, l.pos.z - p.pos.z) : Infinity;
+    if (l && lootD <= CFG.PICK_RANGE) return this.pickUp(p, l);
+    if (drop) return this.openDrop(p, drop);
+    if (veh) return this.enterVehicle(p, veh);
+    if (l) return this.pickUp(p, l);
+    this.pushFeed('주울 물건이 없습니다 — 아이템 가까이 가세요');
+    return false;
   },
 
   /* 낙하: 자유낙하 → 낙하산 → 착지 */
@@ -3589,6 +4922,17 @@ const Game = {
     const headY = ch.pos.y + (ch.crouch ? 1.35 : CFG.BODY_H);
     const res = World.resolve(nx, nz, CFG.BODY_R, ch.pos.y, headY);
     ch.pos.x = res.x; ch.pos.z = res.z;
+    // 세워 둔 차량은 밀고 지나갈 수 없습니다
+    for (const v of this.vehicles) {
+      if (v.driver === ch) continue;
+      if (Math.abs(v.pos.y - ch.pos.y) > 2.4) continue;
+      const dx = ch.pos.x - v.pos.x, dz = ch.pos.z - v.pos.z;
+      const d = Math.hypot(dx, dz), min = CFG.BODY_R + v.spec.r;
+      if (d < min && d > 1e-4) {
+        ch.pos.x = v.pos.x + dx / d * min;
+        ch.pos.z = v.pos.z + dz / d * min;
+      }
+    }
 
     ch.vy -= CFG.GRAVITY * dt;
     ch.pos.y += ch.vy * dt;
@@ -3622,7 +4966,8 @@ const Game = {
     ).normalize();
 
     const scoped = this.ads && p.zoom >= 4;
-    const fpv = Settings.data.fpv && !p.flying && !p.victory;
+    const inCar = !!p.vehicle;
+    const fpv = Settings.data.fpv && !p.flying && !p.victory && !inCar;
 
     if (fpv) {                                  // ---------- 1인칭 ----------
       const eyeY = p.pos.y + (p.crouch ? 1.24 : CFG.EYE) + (p.grounded ? Math.sin(p.stepPhase * 2) * 0.022 * Math.min(1, p.speedSmooth / CFG.SPRINT) : 0) - this.landDip;
@@ -3651,14 +4996,16 @@ const Game = {
     }
     if (this.viewGun) this.viewGun.visible = false;
 
-    const wantDist = p.flying ? 7.6 : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST));
-    const side = p.flying ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
+    const wantDist = p.flying ? 7.6
+      : (inCar ? CFG.VEH_CAM_DIST : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST)));
+    const side = (p.flying || inCar) ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
     const run = Math.min(1, p.speedNow / CFG.SPRINT);
     if (this.landDip > 0.001) this.landDip *= 0.86; else this.landDip = 0;
     const bob = p.grounded ? Math.sin(p.stepPhase * 2) * 0.028 * run : 0;
-    const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT) + bob - this.landDip;
+    const pivotY = p.pos.y + (inCar ? CFG.VEH_CAM_HEIGHT : (p.crouch ? 1.3 : CFG.CAM_HEIGHT))
+                 + (inCar ? 0 : bob) - this.landDip;
     const right = this._v2.set(-dir.z, 0, dir.x).normalize();
     const px = p.pos.x + right.x * side, pz = p.pos.z + right.z * side;
 
@@ -3679,7 +5026,7 @@ const Game = {
     this.camera.rotation.order = 'XYZ';
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
-    const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35 && !p.flying;
+    const sprinting = !this.ads && !inCar && p.speedNow > CFG.WALK * 1.35 && !p.flying;
     const zoom = p.zoom;
     const wantFov = this.ads ? (zoom > 1 ? CFG.FOV / zoom : CFG.ADS_FOV)
                              : CFG.FOV + (sprinting ? 5.5 : 0) + (p.flying ? 8 : 0);
@@ -3689,7 +5036,7 @@ const Game = {
     }
 
     // 카메라가 몸에 바짝 붙으면 아예 몸을 감춰 시야를 가리지 않게 합니다
-    p.mesh.visible = dist > 1.25 && !scoped;
+    p.mesh.visible = !inCar && dist > 1.25 && !scoped;
 
     this.camera.updateMatrixWorld();
     this.updateAimDir();
@@ -3739,6 +5086,124 @@ const Game = {
     this.viewGun.position.z += (tz - this.viewGun.position.z) * kk;
     this.viewGun.rotation.z += ((this.ads ? 0 : 0.05) - this.viewGun.rotation.z) * kk;
     this.viewGun.rotation.x += ((-p.recoil * 0.25 - reload * 0.5) - this.viewGun.rotation.x) * kk;
+  },
+
+  /* ---------- 공중 보급 ---------- */
+  updateDrops(dt) {
+    this.dropTimer -= dt;
+    if (this.dropTimer <= 0 && this.alive > 1) {
+      this.dropTimer = CFG.DROP_EVERY;
+      this.spawnDrop();
+    }
+    for (const a of this.drops) { if (!a.dead) a.update(dt); }
+  },
+
+  /* 자기장 안쪽 임의 지점에 보급 상자를 떨어뜨립니다 */
+  spawnDrop() {
+    const z = this.zone;
+    let x = z.x, zz = z.z;
+    for (let i = 0; i < 60; i++) {
+      const ang = Math.random() * Math.PI * 2, rad = Math.sqrt(Math.random()) * z.r * 0.8;
+      const tx = z.x + Math.cos(ang) * rad, tz = z.z + Math.sin(ang) * rad;
+      if (Math.abs(tx) > World.half - 20 || Math.abs(tz) > World.half - 20) continue;
+      if (World.height(tx, tz) < World.waterY + 2) continue;
+      x = tx; zz = tz; break;
+    }
+    const a = new Airdrop(x, zz, World.height(x, zz) + CFG.DROP_ALT);
+    this.scene.add(a.mesh);
+    this.drops.push(a);
+    this.pushFeed('보급 상자가 투하되었습니다 — 지도를 확인하세요');
+    Sfx.chute();
+  },
+
+  /* 가장 가까운, 열 수 있는 보급 상자 */
+  nearestDrop(ch) {
+    let best = null, bd = CFG.DROP_OPEN;
+    for (const a of this.drops) {
+      if (!a.landed || a.opened || a.dead) continue;
+      const d = Math.hypot(a.pos.x - ch.pos.x, a.pos.z - ch.pos.z);
+      if (d < bd && Math.abs(a.pos.y - ch.pos.y) < 4) { bd = d; best = a; }
+    }
+    return best;
+  },
+
+  openDrop(ch, a) {
+    if (!a || a.opened) return false;
+    a.opened = true;
+    a.crate.rotation.x = -0.5;             // 뚜껑이 열린 듯 기울입니다
+    a.crate.position.y = 0.1;
+    a.smoke.visible = false;
+    const items = a.contents();
+    items.forEach((it, i) => {
+      const ang = (i / items.length) * Math.PI * 2;
+      const x = a.pos.x + Math.cos(ang) * 1.7, z = a.pos.z + Math.sin(ang) * 1.7;
+      const l = new Loot(x, z, it.kind, it.gun || null, it.amount || 0, it.level || 0,
+                         World.groundY(x, z, a.pos.y + 1));
+      l.id = this.loots.length;
+      this.scene.add(l.mesh);
+      this.loots.push(l);
+    });
+    if (ch === this.player) { this.pushFeed('보급 상자를 열었습니다!'); Sfx.pick(); }
+    return true;
+  },
+
+  /* ---------- 차량 ---------- */
+  updateVehicles(dt) {
+    for (const v of this.vehicles) {
+      if (v.driver === this.player) continue;      // 플레이어 차량은 조작에서 처리
+      if (!v.driver) { v.drive(dt, 0, 0, false); continue; }
+      v.drive(dt, 0, 0, false);
+    }
+    // 달리는 차에 치이면 아픕니다
+    for (const v of this.vehicles) {
+      if (Math.abs(v.speed) < 6) continue;
+      for (const c of this.chars) {
+        if (c.dead || c.flying || c === v.driver) continue;
+        const d = Math.hypot(c.pos.x - v.pos.x, c.pos.z - v.pos.z);
+        if (d > v.spec.r + 1.1) continue;
+        if (Math.abs(c.pos.y - v.pos.y) > 2.2) continue;
+        if ((c.hitByCar || 0) > this.time) continue;
+        c.hitByCar = this.time + 0.7;
+        this.damage(c, 18 + Math.abs(v.speed) * 2.4, v.driver || null, false, false);
+        v.speed *= 0.7;
+      }
+    }
+  },
+
+  nearestVehicle(ch) {
+    let best = null, bd = CFG.VEH_RANGE;
+    for (const v of this.vehicles) {
+      if (v.occupied || v.dead) continue;
+      const d = Math.hypot(v.pos.x - ch.pos.x, v.pos.z - ch.pos.z);
+      if (d < bd && Math.abs(v.pos.y - ch.pos.y) < 3) { bd = d; best = v; }
+    }
+    return best;
+  },
+
+  enterVehicle(ch, v) {
+    if (!v || v.occupied || v.dead) return false;
+    v.driver = ch;
+    ch.vehicle = v;
+    ch.mesh.visible = false;
+    this.ads = false;
+    if (ch === this.player) { this.pushFeed(v.spec.name + ' 탑승 — F 로 내립니다'); Sfx.swap(); }
+    return true;
+  },
+
+  exitVehicle(ch) {
+    const v = ch.vehicle;
+    if (!v) return false;
+    v.driver = null;
+    ch.vehicle = null;
+    // 차 옆으로 내려놓습니다
+    const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw);
+    const ox = v.pos.x + rx * (v.spec.r + 0.9), oz = v.pos.z + rz * (v.spec.r + 0.9);
+    const fix = World.resolve(ox, oz, CFG.BODY_R, v.pos.y, v.pos.y + CFG.BODY_H);
+    ch.pos.set(fix.x, World.groundY(fix.x, fix.z, v.pos.y + 1.5), fix.z);
+    ch.vy = 0;
+    ch.mesh.visible = true;
+    if (ch === this.player) this.pushFeed(v.spec.name + ' 에서 내렸습니다');
+    return true;
   },
 
   /* ---------- 자기장 ---------- */
@@ -3866,7 +5331,7 @@ const Game = {
 
   /* ---------- 미니맵 바탕 그림 ---------- */
   buildMinimapImage() {
-    const S = 256;
+    const S = 384;
     const c = document.createElement('canvas');
     c.width = c.height = S;
     const g = c.getContext('2d');
@@ -3893,6 +5358,16 @@ const Game = {
       }
     }
     g.putImageData(img, 0, 0);
+    // 도로
+    g.strokeStyle = 'rgba(196,180,148,0.9)';
+    g.lineWidth = Math.max(1.6, (7 / World.size) * S);
+    g.lineCap = 'round';
+    for (const r of World.roads) {
+      g.beginPath();
+      g.moveTo(((r.x1 + World.half) / World.size) * S, ((r.z1 + World.half) / World.size) * S);
+      g.lineTo(((r.x2 + World.half) / World.size) * S, ((r.z2 + World.half) / World.size) * S);
+      g.stroke();
+    }
     // 건물 자국
     g.fillStyle = 'rgba(30,32,36,0.85)';
     for (const b of World.boxes) {
@@ -4332,8 +5807,20 @@ const Lobby = {
       peerList: document.getElementById('peerList'),
       modeName: document.getElementById('modeName'),
       nick: document.getElementById('nickInput'),
-      revealCard: document.getElementById('revealCard')
+      revealCard: document.getElementById('revealCard'),
+      acctName: document.getElementById('acctName'),
+      myCode: document.getElementById('myCode'),
+      saveCode: document.getElementById('saveCode'),
+      loadCode: document.getElementById('loadCode'),
+      acctNote: document.getElementById('acctNote'),
+      friendCode: document.getElementById('friendCode'),
+      friendName: document.getElementById('friendName'),
+      friendList: document.getElementById('friendList'),
+      islandCode: document.getElementById('islandCode'),
+      joinIsland: document.getElementById('joinIsland'),
+      navNick: document.getElementById('navNick')
     };
+    this.bindAccount();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
@@ -4352,13 +5839,127 @@ const Lobby = {
     this.el.nick.value = Profile.data.name || '';
     this.el.nick.addEventListener('input', () => {
       Profile.setName(this.el.nick.value);
+      if (this.el.acctName) this.el.acctName.value = Profile.data.name || '';
       if (Net.online) Net.push({ name: Profile.nickname() });
       this.showPeers(Net.lobbyPeers);
+      this.refreshAccount();
     });
 
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
+  },
+
+  /* ---------- 친구 · 계정 ---------- */
+  bindAccount() {
+    const e = this.el;
+    const note = (msg, kind) => {
+      e.acctNote.textContent = msg || '';
+      e.acctNote.className = 'acctNote' + (kind ? ' ' + kind : '');
+    };
+    // 클립보드가 막힌 환경에서도 복사되도록 두 가지 방법을 씁니다
+    const copy = (input, label) => {
+      input.removeAttribute('readonly');
+      input.select(); input.setSelectionRange(0, 99999);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      input.setAttribute('readonly', '');
+      if (!ok && navigator.clipboard) {
+        navigator.clipboard.writeText(input.value).then(() => this.toast(label + ' 복사됨')).catch(() => {});
+        return;
+      }
+      this.toast(ok ? label + ' 복사됨' : '길게 눌러 직접 복사하세요');
+    };
+
+    e.acctName.value = Profile.data.name || '';
+    e.acctName.addEventListener('input', () => {
+      Profile.setName(e.acctName.value);
+      if (this.el.nick) this.el.nick.value = Profile.data.name || '';
+      if (Net.online) Net.push({ name: Profile.nickname() });
+      this.refreshAccount();
+    });
+
+    document.getElementById('copyCode').addEventListener('click', () => copy(e.myCode, '친구 코드'));
+    document.getElementById('copySave').addEventListener('click', () => copy(e.saveCode, '저장 코드'));
+    document.getElementById('copyIsland').addEventListener('click', () => copy(e.islandCode, '섬 코드'));
+
+    document.getElementById('doLoad').addEventListener('click', () => {
+      const res = Account.importCode(e.loadCode.value);
+      if (!res.ok) { note(res.why, 'bad'); return; }
+      note('불러왔습니다 — BP ' + Profile.data.bp.toLocaleString() + ', 스킨 ' + Profile.data.owned.skin.length + '개', 'ok');
+      e.loadCode.value = '';
+      e.acctName.value = Profile.data.name || '';
+      if (this.el.nick) this.el.nick.value = Profile.data.name || '';
+      this.refresh();
+      this.refreshUI();
+      this.refreshAccount();
+      Sfx.pick();
+    });
+
+    document.getElementById('addFriend').addEventListener('click', () => {
+      const res = Account.addFriend(e.friendCode.value, e.friendName.value);
+      if (!res.ok) { note(res.why, 'bad'); return; }
+      e.friendCode.value = ''; e.friendName.value = '';
+      note('친구를 등록했습니다', 'ok');
+      this.renderFriends();
+    });
+
+    document.getElementById('newIsland').addEventListener('click', () => {
+      this.islandSeed = (Math.random() * 0x3fffffff) | 0;
+      this.refreshAccount();
+      note('친구에게 이 섬 코드를 보내세요', 'ok');
+    });
+
+    document.getElementById('doJoin').addEventListener('click', () => {
+      const info = Account.parseIslandCode(e.joinIsland.value);
+      if (!info) { note('섬 코드가 올바르지 않습니다 (8자리)', 'bad'); return; }
+      Main.beginMatch(info.bots, { seed: info.seed });
+    });
+
+    this.refreshAccount();
+    this.renderFriends();
+  },
+
+  refreshAccount() {
+    const e = this.el;
+    if (!e || !e.myCode) return;
+    e.myCode.value = Account.data.id;
+    e.saveCode.value = Account.exportCode();
+    if (e.navNick) e.navNick.textContent = Profile.nickname();
+    if (e.acctName && document.activeElement !== e.acctName) e.acctName.value = Profile.data.name || '';
+    if (this.islandSeed == null) this.islandSeed = (Math.random() * 0x3fffffff) | 0;
+    const bots = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    e.islandCode.value = Account.makeIslandCode(this.islandSeed, bots);
+  },
+
+  renderFriends() {
+    const e = this.el;
+    if (!e || !e.friendList) return;
+    const list = Account.data.friends;
+    if (!list.length) {
+      e.friendList.innerHTML = '<p class="friendEmpty">아직 등록한 친구가 없습니다. 친구의 6자리 코드를 받아 추가하세요.</p>';
+      return;
+    }
+    const label = { lobby: '● 로비', match: '● 매치 중', offline: '○ 오프라인', unknown: '· 코드 등록됨' };
+    e.friendList.innerHTML = list.map(f => {
+      const st = Account.friendState(f.id);
+      return '<div class="friendRow" data-id="' + f.id + '">' +
+        '<b>' + this.esc(f.name) + '</b>' +
+        '<span class="fcode">' + f.id + '</span>' +
+        '<span class="fstate ' + st + '">' + label[st] + '</span>' +
+        '<button class="del">삭제</button></div>';
+    }).join('');
+    e.friendList.querySelectorAll('.friendRow').forEach(row => {
+      row.querySelector('.del').addEventListener('click', () => {
+        Account.removeFriend(row.dataset.id);
+        this.renderFriends();
+      });
+    });
+  },
+
+  esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   },
 
   syncView() {
@@ -4369,6 +5970,7 @@ const Lobby = {
   tab(name) {
     this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
+    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); }
   },
 
   buildCrates() {
@@ -4452,6 +6054,7 @@ const Lobby = {
   refreshUI() {
     const d = Profile.data;
     this.el.bp.textContent = d.bp.toLocaleString();
+    this.refreshAccount();          // 저장 코드는 진행 상황이 바뀌면 같이 갱신
 
     const card = (type, key, name, rarity) => {
       const owned = Profile.owns(type, key);
@@ -4595,7 +6198,8 @@ const UI = {
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
-      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox'];
+      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
+      'gear', 'vestTag', 'bagTag', 'speedo'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -4682,7 +6286,25 @@ const UI = {
     const scoped = Game.ads && zoom >= 4 && !p.flying;
     this.el.scope.classList.toggle('hidden', !scoped);
     if (scoped) this.el.scope.querySelector('.zoom').textContent = SCOPES[zoom].label;
-    this.el.meds.textContent = p.meds;
+    this.el.meds.textContent = p.meds + ' / ' + p.medCap;
+
+    // 방어구
+    const tag = (el, lv, table) => {
+      el.className = 'gearTag' + (lv ? ' lv' + lv : ' off');
+      el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
+      el.title = lv ? table[lv].name : '없음';
+    };
+    tag(this.el.vestTag, p.vest, VESTS);
+    tag(this.el.bagTag, p.bag, BAGS);
+
+    // 속도계 (차량 탑승 중에만)
+    if (p.vehicle) {
+      this.el.speedo.classList.remove('hidden');
+      this.el.speedo.querySelector('b').textContent = Math.round(Math.abs(p.vehicle.speed) * 3.6);
+      this.el.speedo.querySelector('em').textContent =
+        p.vehicle.spec.name + ' · ' + Math.max(0, Math.round(p.vehicle.hp));
+    } else this.el.speedo.classList.add('hidden');
+
     this.el.alive.textContent = g.alive;
     this.el.kills.textContent = p.kills;
 
@@ -4694,10 +6316,23 @@ const UI = {
     this.el.feed.innerHTML = g.feed.map(f =>
       '<div style="opacity:' + Math.max(0, Math.min(1, f.life)) + '">' + f.text + '</div>').join('');
 
-    const near = g.nearestLoot(p);
-    if (near && !p.dead) {
+    let hint = null;
+    if (!p.dead && !p.flying) {
+      if (p.vehicle) hint = p.vehicle.spec.name + ' 에서 내리기';
+      else {
+        const near = g.nearestLoot(p);
+        const lootD = near ? Math.hypot(near.pos.x - p.pos.x, near.pos.z - p.pos.z) : Infinity;
+        const drop = g.nearestDrop(p);
+        const veh = g.nearestVehicle(p);
+        if (near && lootD <= CFG.PICK_RANGE) hint = near.label;
+        else if (drop) hint = '보급 상자 열기';
+        else if (veh) hint = veh.spec.name + ' 탑승';
+        else if (near) hint = near.label;
+      }
+    }
+    if (hint) {
       this.el.prompt.classList.remove('hidden');
-      this.el.prompt.innerHTML = '<kbd>F</kbd> ' + near.label;
+      this.el.prompt.innerHTML = '<kbd>F</kbd> ' + hint;
     } else this.el.prompt.classList.add('hidden');
 
     // 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점
@@ -4757,7 +6392,7 @@ const UI = {
 
   drawMinimap(g) {
     const c = this.mctx, S = this.el.minimap.width;
-    const span = 210;                                   // 미니맵에 보이는 실제 거리(m)
+    const span = 280;                                   // 미니맵에 보이는 실제 거리(m)
     const p = g.player;
     const src = g.minimapImg;
     const scale = src.width / World.size;
@@ -4788,10 +6423,26 @@ const UI = {
       c.setLineDash([]);
     }
 
+    // 차량
+    for (const v of g.vehicles) {
+      if (v.dead) continue;
+      const q = toPx(v.pos.x, v.pos.z);
+      if (q[0] < -6 || q[0] > S + 6 || q[1] < -6 || q[1] > S + 6) continue;
+      c.fillStyle = v.occupied ? '#ffd166' : '#9fd3ff';
+      c.fillRect(q[0] - 2.2, q[1] - 2.2, 4.4, 4.4);
+    }
+
+    // 보급 상자
+    for (const a of g.drops) {
+      if (a.dead || a.opened) continue;
+      const q = toPx(a.pos.x, a.pos.z);
+      this.dropMark(c, q[0], q[1], a.landed, 7);
+    }
+
     // 근처 적
     for (const ch of g.chars) {
       if (ch.dead || ch.isPlayer) continue;
-      if (p.pos.distanceTo(ch.pos) > 70) continue;
+      if (p.pos.distanceTo(ch.pos) > 80) continue;
       const q = toPx(ch.pos.x, ch.pos.z);
       c.fillStyle = '#ff6b6b';
       c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI * 2); c.fill();
@@ -4803,6 +6454,19 @@ const UI = {
     c.rotate(Math.PI - Game.look.yaw);   // 지도 위쪽이 북이므로 시선 방향으로 돌립니다
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
+    c.restore();
+  },
+
+  /* 보급 상자 표시: 낙하 중이면 속이 빈 원, 착지하면 채운 낙하산 표식 */
+  dropMark(c, x, y, landed, r) {
+    c.save();
+    c.strokeStyle = '#ff5a4a'; c.lineWidth = 2;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+    if (landed) { c.fillStyle = 'rgba(255,90,74,0.55)'; c.fill(); }
+    c.stroke();
+    c.fillStyle = '#fff';
+    c.fillRect(x - r * 0.32, y - 1.2, r * 0.64, 2.4);
+    c.fillRect(x - 1.2, y - r * 0.32, 2.4, r * 0.64);
     c.restore();
   },
 
@@ -4824,6 +6488,17 @@ const UI = {
       c.beginPath(); c.arc(tc[0], tc[1], (z.tr / World.size) * S, 0, Math.PI * 2);
       c.strokeStyle = '#fff'; c.lineWidth = 1.6; c.stroke();
       c.setLineDash([]);
+    }
+    for (const v of g.vehicles) {
+      if (v.dead) continue;
+      const q = toPx(v.pos.x, v.pos.z);
+      c.fillStyle = v.occupied ? '#ffd166' : '#9fd3ff';
+      c.fillRect(q[0] - 2, q[1] - 2, 4, 4);
+    }
+    for (const a of g.drops) {
+      if (a.dead || a.opened) continue;
+      const q = toPx(a.pos.x, a.pos.z);
+      this.dropMark(c, q[0], q[1], a.landed, 10);
     }
     c.font = '600 12px "IBM Plex Sans KR", system-ui, sans-serif';
     c.fillStyle = 'rgba(255,255,255,0.8)';
@@ -4982,12 +6657,15 @@ const Main = {
     Settings.load();
     Settings.bind();
     Profile.load();
+    Account.load();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);
     Lobby.init();
     Lobby.refresh();
     Net.connect().then(ok => { if (ok) Lobby.onNetReady(); });
+    // db 기능이 켜져 있으면 친구 접속 상태까지 실시간으로 보여 줍니다 (없으면 조용히 넘어감)
+    Account.connect().then(ok => { if (ok) Lobby.renderFriends(); });
     window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
