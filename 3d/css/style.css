@@ -436,6 +436,16 @@ body.playing.paused { cursor: default; }
 .startBtn:hover { filter: brightness(1.08); }
 .dockHint { font-size: 10px; color: rgba(255,255,255,.45); line-height: 1.6; }
 
+.dockGroup input[type="text"] {
+  width: 100%; padding: 7px 9px; font-size: 13px; font-family: inherit;
+  background: #0d1117; border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+}
+.peerList { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.peerList .dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #3fb950; margin-right: 6px; vertical-align: middle;
+}
+
 /* 보상·커스터마이징·전적 시트 */
 .sheet {
   position: absolute; left: 50%; top: 76px; transform: translateX(-50%);

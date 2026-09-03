@@ -4,6 +4,27 @@
    나무 수천 그루에서도 가볍게 동작합니다.
    ============================================================ */
 
+/* ============================================================
+   난수원: 같은 섬을 여러 사람이 공유하려면 지형·아이템 생성이
+   같은 씨앗에서 같은 순서로 나와야 합니다.
+   생성이 끝나면 end() 로 일반 난수로 되돌립니다.
+   ============================================================ */
+let RAND = Math.random;
+const RNG = {
+  state: 1,
+  begin(seed) {
+    this.state = (seed >>> 0) || 1;
+    RAND = () => {                       // mulberry32
+      let t = (this.state += 0x6D2B79F5) >>> 0;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+  end() { RAND = Math.random; }
+};
+const rnd = () => RAND();
+
 /* sRGB 로 고른 색을 렌더러가 쓰는 선형 공간으로 옮깁니다.
    이 변환을 빼면 조명이 겹치며 화면 전체가 하얗게 뜹니다. */
 function srgb(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
@@ -53,7 +74,7 @@ const World = {
   buildHeights() {
     const n = this.seg + 1;
     this.heights = new Float32Array(n * n);
-    const seedX = Math.random() * 900, seedZ = Math.random() * 900;
+    const seedX = rnd() * 900, seedZ = rnd() * 900;
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const x = -this.half + i * this.step;
@@ -277,8 +298,8 @@ const World = {
   freeSpot(minR, near, spread) {
     for (let i = 0; i < 400; i++) {
       let x, z;
-      if (near) { x = near.x + (Math.random() * 2 - 1) * spread; z = near.z + (Math.random() * 2 - 1) * spread; }
-      else { const lim = this.half * 0.72; x = (Math.random() * 2 - 1) * lim; z = (Math.random() * 2 - 1) * lim; }
+      if (near) { x = near.x + (rnd() * 2 - 1) * spread; z = near.z + (rnd() * 2 - 1) * spread; }
+      else { const lim = this.half * 0.72; x = (rnd() * 2 - 1) * lim; z = (rnd() * 2 - 1) * lim; }
       const y = this.height(x, z);
       if (y < this.waterY + 0.6) continue;
       const list = this.near(x, z, x, z, minR + 2);

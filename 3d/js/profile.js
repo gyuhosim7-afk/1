@@ -6,6 +6,7 @@ const Profile = {
   KEY: 'lastSurvivor3d.profile',
   data: {
     bp: 800,
+    name: '',
     owned: { skin: ['recruit'], gun: ['stock'] },
     equipped: { skin: 'recruit', gun: 'stock' },
     stats: { matches: 0, wins: 0, kills: 0, best: 99, bestKills: 0, opened: 0 }
@@ -26,6 +27,7 @@ const Profile = {
           if (GUN_SKINS[d.equipped.gun]) this.data.equipped.gun = d.equipped.gun;
         }
         if (d.stats) Object.assign(this.data.stats, d.stats);
+        if (typeof d.name === 'string') this.data.name = d.name.slice(0, 12);
       }
     } catch (e) { /* 저장소를 못 쓰면 기본값으로 시작합니다 */ }
     // 기본 아이템은 항상 보유
@@ -34,6 +36,9 @@ const Profile = {
   },
 
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+
+  nickname() { return (this.data.name || '').trim() || '생존자'; },
+  setName(v) { this.data.name = (v || '').replace(/[^\S ]/g, '').slice(0, 12); this.save(); },
 
   owns(type, key) { return this.data.owned[type].indexOf(key) >= 0; },
   equip(type, key) {

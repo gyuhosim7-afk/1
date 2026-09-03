@@ -438,6 +438,16 @@ body.playing.paused { cursor: default; }
 .startBtn:hover { filter: brightness(1.08); }
 .dockHint { font-size: 10px; color: rgba(255,255,255,.45); line-height: 1.6; }
 
+.dockGroup input[type="text"] {
+  width: 100%; padding: 7px 9px; font-size: 13px; font-family: inherit;
+  background: #0d1117; border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+}
+.peerList { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.peerList .dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #3fb950; margin-right: 6px; vertical-align: middle;
+}
+
 /* 보상·커스터마이징·전적 시트 */
 .sheet {
   position: absolute; left: 50%; top: 76px; transform: translateX(-50%);
@@ -676,8 +686,13 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
     <!-- 플레이: 화면 왼쪽 아래 설정과 시작 버튼 -->
     <section class="panel playDock" id="tab-play">
       <div class="dockGroup">
+        <span class="dockLabel">닉네임</span>
+        <input id="nickInput" type="text" maxlength="12" placeholder="생존자">
+      </div>
+      <div class="dockGroup">
         <span class="dockLabel">모드</span>
-        <div class="dockRow"><b>솔로</b><span>봇 <input id="botCount" type="number" min="4" max="59" value="29">명</span></div>
+        <div class="dockRow"><b id="modeName">솔로</b><span>봇 <input id="botCount" type="number" min="0" max="59" value="29">명</span></div>
+        <div id="peerList" class="peerList">혼자 플레이 중</div>
       </div>
       <div class="dockGroup">
         <span class="dockLabel">시점</span>
@@ -687,7 +702,7 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
         </div>
       </div>
       <button id="startBtn" class="startBtn">시작</button>
-      <p class="dockHint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.<br>WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
     <!-- 보상(상자) -->
@@ -897,6 +912,7 @@ const Profile = {
   KEY: 'lastSurvivor3d.profile',
   data: {
     bp: 800,
+    name: '',
     owned: { skin: ['recruit'], gun: ['stock'] },
     equipped: { skin: 'recruit', gun: 'stock' },
     stats: { matches: 0, wins: 0, kills: 0, best: 99, bestKills: 0, opened: 0 }
@@ -917,6 +933,7 @@ const Profile = {
           if (GUN_SKINS[d.equipped.gun]) this.data.equipped.gun = d.equipped.gun;
         }
         if (d.stats) Object.assign(this.data.stats, d.stats);
+        if (typeof d.name === 'string') this.data.name = d.name.slice(0, 12);
       }
     } catch (e) { /* 저장소를 못 쓰면 기본값으로 시작합니다 */ }
     // 기본 아이템은 항상 보유
@@ -925,6 +942,9 @@ const Profile = {
   },
 
   save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+
+  nickname() { return (this.data.name || '').trim() || '생존자'; },
+  setName(v) { this.data.name = (v || '').replace(/[^\S ]/g, '').slice(0, 12); this.save(); },
 
   owns(type, key) { return this.data.owned[type].indexOf(key) >= 0; },
   equip(type, key) {
@@ -993,6 +1013,27 @@ const Profile = {
    나무 수천 그루에서도 가볍게 동작합니다.
    ============================================================ */
 
+/* ============================================================
+   난수원: 같은 섬을 여러 사람이 공유하려면 지형·아이템 생성이
+   같은 씨앗에서 같은 순서로 나와야 합니다.
+   생성이 끝나면 end() 로 일반 난수로 되돌립니다.
+   ============================================================ */
+let RAND = Math.random;
+const RNG = {
+  state: 1,
+  begin(seed) {
+    this.state = (seed >>> 0) || 1;
+    RAND = () => {                       // mulberry32
+      let t = (this.state += 0x6D2B79F5) >>> 0;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+  end() { RAND = Math.random; }
+};
+const rnd = () => RAND();
+
 /* sRGB 로 고른 색을 렌더러가 쓰는 선형 공간으로 옮깁니다.
    이 변환을 빼면 조명이 겹치며 화면 전체가 하얗게 뜹니다. */
 function srgb(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
@@ -1042,7 +1083,7 @@ const World = {
   buildHeights() {
     const n = this.seg + 1;
     this.heights = new Float32Array(n * n);
-    const seedX = Math.random() * 900, seedZ = Math.random() * 900;
+    const seedX = rnd() * 900, seedZ = rnd() * 900;
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
         const x = -this.half + i * this.step;
@@ -1266,8 +1307,8 @@ const World = {
   freeSpot(minR, near, spread) {
     for (let i = 0; i < 400; i++) {
       let x, z;
-      if (near) { x = near.x + (Math.random() * 2 - 1) * spread; z = near.z + (Math.random() * 2 - 1) * spread; }
-      else { const lim = this.half * 0.72; x = (Math.random() * 2 - 1) * lim; z = (Math.random() * 2 - 1) * lim; }
+      if (near) { x = near.x + (rnd() * 2 - 1) * spread; z = near.z + (rnd() * 2 - 1) * spread; }
+      else { const lim = this.half * 0.72; x = (rnd() * 2 - 1) * lim; z = (rnd() * 2 - 1) * lim; }
       const y = this.height(x, z);
       if (y < this.waterY + 0.6) continue;
       const list = this.near(x, z, x, z, minR + 2);
@@ -1302,10 +1343,10 @@ const Scenery = {
     const names = ['소치', '게오르고폴', '포친키', '야스나야', '로조크', '프리모스크', '밀타 베이스'];
     for (let i = 0; i < 7; i++) {
       for (let t = 0; t < 300; t++) {
-        const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+        const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
         if (World.height(x, z) < World.waterY + 2.5) continue;
         if (towns.some(o => Math.hypot(o.x - x, o.z - z) < 115)) continue;
-        towns.push({ x, z, name: names[i], r: 34 + Math.random() * 16 });
+        towns.push({ x, z, name: names[i], r: 34 + rnd() * 16 });
         break;
       }
     }
@@ -1317,16 +1358,16 @@ const Scenery = {
 
     // --- 마을 건물 ---
     for (const t of towns) {
-      const count = 4 + Math.floor(Math.random() * 4);
+      const count = 4 + Math.floor(rnd() * 4);
       const placed = [];
       for (let i = 0; i < count; i++) {
         for (let a = 0; a < 40; a++) {
-          const ang = Math.random() * Math.PI * 2, rad = Math.random() * t.r;
+          const ang = rnd() * Math.PI * 2, rad = rnd() * t.r;
           const x = t.x + Math.cos(ang) * rad, z = t.z + Math.sin(ang) * rad;
           if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 20)) continue;
           placed.push({ x, z });
-          const yaw = Math.round(Math.random() * 4) * Math.PI / 2 + (Math.random() - 0.5) * 0.25;
-          const roll = Math.random();
+          const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.25;
+          const roll = rnd();
           if (roll < 0.34) this.warehouse(x, z, yaw);
           else if (roll < 0.78) this.house(x, z, yaw);
           else this.shed(x, z, yaw);
@@ -1335,16 +1376,16 @@ const Scenery = {
       }
       // 컨테이너와 담장으로 엄폐물 추가
       for (let i = 0; i < 5; i++) {
-        const ang = Math.random() * Math.PI * 2, rad = t.r * (0.4 + Math.random() * 0.7);
-        this.container(t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, Math.random() * Math.PI);
+        const ang = rnd() * Math.PI * 2, rad = t.r * (0.4 + rnd() * 0.7);
+        this.container(t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI);
       }
     }
 
     // --- 벌판의 외딴 창고와 컨테이너 ---
     for (let i = 0; i < 16; i++) {
       const s = World.freeSpot(14);
-      if (Math.random() < 0.5) this.shed(s.x, s.z, Math.random() * Math.PI * 2);
-      else this.container(s.x, s.z, Math.random() * Math.PI * 2);
+      if (rnd() < 0.5) this.shed(s.x, s.z, rnd() * Math.PI * 2);
+      else this.container(s.x, s.z, rnd() * Math.PI * 2);
     }
 
     this.scatterNature(towns);
@@ -1398,10 +1439,10 @@ const Scenery = {
     g.fillStyle = '#ffffff';
     g.fillRect(0, 0, 128, 128);
     for (let i = 0; i < 2600; i++) {
-      const v = 200 + Math.floor(Math.random() * 55);
+      const v = 200 + Math.floor(rnd() * 55);
       g.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',0.65)';
-      const x = Math.random() * 128, y = Math.random() * 128;
-      g.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 3);
+      const x = rnd() * 128, y = rnd() * 128;
+      g.fillRect(x, y, 1 + rnd() * 2, 1 + rnd() * 3);
     }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -1501,7 +1542,7 @@ const Scenery = {
   house(cx, cz, yaw) {
     const base = World.height(cx, cz);
     const w = 9.5, d = 7.5, h = 3.4;
-    const wall = Math.random() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
+    const wall = rnd() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
     this.walls(cx, cz, yaw, w, d, h, 0.3, base, wall);
     this.windows(cx, cz, yaw, w, d, h, base, 2, 2.0);
     this.trim(cx, cz, yaw, 0, base + h * 0.45, -d / 2 - 0.02, 2.2, h * 0.9, 0.1, 0x6b5a48);
@@ -1530,10 +1571,10 @@ const Scenery = {
   container(cx, cz, yaw) {
     const base = World.height(cx, cz);
     const palette = [0xb2553f, 0x3f6b8a, 0x5a7a4a, 0xb08a3c, 0x8a8a8a];
-    const color = palette[Math.floor(Math.random() * palette.length)];
+    const color = palette[Math.floor(rnd() * palette.length)];
     this.box(cx, base + 1.3, cz, 6.2, 2.6, 2.5, yaw, color);
-    if (Math.random() < 0.3) {
-      this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (Math.random() - 0.5) * 0.2, color);
+    if (rnd() < 0.3) {
+      this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (rnd() - 0.5) * 0.2, color);
     }
   },
 
@@ -1544,34 +1585,34 @@ const Scenery = {
     const density = Game.low ? 0.6 : 1;
     for (let i = 0; i < Math.round(1100 * density); i++) {
       const lim = World.half * 0.95;
-      const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+      const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 1.2 || nearTown(x, z, 8)) continue;
       // 숲은 뭉쳐서 자라도록 노이즈로 밀도 조절
       if (valueNoise(x / 55 + 11, z / 55 + 7) < 0.42) continue;
-      const pine = Math.random() < 0.55;
-      const s = 0.8 + Math.random() * 0.7;
-      this.trees.push({ x, y, z, s, pine, rot: Math.random() * Math.PI * 2 });
+      const pine = rnd() < 0.55;
+      const s = 0.8 + rnd() * 0.7;
+      this.trees.push({ x, y, z, s, pine, rot: rnd() * Math.PI * 2 });
       World.addCyl({ x, z, r: 0.5 * s, top: y + 8 * s, h: 8 * s });
     }
 
     for (let i = 0; i < 420; i++) {
       const s0 = World.freeSpot(3);
-      const s = 0.7 + Math.random() * 1.5;
-      this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: Math.random() * Math.PI * 2 });
+      const s = 0.7 + rnd() * 1.5;
+      this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: rnd() * Math.PI * 2 });
       // 보이는 크기(가로 1.5s)에 맞춰 충돌 반지름을 잡아야 1인칭에서 바위에 파묻히지 않습니다
       World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
     }
 
     for (let i = 0; i < Math.round(2600 * density); i++) {
       const lim = World.half * 0.95;
-      const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+      const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 0.8) continue;
-      const r = Math.random();
-      const s = r < 0.6 ? 0.22 + Math.random() * 0.28      // 잡초
-                        : 0.6 + Math.random() * 0.85;      // 수풀
-      this.bushes.push({ x, y, z, s, rot: Math.random() * Math.PI * 2, tall: r >= 0.6 });
+      const r = rnd();
+      const s = r < 0.6 ? 0.22 + rnd() * 0.28      // 잡초
+                        : 0.6 + rnd() * 0.85;      // 수풀
+      this.bushes.push({ x, y, z, s, rot: rnd() * Math.PI * 2, tall: r >= 0.6 });
     }
   },
 
@@ -1655,7 +1696,7 @@ const Scenery = {
     const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, Math.max(1, this.rocks.length));
     rockMesh.castShadow = true; rockMesh.receiveShadow = true;
     this.rocks.forEach((r, i) => {
-      e.set(Math.random() * 0.6, r.rot, Math.random() * 0.6); q.setFromEuler(e);
+      e.set(rnd() * 0.6, r.rot, rnd() * 0.6); q.setFromEuler(e);
       m.compose(v.set(r.x, r.y + 0.6 * r.s, r.z), q, sv.set(1.5 * r.s, 1.2 * r.s, 1.4 * r.s));
       rockMesh.setMatrixAt(i, m);
     });
@@ -1745,8 +1786,8 @@ const Build = {
   plane(w, h, color, x, y, z, rx, ry, rz) {
     return { geo: new THREE.PlaneGeometry(w, h), color, x, y, z, rx: rx || 0, ry: ry || 0, rz: rz || 0 };
   },
-  sphere(r, color, x, y, z, sx, sy, sz) {
-    const g = new THREE.SphereGeometry(r, 10, 7);
+  sphere(r, color, x, y, z, sx, sy, sz, seg) {
+    const g = new THREE.SphereGeometry(r, seg || 10, Math.round((seg || 10) * 0.7));
     if (sx || sy || sz) g.scale(sx || 1, sy || 1, sz || 1);
     return { geo: g, color, x, y, z, rx: 0, ry: 0, rz: 0 };
   },
@@ -2043,7 +2084,7 @@ const CharArt = {
     const torsoParts = [
       sc(B.pillar(0.155, 0.145, 0.20, pants, 0, 0.09, 0), 1, 1, 0.72),      // 골반
       B.box(0.33, 0.055, 0.24, gear, 0, 0.19, 0),                            // 허리띠
-      sc(B.pillar(0.145, 0.183, 0.30, top, 0, 0.36, 0), 1, 1, 0.72),         // 배
+      sc(B.pillar(0.138, 0.178, 0.30, top, 0, 0.36, 0), 1, 1, 0.70),         // 배(허리는 좁게)
       sc(B.pillar(0.183, 0.192, 0.24, top, 0, 0.61, 0), 1, 1, 0.70),         // 가슴
       sc(B.pillar(0.196, 0.20, 0.30, vest, 0, 0.55, 0.004), 1, 1, 0.76),     // 방탄조끼
       sc(B.pillar(0.20, 0.19, 0.06, gear, 0, 0.40, 0.004), 1, 1, 0.78),      // 조끼 아래단
@@ -2055,24 +2096,27 @@ const CharArt = {
       sc(B.sphere(0.098, top, 0.202, 0.60, 0), 1, 0.95, 1),
       B.box(0.28, 0.34, 0.15, 0x4a4a3e, 0, 0.46, -0.20),                     // 배낭
       B.box(0.30, 0.09, 0.17, gear, 0, 0.30, -0.20),
-      sc(B.pillar(0.058, 0.065, 0.10, tone, 0, 0.72, 0), 1, 1, 1),           // 목
-      sc(B.sphere(0.115, tone, 0, 0.845, 0.005), 1, 1.1, 0.97),              // 머리
-      B.box(0.155, 0.10, 0.16, tone, 0, 0.785, 0.02),                        // 턱
-      sc(B.sphere(0.03, tone, -0.113, 0.845, 0), 0.6, 1, 1),                 // 귀
-      sc(B.sphere(0.03, tone, 0.113, 0.845, 0), 0.6, 1, 1),
-      sc(B.sphere(0.121, hair, 0, 0.872, -0.012), 1, 0.82, 1),               // 머리카락
-      sc(B.sphere(0.10, hair, 0, 0.815, -0.055), 1, 0.7, 1),                 // 뒷머리
-      B.box(0.03, 0.038, 0.03, tone, 0, 0.828, 0.108),                       // 코
-      B.box(0.035, 0.026, 0.02, 0x1a1a20, -0.048, 0.855, 0.104),             // 눈
-      B.box(0.035, 0.026, 0.02, 0x1a1a20, 0.048, 0.855, 0.104),
-      B.box(0.046, 0.013, 0.02, hair, -0.048, 0.888, 0.103),                 // 눈썹
-      B.box(0.046, 0.013, 0.02, hair, 0.048, 0.888, 0.103),
-      B.box(0.048, 0.012, 0.02, 0x8a5148, 0, 0.792, 0.096)                   // 입
+      sc(B.pillar(0.056, 0.064, 0.11, tone, 0, 0.715, 0), 1, 1, 1),          // 목
+      sc(B.sphere(0.112, tone, 0, 0.856, 0.004, 1, 1, 1, 16), 1, 1.06, 0.99),// 머리
+      sc(B.sphere(0.084, tone, 0, 0.812, 0.014, 1, 1, 1, 14), 0.97, 0.86, 1.0), // 턱·볼
+      sc(B.sphere(0.026, tone, -0.109, 0.852, -0.004, 1, 1, 1, 8), 0.55, 1, 1),  // 귀
+      sc(B.sphere(0.026, tone, 0.109, 0.852, -0.004, 1, 1, 1, 8), 0.55, 1, 1),
+      sc(B.sphere(0.117, hair, 0, 0.872, -0.014, 1, 1, 1, 16), 1.02, 0.86, 1.0), // 머리카락
+      sc(B.sphere(0.095, hair, 0, 0.826, -0.055, 1, 1, 1, 12), 1, 0.8, 0.85),    // 뒷머리
+      B.box(0.021, 0.032, 0.034, tone, 0, 0.836, 0.110),                     // 코
+      B.box(0.030, 0.018, 0.016, 0xd8d2c9, -0.045, 0.862, 0.106),            // 눈 (흰자)
+      B.box(0.030, 0.018, 0.016, 0xd8d2c9, 0.045, 0.862, 0.106),
+      B.box(0.013, 0.015, 0.012, 0x2b2118, -0.045, 0.861, 0.111),            // 눈동자
+      B.box(0.013, 0.015, 0.012, 0x2b2118, 0.045, 0.861, 0.111),
+      B.box(0.042, 0.010, 0.018, hair, -0.045, 0.878, 0.104),                // 눈썹
+      B.box(0.042, 0.010, 0.018, hair, 0.045, 0.878, 0.104),
+      B.box(0.036, 0.008, 0.014, 0x8a5248, 0, 0.792, 0.106)                  // 입
     ];
     if (S.helmet) {                                                          // 헬멧
-      torsoParts.push(sc(B.sphere(0.133, S.helmet, 0, 0.872, 0), 1, 0.78, 1.02));
-      torsoParts.push(B.box(0.26, 0.03, 0.10, S.helmet, 0, 0.855, 0.10));
-      torsoParts.push(B.box(0.05, 0.05, 0.06, gear, 0.12, 0.885, 0.02));
+      // 헬멧은 눈썹 위에서 정수리까지만 덮습니다
+      torsoParts.push(sc(B.sphere(0.126, S.helmet, 0, 0.926, -0.006, 1, 1, 1, 16), 1.02, 0.46, 1.04));
+      torsoParts.push(B.box(0.20, 0.02, 0.07, S.helmet, 0, 0.898, 0.10));      // 앞 챙
+      torsoParts.push(B.box(0.042, 0.04, 0.05, gear, 0.112, 0.915, 0.01));     // 측면 장비
     }
 
     /* 팔 (어깨 관절이 원점) */
@@ -2082,7 +2126,7 @@ const CharArt = {
       B.sphere(0.05, top, 0, -0.32, 0),                                      // 팔꿈치
       sc(B.pillar(0.05, 0.043, 0.28, top, 0, -0.46, 0.005), 1, 1, 1),        // 아래팔
       B.box(0.072, 0.045, 0.08, gear, 0, -0.60, 0.005),                      // 손목
-      B.box(0.078, 0.10, 0.085, gear, 0, -0.655, 0.012)                      // 장갑
+      sc(B.sphere(0.052, gear, 0, -0.655, 0.012, 1, 1, 1, 10), 0.8, 1.05, 0.95) // 장갑
     ];
 
     /* 다리 (엉덩이 관절이 원점, 무릎은 -0.44) */
@@ -2931,14 +2975,20 @@ const Game = {
   },
 
   /* ---------- 매치 시작 ---------- */
-  start(botCount) {
+  /* seed 를 주면 모두가 같은 섬에서 시작합니다 (함께 하기용) */
+  start(botCount, opts) {
+    opts = opts || {};
+    this.seed = opts.seed || (Math.random() * 0x7fffffff) | 0;
+    this.online = !!opts.online;
+    this.startedAt = opts.startedAt || Date.now();
     // 이전 매치 정리
     for (const c of this.chars) this.scene.remove(c.mesh);
     for (const l of this.loots) this.scene.remove(l.mesh);
     if (this.zoneMesh) this.scene.remove(this.zoneMesh);
     Scenery.dispose(this.scene);
 
-    this.chars = []; this.loots = []; this.feed = [];
+    RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
+    this.chars = []; this.loots = []; this.feed = []; this.botById = {};
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
 
@@ -2947,6 +2997,16 @@ const Game = {
     const R0 = World.half * 0.85;   // 첫 자기장은 섬 안쪽까지만
     this.zone = { x: 0, z: 0, r: R0, R0, sx: 0, sz: 0, sr: R0, tx: 0, tz: 0, tr: R0,
                   phase: 0, timer: PHASES[0].wait, shrinking: false, dps: PHASES[0].dps };
+    // 자기장 이동 계획을 미리 뽑아 두면 여러 사람이 같은 자기장을 봅니다
+    this.zonePlan = [];
+    let cx = 0, cz = 0, cr = R0;
+    for (const ph of PHASES) {
+      const tr = R0 * ph.f;
+      const off = Math.max(0, cr - tr) * 0.75 * rnd();
+      const ang = rnd() * Math.PI * 2;
+      cx = cx + Math.cos(ang) * off; cz = cz + Math.sin(ang) * off; cr = tr;
+      this.zonePlan.push({ x: cx, z: cz, r: tr });
+    }
 
     const zGeo = new THREE.CylinderGeometry(1, 1, 260, 64, 1, true);
     const zMat = new THREE.MeshBasicMaterial({
@@ -2973,6 +3033,8 @@ const Game = {
       const s = this.spawnSpot();
       const nm = names.length ? names.splice(Math.floor(Math.random() * names.length), 1)[0] : '봇' + i;
       const b = new Char3D(s.x, s.z, false, nm, OUTFITS[i % OUTFITS.length]);
+      b.netId = i;
+      this.botById[i] = b;
       for (const k of GUN_KEYS) b.reserve[k] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       this.scene.add(b.mesh);
@@ -2995,10 +3057,18 @@ const Game = {
     }
 
     this.spawnLoot();
+    RNG.end();                            // 여기서부터는 각자의 난수 (조준 흔들림, 봇 판단 등)
     this.buildMinimapImage();
     this.ads = false;
     this.camDist = CFG.CAM_DIST;
     this.updateCamera(0.016);   // 첫 프레임 전에 카메라를 제자리에 놓습니다
+    // 이미 시작된 매치에 뒤늦게 들어오면 자기장을 지금 시각까지 진행시킵니다
+    let behind = (Date.now() - this.startedAt) / 1000;
+    if (behind > 1) {
+      behind = Math.min(behind, 600);
+      while (behind > 0) { this.updateZone(Math.min(0.5, behind)); behind -= 0.5; }
+    }
+
     this.state = 'playing';
     this.pushFeed('전투 시작 — 생존자 ' + this.chars.length + '명');
   },
@@ -3034,6 +3104,7 @@ const Game = {
       } else {
         l = new Loot(x, z, 'med', null, 1);
       }
+      l.id = this.loots.length;
       this.scene.add(l.mesh);
       this.loots.push(l);
     };
@@ -3073,6 +3144,8 @@ const Game = {
       }
       if (c.swap > 0) c.swap -= dt;
 
+      if (c.remote || (c.ai && this.online && !Net.isHost)) continue;   // 남이 굴리는 캐릭터
+
       if (c.flying) {                       // 낙하 중에는 전투와 자기장 판정을 쉽니다
         if (!c.isPlayer) {
           const t = c.ai.drop;
@@ -3102,6 +3175,8 @@ const Game = {
       const d = Math.hypot(l.pos.x - cam.x, l.pos.y - cam.y, l.pos.z - cam.z);
       l.update(this.time, d, l === this.highlight);
     }
+
+    if (this.online) Net.interpolate(dt);
 
     this.updateEffects(dt);
     this.updateCamera(dt);
@@ -3275,11 +3350,26 @@ const Game = {
       if (hit && hit.t < wallT) {
         endT = hit.t;
         const dmg = spec.dmg * (hit.head ? HEADSHOT : 1) * (1 - Math.min(0.45, hit.t / spec.range * 0.45));
-        this.damage(hit.char, dmg, ch, hit.head, false);
+        if (ch.isPlayer && this.online && hit.char.remote) {
+          // 상대의 체력은 상대가 관리합니다. 맞았다는 사실만 보냅니다
+          const peerId = Object.keys(Net.players).find(k => Net.players[k] === hit.char);
+          if (peerId) Net.hitPlayer(peerId, dmg, hit.head);
+          this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+        } else if (ch.isPlayer && this.online && hit.char.ai && !Net.isHost) {
+          Net.hitBot(hit.char.netId, dmg, hit.head);
+          this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+        } else {
+          this.damage(hit.char, dmg, ch, hit.head, false);
+        }
       } else if (wallT < maxT) {
         this.puff(ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
       }
       this.tracer(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT, ch.isPlayer);
+      if (ch.isPlayer && this.online) {
+        Net.shot(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
+      }
     }
 
     Sfx.shot(ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos), ch.gun);
@@ -3342,6 +3432,7 @@ const Game = {
     c.rank = this.alive + 1;
     c.deadT = 0;
     if (src && src !== c) { src.kills++; if (src === this.player) Sfx.kill(); }
+    if (c === this.player && this.online) Net.died(src ? src.name : '');
     this.dropLoot(c);
     if (isZone) this.pushFeed(c.name + ' 님이 자기장에 쓰러졌습니다');
     else this.pushFeed((src ? src.name : '???') + ' → ' + c.name + (src === this.player ? ' (처치!)' : ''));
@@ -3409,7 +3500,7 @@ const Game = {
     }
     l.dead = true;
     this.scene.remove(l.mesh);
-    if (ch === this.player) Sfx.pick();
+    if (ch === this.player) { Sfx.pick(); if (this.online) Net.pick(l.id); }
     return true;
   },
 
@@ -3670,13 +3761,10 @@ const Game = {
     if (!z.shrinking) {
       if (z.timer <= 0 && z.phase < PHASES.length) {
         const ph = PHASES[z.phase];
-        const tr = z.R0 * ph.f;
-        const off = Math.max(0, z.r - tr) * 0.75 * Math.random();
-        const ang = Math.random() * Math.PI * 2;
+        const plan = this.zonePlan[z.phase];
         z.sx = z.x; z.sz = z.z; z.sr = z.r;
-        z.tx = z.x + Math.cos(ang) * off;
-        z.tz = z.z + Math.sin(ang) * off;
-        z.tr = tr; z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
+        z.tx = plan.x; z.tz = plan.z; z.tr = plan.r;
+        z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
         this.pushFeed('자기장 ' + (z.phase + 1) + '단계 축소 시작');
       }
     } else {
@@ -3856,6 +3944,252 @@ const Game = {
 };
 
 /* ============================================================
+   함께 하기: 같은 링크를 연 사람들과 실시간으로 같은 섬에서 플레이
+   - 위치·체력 같은 상태는 presence 로 계속 흘려보냅니다
+   - 사격·피격·아이템 획득·사망은 event 로 알립니다
+   - 봇은 방장 한 명이 굴리고 나머지는 그 결과만 받아 그립니다
+   room 을 쓸 수 없는 환경(파일로 직접 열기 등)에서는 조용히 혼자 플레이합니다.
+   ============================================================ */
+const Net = {
+  room: null, ready: false, myPeer: null, hostPeer: null,
+  players: {},              // peer -> Char3D (다른 사람 캐릭터)
+  lobbyPeers: [],
+  lastSend: 0, lastShot: 0,
+  pendingStart: null,
+
+  get online() { return !!(this.room && this.ready); },
+  get isHost() { return !this.online || this.hostPeer === this.myPeer; },
+  get playerCount() { return this.lobbyPeers.filter(p => p.kind === 'viewer').length || 1; },
+
+  async connect() {
+    if (!window.claude || !window.claude.use) return false;
+    let room = null;
+    try { room = await window.claude.use('room'); } catch (e) { room = null; }
+    if (!room) return false;
+
+    this.room = room;
+    this.ready = true;
+
+    room.onPeers(change => this.onPeers(change), () => { this.ready = false; });
+    room.on('start', m => this.onStart(m));
+    room.on('shot', m => this.onShot(m));
+    room.on('hit', m => this.onHit(m));
+    room.on('pick', m => this.onPick(m));
+    room.on('died', m => this.onDied(m));
+
+    this.push({ mode: 'lobby', name: Profile.nickname(), skin: Profile.data.equipped.skin });
+    return true;
+  },
+
+  push(patch) { if (this.online) this.room.presence(patch).catch(() => {}); },
+  send(topic, data) { if (this.online) this.room.emit(topic, data).catch(() => {}); },
+
+  /* ---------- 참가자 변화 ---------- */
+  onPeers(change) {
+    const list = change.peers.filter(p => p.kind === 'viewer');
+    this.lobbyPeers = list;
+    const me = list.find(p => p.isMe && p.sameTab);
+    if (me) this.myPeer = me.peer;
+
+    // 방장이 사라지면 남은 사람 중 첫 번째가 이어받습니다
+    if (this.hostPeer && !list.some(p => p.peer === this.hostPeer)) {
+      this.hostPeer = list.map(p => p.peer).sort()[0] || this.myPeer;
+      if (this.hostPeer === this.myPeer) Game.pushFeed('방장을 이어받았습니다');
+    }
+
+    for (const p of change.left) this.removePlayer(p.peer);
+    if (Game.state === 'playing') for (const p of list) this.syncPlayer(p);
+    if (typeof Lobby !== 'undefined' && Lobby.el) Lobby.showPeers(list);
+  },
+
+  /* ---------- 매치 시작 ---------- */
+  hostStart(botCount) {
+    const seed = (Math.random() * 0x7fffffff) | 0;
+    const at = Date.now() + 1200;             // 다 같이 시작하도록 잠깐 여유를 둡니다
+    this.hostPeer = this.myPeer;
+    this.send('start', { seed, at, bots: botCount, host: this.myPeer });
+    this.pendingStart = { seed, at, bots: botCount, host: this.myPeer };
+  },
+
+  onStart(msg) {
+    const d = msg.data || {};
+    if (!d.seed) return;
+    if (msg.isMe && msg.sameTab) return;       // 내가 보낸 것은 이미 처리
+    this.hostPeer = d.host || msg.peer;
+    this.pendingStart = { seed: d.seed, at: d.at, bots: d.bots || 0, host: this.hostPeer };
+    Lobby.notifyStarting();
+  },
+
+  /* 예약된 시작 시각이 되면 매치를 엽니다 */
+  tick() {
+    if (this.pendingStart && Date.now() >= this.pendingStart.at) {
+      const s = this.pendingStart;
+      this.pendingStart = null;
+      Main.beginMatch(s.bots, { seed: s.seed, startedAt: s.at, online: true });
+    }
+  },
+
+  /* ---------- 매치 중 상태 주고받기 ---------- */
+  update(dt) {
+    if (!this.online || Game.state !== 'playing') return;
+    const now = performance.now();
+    if (now - this.lastSend < 55) return;      // 초당 18회 정도
+    this.lastSend = now;
+
+    const p = Game.player;
+    const patch = {
+      mode: 'match',
+      name: Profile.nickname(),
+      skin: Profile.data.equipped.skin,
+      gunSkin: Profile.data.equipped.gun,
+      x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
+      yaw: +p.yaw.toFixed(2), pitch: +p.pitch.toFixed(2),
+      hp: Math.max(0, Math.round(p.hp)),
+      gun: p.gun || '', scope: p.zoom,
+      fly: p.flying || '', crouch: !!p.crouch, dead: !!p.dead,
+      spd: +p.speedNow.toFixed(1)
+    };
+    if (this.isHost) patch.bots = this.packBots();
+    this.push(patch);
+  },
+
+  /* 봇 상태를 문자열 하나로 압축 (방장만 보냅니다) */
+  packBots() {
+    const out = [];
+    for (const c of Game.chars) {
+      if (!c.ai || c.remote) continue;
+      out.push([c.netId, c.pos.x.toFixed(1), c.pos.y.toFixed(1), c.pos.z.toFixed(1),
+                c.yaw.toFixed(2), Math.max(0, Math.round(c.hp)), c.gun || ''].join(','));
+    }
+    return out.join('|');
+  },
+
+  applyBots(str) {
+    if (!str) return;
+    for (const row of str.split('|')) {
+      const f = row.split(',');
+      const c = Game.botById[+f[0]];
+      if (!c) continue;
+      c.netTarget = c.netTarget || new THREE.Vector3();
+      c.netTarget.set(+f[1], +f[2], +f[3]);
+      c.yaw = +f[4];
+      const hp = +f[5];
+      if (hp <= 0 && !c.dead) { c.dead = true; c.deadT = 0; }
+      c.hp = hp;
+      if (f[6] && c.gun !== f[6]) c.giveGun(f[6], 60);
+    }
+  },
+
+  /* 다른 사람 캐릭터를 만들거나 위치를 갱신 */
+  syncPlayer(peer) {
+    if (!peer || peer.isMe || peer.kind !== 'viewer') return;
+    const d = peer.presence || {};
+    if (d.mode !== 'match') { this.removePlayer(peer.peer); return; }
+
+    let c = this.players[peer.peer];
+    if (!c) {
+      const skin = SKINS[d.skin] || SKINS.recruit;
+      c = new Char3D(d.x || 0, d.z || 0, false, d.name || '생존자', skin);
+      c.remote = true;
+      c.ai = null;
+      c.gunSkin = d.gunSkin || 'stock';
+      Game.scene.add(c.mesh);
+      Game.chars.push(c);
+      this.players[peer.peer] = c;
+      Game.pushFeed((d.name || '생존자') + ' 님이 합류했습니다');
+    }
+    c.netTarget = c.netTarget || new THREE.Vector3();
+    c.netTarget.set(d.x || 0, d.y || 0, d.z || 0);
+    c.yaw = d.yaw || 0;
+    c.pitch = d.pitch || 0;
+    c.hp = d.hp == null ? 100 : d.hp;
+    c.crouch = !!d.crouch;
+    c.flying = d.fly || null;
+    c.speedNow = d.spd || 0;
+    if (d.dead && !c.dead) { c.dead = true; c.deadT = 0; }
+    if (!d.dead && c.dead) { c.dead = false; c.deadT = 0; }
+    if (d.gun && c.gun !== d.gun) c.giveGun(d.gun, 60);
+    if (this.isHost && d.bots) { /* 방장은 자기 계산을 씁니다 */ }
+    else if (d.bots) this.applyBots(d.bots);
+  },
+
+  removePlayer(peerId) {
+    const c = this.players[peerId];
+    if (!c) return;
+    Game.scene.remove(c.mesh);
+    const i = Game.chars.indexOf(c);
+    if (i >= 0) Game.chars.splice(i, 1);
+    delete this.players[peerId];
+  },
+
+  /* 매 프레임: 받은 위치로 부드럽게 따라갑니다 */
+  interpolate(dt) {
+    const k = Math.min(1, dt * 12);
+    for (const id in this.players) {
+      const c = this.players[id];
+      if (c.netTarget) c.pos.lerp(c.netTarget, k);
+      c.syncMesh(dt, false);
+    }
+    if (!this.isHost) {
+      for (const c of Game.chars) {
+        if (!c.ai || c.remote) continue;
+        if (c.netTarget) c.pos.lerp(c.netTarget, k);
+        c.syncMesh(dt, false);
+      }
+    }
+  },
+
+  /* ---------- 사건 ---------- */
+  shot(x, y, z, ex, ey, ez) {
+    const now = performance.now();
+    if (now - this.lastShot < 120) return;     // 초당 8회로 제한
+    this.lastShot = now;
+    this.send('shot', { x: +x.toFixed(1), y: +y.toFixed(1), z: +z.toFixed(1),
+                        ex: +ex.toFixed(1), ey: +ey.toFixed(1), ez: +ez.toFixed(1) });
+  },
+  onShot(m) {
+    if (m.isMe || Game.state !== 'playing') return;
+    const d = m.data || {};
+    Game.tracer(d.x, d.y, d.z, d.ex, d.ey, d.ez, false);
+    Game.muzzleFlash(d.x, d.y, d.z, false);
+    Sfx.shot(Game.player ? Game.player.pos.distanceTo(new THREE.Vector3(d.x, d.y, d.z)) : 200, 'rifle');
+  },
+
+  hitPlayer(peerId, dmg, head) { this.send('hit', { to: peerId, dmg: Math.round(dmg), head: !!head }); },
+  hitBot(netId, dmg, head) { this.send('hit', { bot: netId, dmg: Math.round(dmg), head: !!head, by: Profile.nickname() }); },
+  onHit(m) {
+    if (Game.state !== 'playing') return;
+    const d = m.data || {};
+    if (d.to && d.to === this.myPeer && !m.isMe) {
+      Game.damage(Game.player, d.dmg, this.players[m.peer] || null, d.head, false);
+    } else if (d.bot != null && this.isHost && !m.isMe) {
+      const c = Game.botById[d.bot];
+      if (c && !c.dead) Game.damage(c, d.dmg, this.players[m.peer] || null, d.head, false);
+    }
+  },
+
+  pick(lootId) { this.send('pick', { id: lootId }); },
+  onPick(m) {
+    if (m.isMe || Game.state !== 'playing') return;
+    const l = Game.loots.find(x => x.id === (m.data || {}).id);
+    if (l && !l.dead) { l.dead = true; Game.scene.remove(l.mesh); }
+  },
+
+  died(byName) { this.send('died', { by: byName || '' }); },
+  onDied(m) {
+    if (m.isMe || Game.state !== 'playing') return;
+    const c = this.players[m.peer];
+    if (c && !c.dead) { c.dead = true; c.deadT = 0; Game.pushFeed(c.name + ' 탈락'); }
+  },
+
+  leaveMatch() {
+    for (const id in this.players) this.removePlayer(id);
+    this.players = {};
+    this.push({ mode: 'lobby', bots: null });
+  }
+};
+
+/* ============================================================
    로비: 캐릭터 미리보기(3D) + 상자·스킨·전적 화면
    ============================================================ */
 const Lobby = {
@@ -4002,6 +4336,9 @@ const Lobby = {
       gunGrid: document.getElementById('gunGrid'),
       statList: document.getElementById('statList'),
       reveal: document.getElementById('reveal'),
+      peerList: document.getElementById('peerList'),
+      modeName: document.getElementById('modeName'),
+      nick: document.getElementById('nickInput'),
       revealCard: document.getElementById('revealCard')
     };
 
@@ -4018,6 +4355,14 @@ const Lobby = {
     document.getElementById('reveal').addEventListener('click', () => {
       this.el.reveal.classList.add('hidden');
     });
+    // 닉네임
+    this.el.nick.value = Profile.data.name || '';
+    this.el.nick.addEventListener('input', () => {
+      Profile.setName(this.el.nick.value);
+      if (Net.online) Net.push({ name: Profile.nickname() });
+      this.showPeers(Net.lobbyPeers);
+    });
+
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
@@ -4084,6 +4429,24 @@ const Lobby = {
     Sfx.pick();
     this.refreshUI();
   },
+
+  /* 함께 접속한 사람 목록 */
+  showPeers(list) {
+    if (!this.el || !this.el.peerList) return;
+    const others = (list || []).filter(p => !p.isMe && p.kind === 'viewer');
+    if (!Net.online) { this.el.peerList.textContent = '혼자 플레이 중'; this.el.modeName.textContent = '솔로'; return; }
+    if (!others.length) {
+      this.el.peerList.innerHTML = '<span class="dot on"></span>연결됨 · 링크를 공유해 보세요';
+      this.el.modeName.textContent = '솔로';
+      return;
+    }
+    const names = others.map(p => (p.presence && p.presence.name) || '생존자');
+    this.el.modeName.textContent = '함께 ' + (others.length + 1) + '명';
+    this.el.peerList.innerHTML = '<span class="dot on"></span>' + names.join(', ') + ' 님과 함께';
+  },
+
+  onNetReady() { this.showPeers(Net.lobbyPeers); },
+  notifyStarting() { this.toast('곧 함께 시작합니다'); },
 
   toast(msg) {
     const t = document.getElementById('lobbyToast');
@@ -4631,11 +4994,14 @@ const Main = {
     Input.init(canvas);
     Lobby.init();
     Lobby.refresh();
+    Net.connect().then(ok => { if (ok) Lobby.onNetReady(); });
     window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
     UI.el.resumeBtn.addEventListener('click', e => { e.stopPropagation(); Input.toggleSettings(false); });
-    UI.el.lobbyBtn.addEventListener('click', () => { Game.state = 'menu'; UI.showMenu(); Lobby.tab('play'); });
+    UI.el.lobbyBtn.addEventListener('click', () => {
+      Game.state = 'menu'; Net.leaveMatch(); UI.showMenu(); Lobby.tab('play');
+    });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
@@ -4646,9 +5012,23 @@ const Main = {
     try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
-    const n = Math.max(4, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    const n = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+
+    // 같은 링크를 연 사람이 더 있으면 같은 섬에서 함께 시작합니다
+    if (Net.online && Net.playerCount > 1) {
+      Net.hostStart(n);
+      Lobby.notifyStarting();
+      return;
+    }
+    this.beginMatch(n, {});
+  },
+
+  beginMatch(n, opts) {
+    Sfx.init();
+    Input.settingsOpen = false;
+    UI.el.bigmap.classList.add('hidden');
     UI.showGame();
-    Game.start(n);
+    Game.start(n, opts || {});
     if (Input.mode === 'lock') {
       Game.renderer.domElement.requestPointerLock();
       // 잠금이 조용히 무시되는 브라우저에서는 대체 조작으로 넘어갑니다
@@ -4659,6 +5039,8 @@ const Main = {
   loop(t) {
     const dt = Math.min(CFG.MAX_DT, (t - this.last) / 1000);
     this.last = t;
+    Net.tick();
+    Net.update(dt);
     if (Game.state === 'playing') {
       const paused = Input.settingsOpen || (Input.mode === 'lock' && !Input.locked);
       UI.el.pause.classList.toggle('hidden', !paused);

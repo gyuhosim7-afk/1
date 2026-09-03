@@ -118,8 +118,13 @@
     <!-- 플레이: 화면 왼쪽 아래 설정과 시작 버튼 -->
     <section class="panel playDock" id="tab-play">
       <div class="dockGroup">
+        <span class="dockLabel">닉네임</span>
+        <input id="nickInput" type="text" maxlength="12" placeholder="생존자">
+      </div>
+      <div class="dockGroup">
         <span class="dockLabel">모드</span>
-        <div class="dockRow"><b>솔로</b><span>봇 <input id="botCount" type="number" min="4" max="59" value="29">명</span></div>
+        <div class="dockRow"><b id="modeName">솔로</b><span>봇 <input id="botCount" type="number" min="0" max="59" value="29">명</span></div>
+        <div id="peerList" class="peerList">혼자 플레이 중</div>
       </div>
       <div class="dockGroup">
         <span class="dockLabel">시점</span>
@@ -129,7 +134,7 @@
         </div>
       </div>
       <button id="startBtn" class="startBtn">시작</button>
-      <p class="dockHint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.<br>WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
     <!-- 보상(상자) -->
@@ -191,6 +196,7 @@
 <script src="js/entities.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/game.js"></script>
+<script src="js/net.js"></script>
 <script src="js/lobby.js"></script>
 <script src="js/main.js"></script>
 </body>

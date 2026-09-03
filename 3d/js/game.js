@@ -193,14 +193,20 @@ const Game = {
   },
 
   /* ---------- 매치 시작 ---------- */
-  start(botCount) {
+  /* seed 를 주면 모두가 같은 섬에서 시작합니다 (함께 하기용) */
+  start(botCount, opts) {
+    opts = opts || {};
+    this.seed = opts.seed || (Math.random() * 0x7fffffff) | 0;
+    this.online = !!opts.online;
+    this.startedAt = opts.startedAt || Date.now();
     // 이전 매치 정리
     for (const c of this.chars) this.scene.remove(c.mesh);
     for (const l of this.loots) this.scene.remove(l.mesh);
     if (this.zoneMesh) this.scene.remove(this.zoneMesh);
     Scenery.dispose(this.scene);
 
-    this.chars = []; this.loots = []; this.feed = [];
+    RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
+    this.chars = []; this.loots = []; this.feed = []; this.botById = {};
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
 
@@ -209,6 +215,16 @@ const Game = {
     const R0 = World.half * 0.85;   // 첫 자기장은 섬 안쪽까지만
     this.zone = { x: 0, z: 0, r: R0, R0, sx: 0, sz: 0, sr: R0, tx: 0, tz: 0, tr: R0,
                   phase: 0, timer: PHASES[0].wait, shrinking: false, dps: PHASES[0].dps };
+    // 자기장 이동 계획을 미리 뽑아 두면 여러 사람이 같은 자기장을 봅니다
+    this.zonePlan = [];
+    let cx = 0, cz = 0, cr = R0;
+    for (const ph of PHASES) {
+      const tr = R0 * ph.f;
+      const off = Math.max(0, cr - tr) * 0.75 * rnd();
+      const ang = rnd() * Math.PI * 2;
+      cx = cx + Math.cos(ang) * off; cz = cz + Math.sin(ang) * off; cr = tr;
+      this.zonePlan.push({ x: cx, z: cz, r: tr });
+    }
 
     const zGeo = new THREE.CylinderGeometry(1, 1, 260, 64, 1, true);
     const zMat = new THREE.MeshBasicMaterial({
@@ -235,6 +251,8 @@ const Game = {
       const s = this.spawnSpot();
       const nm = names.length ? names.splice(Math.floor(Math.random() * names.length), 1)[0] : '봇' + i;
       const b = new Char3D(s.x, s.z, false, nm, OUTFITS[i % OUTFITS.length]);
+      b.netId = i;
+      this.botById[i] = b;
       for (const k of GUN_KEYS) b.reserve[k] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       this.scene.add(b.mesh);
@@ -257,10 +275,18 @@ const Game = {
     }
 
     this.spawnLoot();
+    RNG.end();                            // 여기서부터는 각자의 난수 (조준 흔들림, 봇 판단 등)
     this.buildMinimapImage();
     this.ads = false;
     this.camDist = CFG.CAM_DIST;
     this.updateCamera(0.016);   // 첫 프레임 전에 카메라를 제자리에 놓습니다
+    // 이미 시작된 매치에 뒤늦게 들어오면 자기장을 지금 시각까지 진행시킵니다
+    let behind = (Date.now() - this.startedAt) / 1000;
+    if (behind > 1) {
+      behind = Math.min(behind, 600);
+      while (behind > 0) { this.updateZone(Math.min(0.5, behind)); behind -= 0.5; }
+    }
+
     this.state = 'playing';
     this.pushFeed('전투 시작 — 생존자 ' + this.chars.length + '명');
   },
@@ -296,6 +322,7 @@ const Game = {
       } else {
         l = new Loot(x, z, 'med', null, 1);
       }
+      l.id = this.loots.length;
       this.scene.add(l.mesh);
       this.loots.push(l);
     };
@@ -335,6 +362,8 @@ const Game = {
       }
       if (c.swap > 0) c.swap -= dt;
 
+      if (c.remote || (c.ai && this.online && !Net.isHost)) continue;   // 남이 굴리는 캐릭터
+
       if (c.flying) {                       // 낙하 중에는 전투와 자기장 판정을 쉽니다
         if (!c.isPlayer) {
           const t = c.ai.drop;
@@ -364,6 +393,8 @@ const Game = {
       const d = Math.hypot(l.pos.x - cam.x, l.pos.y - cam.y, l.pos.z - cam.z);
       l.update(this.time, d, l === this.highlight);
     }
+
+    if (this.online) Net.interpolate(dt);
 
     this.updateEffects(dt);
     this.updateCamera(dt);
@@ -537,11 +568,26 @@ const Game = {
       if (hit && hit.t < wallT) {
         endT = hit.t;
         const dmg = spec.dmg * (hit.head ? HEADSHOT : 1) * (1 - Math.min(0.45, hit.t / spec.range * 0.45));
-        this.damage(hit.char, dmg, ch, hit.head, false);
+        if (ch.isPlayer && this.online && hit.char.remote) {
+          // 상대의 체력은 상대가 관리합니다. 맞았다는 사실만 보냅니다
+          const peerId = Object.keys(Net.players).find(k => Net.players[k] === hit.char);
+          if (peerId) Net.hitPlayer(peerId, dmg, hit.head);
+          this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+        } else if (ch.isPlayer && this.online && hit.char.ai && !Net.isHost) {
+          Net.hitBot(hit.char.netId, dmg, hit.head);
+          this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+        } else {
+          this.damage(hit.char, dmg, ch, hit.head, false);
+        }
       } else if (wallT < maxT) {
         this.puff(ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
       }
       this.tracer(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT, ch.isPlayer);
+      if (ch.isPlayer && this.online) {
+        Net.shot(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
+      }
     }
 
     Sfx.shot(ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos), ch.gun);
@@ -604,6 +650,7 @@ const Game = {
     c.rank = this.alive + 1;
     c.deadT = 0;
     if (src && src !== c) { src.kills++; if (src === this.player) Sfx.kill(); }
+    if (c === this.player && this.online) Net.died(src ? src.name : '');
     this.dropLoot(c);
     if (isZone) this.pushFeed(c.name + ' 님이 자기장에 쓰러졌습니다');
     else this.pushFeed((src ? src.name : '???') + ' → ' + c.name + (src === this.player ? ' (처치!)' : ''));
@@ -671,7 +718,7 @@ const Game = {
     }
     l.dead = true;
     this.scene.remove(l.mesh);
-    if (ch === this.player) Sfx.pick();
+    if (ch === this.player) { Sfx.pick(); if (this.online) Net.pick(l.id); }
     return true;
   },
 
@@ -932,13 +979,10 @@ const Game = {
     if (!z.shrinking) {
       if (z.timer <= 0 && z.phase < PHASES.length) {
         const ph = PHASES[z.phase];
-        const tr = z.R0 * ph.f;
-        const off = Math.max(0, z.r - tr) * 0.75 * Math.random();
-        const ang = Math.random() * Math.PI * 2;
+        const plan = this.zonePlan[z.phase];
         z.sx = z.x; z.sz = z.z; z.sr = z.r;
-        z.tx = z.x + Math.cos(ang) * off;
-        z.tz = z.z + Math.sin(ang) * off;
-        z.tr = tr; z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
+        z.tx = plan.x; z.tz = plan.z; z.tr = plan.r;
+        z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
         this.pushFeed('자기장 ' + (z.phase + 1) + '단계 축소 시작');
       }
     } else {

@@ -145,6 +145,9 @@ const Lobby = {
       gunGrid: document.getElementById('gunGrid'),
       statList: document.getElementById('statList'),
       reveal: document.getElementById('reveal'),
+      peerList: document.getElementById('peerList'),
+      modeName: document.getElementById('modeName'),
+      nick: document.getElementById('nickInput'),
       revealCard: document.getElementById('revealCard')
     };
 
@@ -161,6 +164,14 @@ const Lobby = {
     document.getElementById('reveal').addEventListener('click', () => {
       this.el.reveal.classList.add('hidden');
     });
+    // 닉네임
+    this.el.nick.value = Profile.data.name || '';
+    this.el.nick.addEventListener('input', () => {
+      Profile.setName(this.el.nick.value);
+      if (Net.online) Net.push({ name: Profile.nickname() });
+      this.showPeers(Net.lobbyPeers);
+    });
+
     this.buildCrates();
     this.buildRates();
     this.refreshUI();
@@ -227,6 +238,24 @@ const Lobby = {
     Sfx.pick();
     this.refreshUI();
   },
+
+  /* 함께 접속한 사람 목록 */
+  showPeers(list) {
+    if (!this.el || !this.el.peerList) return;
+    const others = (list || []).filter(p => !p.isMe && p.kind === 'viewer');
+    if (!Net.online) { this.el.peerList.textContent = '혼자 플레이 중'; this.el.modeName.textContent = '솔로'; return; }
+    if (!others.length) {
+      this.el.peerList.innerHTML = '<span class="dot on"></span>연결됨 · 링크를 공유해 보세요';
+      this.el.modeName.textContent = '솔로';
+      return;
+    }
+    const names = others.map(p => (p.presence && p.presence.name) || '생존자');
+    this.el.modeName.textContent = '함께 ' + (others.length + 1) + '명';
+    this.el.peerList.innerHTML = '<span class="dot on"></span>' + names.join(', ') + ' 님과 함께';
+  },
+
+  onNetReady() { this.showPeers(Net.lobbyPeers); },
+  notifyStarting() { this.toast('곧 함께 시작합니다'); },
 
   toast(msg) {
     const t = document.getElementById('lobbyToast');

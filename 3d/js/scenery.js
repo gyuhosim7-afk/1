@@ -18,10 +18,10 @@ const Scenery = {
     const names = ['소치', '게오르고폴', '포친키', '야스나야', '로조크', '프리모스크', '밀타 베이스'];
     for (let i = 0; i < 7; i++) {
       for (let t = 0; t < 300; t++) {
-        const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+        const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
         if (World.height(x, z) < World.waterY + 2.5) continue;
         if (towns.some(o => Math.hypot(o.x - x, o.z - z) < 115)) continue;
-        towns.push({ x, z, name: names[i], r: 34 + Math.random() * 16 });
+        towns.push({ x, z, name: names[i], r: 34 + rnd() * 16 });
         break;
       }
     }
@@ -33,16 +33,16 @@ const Scenery = {
 
     // --- 마을 건물 ---
     for (const t of towns) {
-      const count = 4 + Math.floor(Math.random() * 4);
+      const count = 4 + Math.floor(rnd() * 4);
       const placed = [];
       for (let i = 0; i < count; i++) {
         for (let a = 0; a < 40; a++) {
-          const ang = Math.random() * Math.PI * 2, rad = Math.random() * t.r;
+          const ang = rnd() * Math.PI * 2, rad = rnd() * t.r;
           const x = t.x + Math.cos(ang) * rad, z = t.z + Math.sin(ang) * rad;
           if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 20)) continue;
           placed.push({ x, z });
-          const yaw = Math.round(Math.random() * 4) * Math.PI / 2 + (Math.random() - 0.5) * 0.25;
-          const roll = Math.random();
+          const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.25;
+          const roll = rnd();
           if (roll < 0.34) this.warehouse(x, z, yaw);
           else if (roll < 0.78) this.house(x, z, yaw);
           else this.shed(x, z, yaw);
@@ -51,16 +51,16 @@ const Scenery = {
       }
       // 컨테이너와 담장으로 엄폐물 추가
       for (let i = 0; i < 5; i++) {
-        const ang = Math.random() * Math.PI * 2, rad = t.r * (0.4 + Math.random() * 0.7);
-        this.container(t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, Math.random() * Math.PI);
+        const ang = rnd() * Math.PI * 2, rad = t.r * (0.4 + rnd() * 0.7);
+        this.container(t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI);
       }
     }
 
     // --- 벌판의 외딴 창고와 컨테이너 ---
     for (let i = 0; i < 16; i++) {
       const s = World.freeSpot(14);
-      if (Math.random() < 0.5) this.shed(s.x, s.z, Math.random() * Math.PI * 2);
-      else this.container(s.x, s.z, Math.random() * Math.PI * 2);
+      if (rnd() < 0.5) this.shed(s.x, s.z, rnd() * Math.PI * 2);
+      else this.container(s.x, s.z, rnd() * Math.PI * 2);
     }
 
     this.scatterNature(towns);
@@ -114,10 +114,10 @@ const Scenery = {
     g.fillStyle = '#ffffff';
     g.fillRect(0, 0, 128, 128);
     for (let i = 0; i < 2600; i++) {
-      const v = 200 + Math.floor(Math.random() * 55);
+      const v = 200 + Math.floor(rnd() * 55);
       g.fillStyle = 'rgba(' + v + ',' + v + ',' + v + ',0.65)';
-      const x = Math.random() * 128, y = Math.random() * 128;
-      g.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 3);
+      const x = rnd() * 128, y = rnd() * 128;
+      g.fillRect(x, y, 1 + rnd() * 2, 1 + rnd() * 3);
     }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -217,7 +217,7 @@ const Scenery = {
   house(cx, cz, yaw) {
     const base = World.height(cx, cz);
     const w = 9.5, d = 7.5, h = 3.4;
-    const wall = Math.random() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
+    const wall = rnd() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
     this.walls(cx, cz, yaw, w, d, h, 0.3, base, wall);
     this.windows(cx, cz, yaw, w, d, h, base, 2, 2.0);
     this.trim(cx, cz, yaw, 0, base + h * 0.45, -d / 2 - 0.02, 2.2, h * 0.9, 0.1, 0x6b5a48);
@@ -246,10 +246,10 @@ const Scenery = {
   container(cx, cz, yaw) {
     const base = World.height(cx, cz);
     const palette = [0xb2553f, 0x3f6b8a, 0x5a7a4a, 0xb08a3c, 0x8a8a8a];
-    const color = palette[Math.floor(Math.random() * palette.length)];
+    const color = palette[Math.floor(rnd() * palette.length)];
     this.box(cx, base + 1.3, cz, 6.2, 2.6, 2.5, yaw, color);
-    if (Math.random() < 0.3) {
-      this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (Math.random() - 0.5) * 0.2, color);
+    if (rnd() < 0.3) {
+      this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (rnd() - 0.5) * 0.2, color);
     }
   },
 
@@ -260,34 +260,34 @@ const Scenery = {
     const density = Game.low ? 0.6 : 1;
     for (let i = 0; i < Math.round(1100 * density); i++) {
       const lim = World.half * 0.95;
-      const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+      const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 1.2 || nearTown(x, z, 8)) continue;
       // 숲은 뭉쳐서 자라도록 노이즈로 밀도 조절
       if (valueNoise(x / 55 + 11, z / 55 + 7) < 0.42) continue;
-      const pine = Math.random() < 0.55;
-      const s = 0.8 + Math.random() * 0.7;
-      this.trees.push({ x, y, z, s, pine, rot: Math.random() * Math.PI * 2 });
+      const pine = rnd() < 0.55;
+      const s = 0.8 + rnd() * 0.7;
+      this.trees.push({ x, y, z, s, pine, rot: rnd() * Math.PI * 2 });
       World.addCyl({ x, z, r: 0.5 * s, top: y + 8 * s, h: 8 * s });
     }
 
     for (let i = 0; i < 420; i++) {
       const s0 = World.freeSpot(3);
-      const s = 0.7 + Math.random() * 1.5;
-      this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: Math.random() * Math.PI * 2 });
+      const s = 0.7 + rnd() * 1.5;
+      this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: rnd() * Math.PI * 2 });
       // 보이는 크기(가로 1.5s)에 맞춰 충돌 반지름을 잡아야 1인칭에서 바위에 파묻히지 않습니다
       World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
     }
 
     for (let i = 0; i < Math.round(2600 * density); i++) {
       const lim = World.half * 0.95;
-      const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
+      const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 0.8) continue;
-      const r = Math.random();
-      const s = r < 0.6 ? 0.22 + Math.random() * 0.28      // 잡초
-                        : 0.6 + Math.random() * 0.85;      // 수풀
-      this.bushes.push({ x, y, z, s, rot: Math.random() * Math.PI * 2, tall: r >= 0.6 });
+      const r = rnd();
+      const s = r < 0.6 ? 0.22 + rnd() * 0.28      // 잡초
+                        : 0.6 + rnd() * 0.85;      // 수풀
+      this.bushes.push({ x, y, z, s, rot: rnd() * Math.PI * 2, tall: r >= 0.6 });
     }
   },
 
@@ -371,7 +371,7 @@ const Scenery = {
     const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, Math.max(1, this.rocks.length));
     rockMesh.castShadow = true; rockMesh.receiveShadow = true;
     this.rocks.forEach((r, i) => {
-      e.set(Math.random() * 0.6, r.rot, Math.random() * 0.6); q.setFromEuler(e);
+      e.set(rnd() * 0.6, r.rot, rnd() * 0.6); q.setFromEuler(e);
       m.compose(v.set(r.x, r.y + 0.6 * r.s, r.z), q, sv.set(1.5 * r.s, 1.2 * r.s, 1.4 * r.s));
       rockMesh.setMatrixAt(i, m);
     });

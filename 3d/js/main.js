@@ -493,11 +493,14 @@ const Main = {
     Input.init(canvas);
     Lobby.init();
     Lobby.refresh();
+    Net.connect().then(ok => { if (ok) Lobby.onNetReady(); });
     window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
     UI.el.resumeBtn.addEventListener('click', e => { e.stopPropagation(); Input.toggleSettings(false); });
-    UI.el.lobbyBtn.addEventListener('click', () => { Game.state = 'menu'; UI.showMenu(); Lobby.tab('play'); });
+    UI.el.lobbyBtn.addEventListener('click', () => {
+      Game.state = 'menu'; Net.leaveMatch(); UI.showMenu(); Lobby.tab('play');
+    });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
@@ -508,9 +511,23 @@ const Main = {
     try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
-    const n = Math.max(4, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    const n = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+
+    // 같은 링크를 연 사람이 더 있으면 같은 섬에서 함께 시작합니다
+    if (Net.online && Net.playerCount > 1) {
+      Net.hostStart(n);
+      Lobby.notifyStarting();
+      return;
+    }
+    this.beginMatch(n, {});
+  },
+
+  beginMatch(n, opts) {
+    Sfx.init();
+    Input.settingsOpen = false;
+    UI.el.bigmap.classList.add('hidden');
     UI.showGame();
-    Game.start(n);
+    Game.start(n, opts || {});
     if (Input.mode === 'lock') {
       Game.renderer.domElement.requestPointerLock();
       // 잠금이 조용히 무시되는 브라우저에서는 대체 조작으로 넘어갑니다
@@ -521,6 +538,8 @@ const Main = {
   loop(t) {
     const dt = Math.min(CFG.MAX_DT, (t - this.last) / 1000);
     this.last = t;
+    Net.tick();
+    Net.update(dt);
     if (Game.state === 'playing') {
       const paused = Input.settingsOpen || (Input.mode === 'lock' && !Input.locked);
       UI.el.pause.classList.toggle('hidden', !paused);
