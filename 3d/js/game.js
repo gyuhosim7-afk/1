@@ -261,7 +261,8 @@ const Game = {
 
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
-    const r = this._v2.set(f.z, 0, -f.x);
+    // 전진 f 를 기준으로 한 오른쪽 벡터. Y 축이 위인 오른손 좌표계에서는 (-f.z, 0, f.x) 입니다
+    const r = this._v2.set(-f.z, 0, f.x);
     // 키보드와 조이스틱을 함께 받습니다 (ax: 좌우, az: 앞뒤, -1~1)
     let ix = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
     let iz = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
@@ -303,9 +304,9 @@ const Game = {
 
     // 총구 위치 (어깨 앞)
     const fwd = this._v2.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
-    const mx = p.pos.x + fwd.x * 0.55 + fwd.z * 0.28;
+    const mx = p.pos.x + fwd.x * 0.55 - fwd.z * 0.28;
     const my = p.pos.y + (p.crouch ? 1.05 : 1.32);
-    const mz = p.pos.z + fwd.z * 0.55 - fwd.x * 0.28;
+    const mz = p.pos.z + fwd.z * 0.55 + fwd.x * 0.28;
     const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
     this.fireShot(p, mx, my, mz, d);
     this.recoilKick = Math.min(1, this.recoilKick + 0.5);
@@ -494,7 +495,7 @@ const Game = {
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
     const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT);
-    const right = this._v2.set(dir.z, 0, -dir.x).normalize();
+    const right = this._v2.set(-dir.z, 0, dir.x).normalize();
     const px = p.pos.x + right.x * side, pz = p.pos.z + right.z * side;
 
     // 카메라가 벽이나 나무를 뚫지 않도록 거리 축소

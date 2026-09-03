@@ -47,7 +47,7 @@ function makeBody(outfit, isPlayer) {
   const barrel = boxMesh(0.06, 0.06, 0.42, 0x3a3a3c, 0, 0.01, 0.62);
   const mag = boxMesh(0.08, 0.2, 0.1, 0x333336, 0, -0.14, 0.16);
   gun.add(body); gun.add(barrel); gun.add(mag);
-  gun.position.set(0.26, 1.28, 0.16);
+  gun.position.set(-0.26, 1.28, 0.16);
   gun.visible = false;
 
   g.add(legL); g.add(legR); g.add(torso); g.add(vest); g.add(pack);

@@ -138,7 +138,8 @@ const UI = {
   drawCompass(yaw) {
     const c = this.cctx, w = this.el.compass.width, h = this.el.compass.height;
     c.clearRect(0, 0, w, h);
-    const deg = ((yaw * 180 / Math.PI) % 360 + 360) % 360;   // 바라보는 방위
+    // 지도 기준으로 위쪽이 북(-Z), 오른쪽이 동(+X). 시선 yaw 를 방위각으로 바꿉니다
+    const deg = ((180 - yaw * 180 / Math.PI) % 360 + 360) % 360;
     const pxPerDeg = w / 140;
     c.font = '600 12px "IBM Plex Sans KR", system-ui, sans-serif';
     c.textAlign = 'center';
@@ -201,7 +202,7 @@ const UI = {
     // 플레이어 (시야 방향 삼각형)
     c.save();
     c.translate(S / 2, S / 2);
-    c.rotate(-Game.look.yaw);
+    c.rotate(Math.PI - Game.look.yaw);   // 지도 위쪽이 북이므로 시선 방향으로 돌립니다
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
     c.restore();
@@ -231,7 +232,7 @@ const UI = {
     c.textAlign = 'center';
     for (const t of World.towns) { const q = toPx(t.x, t.z); c.fillText(t.name, q[0], q[1]); }
     const pp = toPx(g.player.pos.x, g.player.pos.z);
-    c.save(); c.translate(pp[0], pp[1]); c.rotate(-Game.look.yaw);
+    c.save(); c.translate(pp[0], pp[1]); c.rotate(Math.PI - Game.look.yaw);
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -9); c.lineTo(6, 7); c.lineTo(-6, 7); c.closePath(); c.fill();
     c.restore();

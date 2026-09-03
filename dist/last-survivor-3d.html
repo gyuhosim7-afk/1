@@ -135,8 +135,11 @@ html, body {
 
 #keys {
   position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
-  display: flex; gap: 12px; font-size: 10px; color: rgba(255, 255, 255, .45);
+  display: flex; gap: 11px; font-size: 10px; color: rgba(255, 255, 255, .45);
+  white-space: nowrap;
 }
+/* 폭이 좁으면 줄바꿈되며 체력바를 가리므로 아예 숨깁니다 */
+@media (max-width: 1180px) { #keys { display: none; } }
 kbd {
   background: rgba(255, 255, 255, .12); border: 1px solid var(--line);
   border-radius: 3px; padding: 1px 4px; font-size: 10px; font-family: inherit;
@@ -1146,7 +1149,7 @@ function makeBody(outfit, isPlayer) {
   const barrel = boxMesh(0.06, 0.06, 0.42, 0x3a3a3c, 0, 0.01, 0.62);
   const mag = boxMesh(0.08, 0.2, 0.1, 0x333336, 0, -0.14, 0.16);
   gun.add(body); gun.add(barrel); gun.add(mag);
-  gun.position.set(0.26, 1.28, 0.16);
+  gun.position.set(-0.26, 1.28, 0.16);
   gun.visible = false;
 
   g.add(legL); g.add(legR); g.add(torso); g.add(vest); g.add(pack);
@@ -1783,7 +1786,8 @@ const Game = {
 
     // 이동 (카메라 기준)
     const f = this._v.set(Math.sin(this.look.yaw), 0, Math.cos(this.look.yaw));
-    const r = this._v2.set(f.z, 0, -f.x);
+    // 전진 f 를 기준으로 한 오른쪽 벡터. Y 축이 위인 오른손 좌표계에서는 (-f.z, 0, f.x) 입니다
+    const r = this._v2.set(-f.z, 0, f.x);
     // 키보드와 조이스틱을 함께 받습니다 (ax: 좌우, az: 앞뒤, -1~1)
     let ix = (input.right ? 1 : 0) - (input.left ? 1 : 0) + (input.ax || 0);
     let iz = (input.fwd ? 1 : 0) - (input.back ? 1 : 0) + (input.az || 0);
@@ -1825,9 +1829,9 @@ const Game = {
 
     // 총구 위치 (어깨 앞)
     const fwd = this._v2.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
-    const mx = p.pos.x + fwd.x * 0.55 + fwd.z * 0.28;
+    const mx = p.pos.x + fwd.x * 0.55 - fwd.z * 0.28;
     const my = p.pos.y + (p.crouch ? 1.05 : 1.32);
-    const mz = p.pos.z + fwd.z * 0.55 - fwd.x * 0.28;
+    const mz = p.pos.z + fwd.z * 0.55 + fwd.x * 0.28;
     const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
     this.fireShot(p, mx, my, mz, d);
     this.recoilKick = Math.min(1, this.recoilKick + 0.5);
@@ -2016,7 +2020,7 @@ const Game = {
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
     const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT);
-    const right = this._v2.set(dir.z, 0, -dir.x).normalize();
+    const right = this._v2.set(-dir.z, 0, dir.x).normalize();
     const px = p.pos.x + right.x * side, pz = p.pos.z + right.z * side;
 
     // 카메라가 벽이나 나무를 뚫지 않도록 거리 축소
@@ -2322,7 +2326,8 @@ const UI = {
   drawCompass(yaw) {
     const c = this.cctx, w = this.el.compass.width, h = this.el.compass.height;
     c.clearRect(0, 0, w, h);
-    const deg = ((yaw * 180 / Math.PI) % 360 + 360) % 360;   // 바라보는 방위
+    // 지도 기준으로 위쪽이 북(-Z), 오른쪽이 동(+X). 시선 yaw 를 방위각으로 바꿉니다
+    const deg = ((180 - yaw * 180 / Math.PI) % 360 + 360) % 360;
     const pxPerDeg = w / 140;
     c.font = '600 12px "IBM Plex Sans KR", system-ui, sans-serif';
     c.textAlign = 'center';
@@ -2385,7 +2390,7 @@ const UI = {
     // 플레이어 (시야 방향 삼각형)
     c.save();
     c.translate(S / 2, S / 2);
-    c.rotate(-Game.look.yaw);
+    c.rotate(Math.PI - Game.look.yaw);   // 지도 위쪽이 북이므로 시선 방향으로 돌립니다
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
     c.restore();
@@ -2415,7 +2420,7 @@ const UI = {
     c.textAlign = 'center';
     for (const t of World.towns) { const q = toPx(t.x, t.z); c.fillText(t.name, q[0], q[1]); }
     const pp = toPx(g.player.pos.x, g.player.pos.z);
-    c.save(); c.translate(pp[0], pp[1]); c.rotate(-Game.look.yaw);
+    c.save(); c.translate(pp[0], pp[1]); c.rotate(Math.PI - Game.look.yaw);
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -9); c.lineTo(6, 7); c.lineTo(-6, 7); c.closePath(); c.fill();
     c.restore();

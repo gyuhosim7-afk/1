@@ -133,8 +133,11 @@ html, body {
 
 #keys {
   position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
-  display: flex; gap: 12px; font-size: 10px; color: rgba(255, 255, 255, .45);
+  display: flex; gap: 11px; font-size: 10px; color: rgba(255, 255, 255, .45);
+  white-space: nowrap;
 }
+/* 폭이 좁으면 줄바꿈되며 체력바를 가리므로 아예 숨깁니다 */
+@media (max-width: 1180px) { #keys { display: none; } }
 kbd {
   background: rgba(255, 255, 255, .12); border: 1px solid var(--line);
   border-radius: 3px; padding: 1px 4px; font-size: 10px; font-family: inherit;
