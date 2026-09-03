@@ -56,11 +56,24 @@ html, body {
   font-size: 13px; line-height: 1.75; text-shadow: 0 1px 4px #000; max-width: 300px;
 }
 
-/* --- 레드도트 조준점 (화면 중앙 고정) --- */
+/* --- 조준선: 기본 십자선 + 레드도트 조준경용 빨간 점 --- */
 #cross {
-  --ring: 18px;
+  --gap: 8px; --ring: 18px;
   position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 9;
 }
+#cross .t, #cross .b, #cross .l, #cross .r {
+  position: absolute; background: rgba(255, 255, 255, .92); box-shadow: 0 0 2px #000;
+}
+#cross .t { left: -1px; top: calc(-1 * var(--gap) - 9px); width: 2px; height: 9px; }
+#cross .b { left: -1px; top: var(--gap); width: 2px; height: 9px; }
+#cross .l { top: -1px; left: calc(-1 * var(--gap) - 9px); height: 2px; width: 9px; }
+#cross .r { top: -1px; left: var(--gap); height: 2px; width: 9px; }
+#cross:not(.reddot) .ring { display: none; }
+#cross:not(.reddot) .dot {
+  background: rgba(255, 255, 255, .8); box-shadow: 0 0 2px #000;
+  width: 3px; height: 3px; left: -1.5px; top: -1.5px;
+}
+#cross.reddot .t, #cross.reddot .b, #cross.reddot .l, #cross.reddot .r { display: none; }
 #cross .ring {
   position: absolute; left: 50%; top: 50%;
   width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); margin-top: calc(var(--ring) / -2);
@@ -346,7 +359,7 @@ body.playing.paused { cursor: default; }
 
   <div id="feed"></div>
 
-  <div id="cross"><i class="ring"></i><i class="dot"></i></div>
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="ring"></i><i class="dot"></i></div>
   <div id="scope" class="hidden">
     <div class="lens">
       <i class="v"></i><i class="h"></i><i class="dot"></i>
@@ -430,28 +443,8 @@ body.playing.paused { cursor: default; }
       <li>무기는 <b>두 자루</b>까지 들 수 있고 <b>1</b>·<b>2</b> 키나 휠로 바꿉니다. 지정사수총과 저격총에는 <b>조준경</b>이 달려 있습니다.</li>
     </ul>
     <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-    <div class="settings menuSettings">
-      <label class="row">
-        <span>마우스 감도</span>
-        <input type="range" data-set="sens" min="0.2" max="4" step="0.05">
-        <b data-val="sens">1.00</b>
-      </label>
-      <label class="row">
-        <span>정조준 감도</span>
-        <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
-        <b data-val="ads">0.65</b>
-      </label>
-      <label class="row check">
-        <input type="checkbox" data-set="invert">
-        <span>Y축 반전</span>
-      </label>
-      <label class="row check">
-        <input type="checkbox" data-set="edge">
-        <span>화면 끝 회전 보조 (커서가 가장자리에 닿으면 계속 회전)</span>
-      </label>
-    </div>
     <button id="startBtn">낙하 시작</button>
-    <p class="hint">시작하면 마우스가 화면에 고정됩니다. <kbd>Esc</kbd> 로 잠시 멈추고 <kbd>O</kbd> 로 설정을 엽니다.</p>
+    <p class="hint">시작하면 마우스가 화면에 고정됩니다. 게임 중 <kbd>O</kbd> 키로 마우스 감도를 조절할 수 있습니다.</p>
   </div>
 </div>
 
@@ -3411,10 +3404,12 @@ const UI = {
       this.el.prompt.innerHTML = '<kbd>F</kbd> ' + near.label;
     } else this.el.prompt.classList.add('hidden');
 
-    // 레드도트 조준점 (화면 중앙 고정) — 탄퍼짐에 따라 링이 커집니다
+    // 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점
     const spread = p.gun ? (Game.ads ? GUNS[p.gun].adsSpread : GUNS[p.gun].spread) : 0.05;
-    const ring = 14 + spread * 620 * (p.speedNow > 2.5 ? 1.6 : 1);
-    this.el.cross.style.setProperty('--ring', ring.toFixed(1) + 'px');
+    const moveMul = p.speedNow > 2.5 ? 1.6 : 1;
+    this.el.cross.style.setProperty('--gap', (4 + spread * 460 * moveMul).toFixed(1) + 'px');
+    this.el.cross.style.setProperty('--ring', (14 + spread * 620 * moveMul).toFixed(1) + 'px');
+    this.el.cross.classList.toggle('reddot', Game.ads && p.zoom === 2);
     this.el.cross.style.opacity = (p.flying || scoped) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
@@ -3599,24 +3594,26 @@ const Input = {
     }, { passive: false });
     window.addEventListener('blur', () => { this.keys = {}; this.fire = false; this.ads = false; });
 
+    // 한글 입력 상태에서도 동작하도록 e.key 가 아니라 물리 키 위치(e.code)를 씁니다.
+    // (한글 모드에서는 W 키가 'ㅈ' 으로 들어와 이동이 먹지 않습니다)
     window.addEventListener('keydown', e => {
-      const k = e.key.toLowerCase();
-      if ([' ', 'tab', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
-      if (this.keys[k]) return;                    // 키 반복 무시
-      this.keys[k] = true;
-      if (Game.state !== 'playing') { if (k === 'enter') Main.startGame(); return; }
-      if (k === ' ') this.jump = true;
-      if (k === 'r') Game.player.startReload();
-      if (k === 'f' || k === 'e') Game.tryPickup();
-      if (k === 'q') Game.player.startHeal();
-      if (k === 'tab') UI.el.bigmap.classList.toggle('hidden');
-      if (k === 'm') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
-      if (k === 'o') this.toggleSettings();
-      if (k === '1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
-      if (k === '2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
-      if (k === 'x') { if (Game.player.swapSlot()) Sfx.swap(); }
+      const c = e.code || '';
+      if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(c)) e.preventDefault();
+      if (this.keys[c]) return;                    // 키 반복 무시
+      this.keys[c] = true;
+      if (Game.state !== 'playing') { if (c === 'Enter' || c === 'NumpadEnter') Main.startGame(); return; }
+      if (c === 'Space') this.jump = true;
+      if (c === 'KeyR') Game.player.startReload();
+      if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
+      if (c === 'KeyQ') Game.player.startHeal();
+      if (c === 'Tab') UI.el.bigmap.classList.toggle('hidden');
+      if (c === 'KeyM') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
+      if (c === 'KeyO') this.toggleSettings();
+      if (c === 'Digit1' || c === 'Numpad1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
+      if (c === 'Digit2' || c === 'Numpad2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
+      if (c === 'KeyX') { if (Game.player.swapSlot()) Sfx.swap(); }
     });
-    window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('keyup', e => { this.keys[e.code || ''] = false; });
   },
 
   /* 설정 창 열고 닫기 — 열려 있는 동안 게임은 멈춥니다 */
@@ -3641,12 +3638,12 @@ const Input = {
 
   poll() {
     const k = this.keys;
-    this.fwd = !!(k['w'] || k['arrowup']);
-    this.back = !!(k['s'] || k['arrowdown']);
-    this.left = !!(k['a'] || k['arrowleft']);
-    this.right = !!(k['d'] || k['arrowright']);
-    this.sprint = !!k['shift'];
-    this.crouch = !!(k['c'] || k['control']);
+    this.fwd = !!(k['KeyW'] || k['ArrowUp']);
+    this.back = !!(k['KeyS'] || k['ArrowDown']);
+    this.left = !!(k['KeyA'] || k['ArrowLeft']);
+    this.right = !!(k['KeyD'] || k['ArrowRight']);
+    this.sprint = !!(k['ShiftLeft'] || k['ShiftRight']);
+    this.crouch = !!(k['KeyC'] || k['ControlLeft'] || k['ControlRight']);
 
     if (Game.state !== 'playing' || this.settingsOpen) return;
 

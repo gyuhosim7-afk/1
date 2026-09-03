@@ -186,10 +186,12 @@ const UI = {
       this.el.prompt.innerHTML = '<kbd>F</kbd> ' + near.label;
     } else this.el.prompt.classList.add('hidden');
 
-    // 레드도트 조준점 (화면 중앙 고정) — 탄퍼짐에 따라 링이 커집니다
+    // 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점
     const spread = p.gun ? (Game.ads ? GUNS[p.gun].adsSpread : GUNS[p.gun].spread) : 0.05;
-    const ring = 14 + spread * 620 * (p.speedNow > 2.5 ? 1.6 : 1);
-    this.el.cross.style.setProperty('--ring', ring.toFixed(1) + 'px');
+    const moveMul = p.speedNow > 2.5 ? 1.6 : 1;
+    this.el.cross.style.setProperty('--gap', (4 + spread * 460 * moveMul).toFixed(1) + 'px');
+    this.el.cross.style.setProperty('--ring', (14 + spread * 620 * moveMul).toFixed(1) + 'px');
+    this.el.cross.classList.toggle('reddot', Game.ads && p.zoom === 2);
     this.el.cross.style.opacity = (p.flying || scoped) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
@@ -374,24 +376,26 @@ const Input = {
     }, { passive: false });
     window.addEventListener('blur', () => { this.keys = {}; this.fire = false; this.ads = false; });
 
+    // 한글 입력 상태에서도 동작하도록 e.key 가 아니라 물리 키 위치(e.code)를 씁니다.
+    // (한글 모드에서는 W 키가 'ㅈ' 으로 들어와 이동이 먹지 않습니다)
     window.addEventListener('keydown', e => {
-      const k = e.key.toLowerCase();
-      if ([' ', 'tab', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) e.preventDefault();
-      if (this.keys[k]) return;                    // 키 반복 무시
-      this.keys[k] = true;
-      if (Game.state !== 'playing') { if (k === 'enter') Main.startGame(); return; }
-      if (k === ' ') this.jump = true;
-      if (k === 'r') Game.player.startReload();
-      if (k === 'f' || k === 'e') Game.tryPickup();
-      if (k === 'q') Game.player.startHeal();
-      if (k === 'tab') UI.el.bigmap.classList.toggle('hidden');
-      if (k === 'm') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
-      if (k === 'o') this.toggleSettings();
-      if (k === '1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
-      if (k === '2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
-      if (k === 'x') { if (Game.player.swapSlot()) Sfx.swap(); }
+      const c = e.code || '';
+      if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(c)) e.preventDefault();
+      if (this.keys[c]) return;                    // 키 반복 무시
+      this.keys[c] = true;
+      if (Game.state !== 'playing') { if (c === 'Enter' || c === 'NumpadEnter') Main.startGame(); return; }
+      if (c === 'Space') this.jump = true;
+      if (c === 'KeyR') Game.player.startReload();
+      if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
+      if (c === 'KeyQ') Game.player.startHeal();
+      if (c === 'Tab') UI.el.bigmap.classList.toggle('hidden');
+      if (c === 'KeyM') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
+      if (c === 'KeyO') this.toggleSettings();
+      if (c === 'Digit1' || c === 'Numpad1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
+      if (c === 'Digit2' || c === 'Numpad2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
+      if (c === 'KeyX') { if (Game.player.swapSlot()) Sfx.swap(); }
     });
-    window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('keyup', e => { this.keys[e.code || ''] = false; });
   },
 
   /* 설정 창 열고 닫기 — 열려 있는 동안 게임은 멈춥니다 */
@@ -416,12 +420,12 @@ const Input = {
 
   poll() {
     const k = this.keys;
-    this.fwd = !!(k['w'] || k['arrowup']);
-    this.back = !!(k['s'] || k['arrowdown']);
-    this.left = !!(k['a'] || k['arrowleft']);
-    this.right = !!(k['d'] || k['arrowright']);
-    this.sprint = !!k['shift'];
-    this.crouch = !!(k['c'] || k['control']);
+    this.fwd = !!(k['KeyW'] || k['ArrowUp']);
+    this.back = !!(k['KeyS'] || k['ArrowDown']);
+    this.left = !!(k['KeyA'] || k['ArrowLeft']);
+    this.right = !!(k['KeyD'] || k['ArrowRight']);
+    this.sprint = !!(k['ShiftLeft'] || k['ShiftRight']);
+    this.crouch = !!(k['KeyC'] || k['ControlLeft'] || k['ControlRight']);
 
     if (Game.state !== 'playing' || this.settingsOpen) return;
 

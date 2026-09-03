@@ -54,11 +54,24 @@ html, body {
   font-size: 13px; line-height: 1.75; text-shadow: 0 1px 4px #000; max-width: 300px;
 }
 
-/* --- 레드도트 조준점 (화면 중앙 고정) --- */
+/* --- 조준선: 기본 십자선 + 레드도트 조준경용 빨간 점 --- */
 #cross {
-  --ring: 18px;
+  --gap: 8px; --ring: 18px;
   position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 9;
 }
+#cross .t, #cross .b, #cross .l, #cross .r {
+  position: absolute; background: rgba(255, 255, 255, .92); box-shadow: 0 0 2px #000;
+}
+#cross .t { left: -1px; top: calc(-1 * var(--gap) - 9px); width: 2px; height: 9px; }
+#cross .b { left: -1px; top: var(--gap); width: 2px; height: 9px; }
+#cross .l { top: -1px; left: calc(-1 * var(--gap) - 9px); height: 2px; width: 9px; }
+#cross .r { top: -1px; left: var(--gap); height: 2px; width: 9px; }
+#cross:not(.reddot) .ring { display: none; }
+#cross:not(.reddot) .dot {
+  background: rgba(255, 255, 255, .8); box-shadow: 0 0 2px #000;
+  width: 3px; height: 3px; left: -1.5px; top: -1.5px;
+}
+#cross.reddot .t, #cross.reddot .b, #cross.reddot .l, #cross.reddot .r { display: none; }
 #cross .ring {
   position: absolute; left: 50%; top: 50%;
   width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); margin-top: calc(var(--ring) / -2);

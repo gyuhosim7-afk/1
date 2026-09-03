@@ -1518,23 +1518,24 @@ const UI = {
 const Input = {
   keys: {},
   init(canvas) {
+    // 한글 입력 상태에서도 동작하도록 물리 키 위치(e.code)를 씁니다
     window.addEventListener('keydown', e => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-      const k = e.key.toLowerCase();
-      this.keys[k] = true;
+      const c = e.code || '';
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(c)) e.preventDefault();
+      this.keys[c] = true;
       if (Game.state !== 'playing') {
-        if (k === 'enter') Main.startGame();
+        if (c === 'Enter' || c === 'NumpadEnter') Main.startGame();
         return;
       }
-      if (k === 'r') Game.player.startReload();
-      if (k === 'f') {
+      if (c === 'KeyR') Game.player.startReload();
+      if (c === 'KeyF') {
         const p = Game.nearestPickup(Game.player);
         if (p) Game.pickUp(Game.player, p);
       }
-      if (k === 'q' || k === 'e') Game.player.startHeal();
-      if (k === 'm') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
+      if (c === 'KeyQ' || c === 'KeyE') Game.player.startHeal();
+      if (c === 'KeyM') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
     });
-    window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('keyup', e => { this.keys[e.code || ''] = false; });
     window.addEventListener('blur', () => { this.keys = {}; Game.input.shoot = 0; });
 
     canvas.addEventListener('mousemove', e => {
@@ -1550,11 +1551,11 @@ const Input = {
 
   poll() {
     const i = Game.input, k = this.keys;
-    i.up = (k['w'] || k['arrowup']) ? 1 : 0;
-    i.down = (k['s'] || k['arrowdown']) ? 1 : 0;
-    i.left = (k['a'] || k['arrowleft']) ? 1 : 0;
-    i.right = (k['d'] || k['arrowright']) ? 1 : 0;
-    i.sprint = (k['shift']) ? 1 : 0;
+    i.up = (k['KeyW'] || k['ArrowUp']) ? 1 : 0;
+    i.down = (k['KeyS'] || k['ArrowDown']) ? 1 : 0;
+    i.left = (k['KeyA'] || k['ArrowLeft']) ? 1 : 0;
+    i.right = (k['KeyD'] || k['ArrowRight']) ? 1 : 0;
+    i.sprint = (k['ShiftLeft'] || k['ShiftRight']) ? 1 : 0;
   }
 };
 

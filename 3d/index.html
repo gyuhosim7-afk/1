@@ -21,7 +21,7 @@
 
   <div id="feed"></div>
 
-  <div id="cross"><i class="ring"></i><i class="dot"></i></div>
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="ring"></i><i class="dot"></i></div>
   <div id="scope" class="hidden">
     <div class="lens">
       <i class="v"></i><i class="h"></i><i class="dot"></i>
@@ -105,28 +105,8 @@
       <li>무기는 <b>두 자루</b>까지 들 수 있고 <b>1</b>·<b>2</b> 키나 휠로 바꿉니다. 지정사수총과 저격총에는 <b>조준경</b>이 달려 있습니다.</li>
     </ul>
     <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-    <div class="settings menuSettings">
-      <label class="row">
-        <span>마우스 감도</span>
-        <input type="range" data-set="sens" min="0.2" max="4" step="0.05">
-        <b data-val="sens">1.00</b>
-      </label>
-      <label class="row">
-        <span>정조준 감도</span>
-        <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
-        <b data-val="ads">0.65</b>
-      </label>
-      <label class="row check">
-        <input type="checkbox" data-set="invert">
-        <span>Y축 반전</span>
-      </label>
-      <label class="row check">
-        <input type="checkbox" data-set="edge">
-        <span>화면 끝 회전 보조 (커서가 가장자리에 닿으면 계속 회전)</span>
-      </label>
-    </div>
     <button id="startBtn">낙하 시작</button>
-    <p class="hint">시작하면 마우스가 화면에 고정됩니다. <kbd>Esc</kbd> 로 잠시 멈추고 <kbd>O</kbd> 로 설정을 엽니다.</p>
+    <p class="hint">시작하면 마우스가 화면에 고정됩니다. 게임 중 <kbd>O</kbd> 키로 마우스 감도를 조절할 수 있습니다.</p>
   </div>
 </div>
 
