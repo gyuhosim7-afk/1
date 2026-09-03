@@ -4,11 +4,11 @@
    ============================================================ */
 const Scenery = {
   boxDefs: [],   // { x,y,z, sx,sy,sz, yaw, color, solid }
-  trees: [], rocks: [], bushes: [],
+  trees: [], rocks: [], bushes: [], grass: [],
   meshes: [],
 
   build(scene) {
-    this.boxDefs = []; this.trees = []; this.rocks = []; this.bushes = [];
+    this.boxDefs = []; this.trees = []; this.rocks = []; this.bushes = []; this.grass = [];
     World.resetColliders();
     World.buildHeights();
 
@@ -85,7 +85,9 @@ const Scenery = {
       const hx = World.height(x + 2, z) - World.height(x - 2, z);
       const hz = World.height(x, z + 2) - World.height(x, z - 2);
       const slope = Math.min(1, Math.hypot(hx, hz) / 5.5);
-      tmp.copy(cGrass).lerp(cGrass2, valueNoise(x / 26, z / 26));
+      const v1 = valueNoise(x / 26, z / 26), v2 = valueNoise(x / 7 + 40, z / 7 + 90);
+      tmp.copy(cGrass).lerp(cGrass2, v1 * 0.75 + v2 * 0.25);
+      tmp.multiplyScalar(0.88 + v2 * 0.26);
       if (slope > 0.42) tmp.lerp(cRock, Math.min(1, (slope - 0.42) / 0.4));
       if (h < World.waterY + 1.6) tmp.lerp(cSand, Math.min(1, (World.waterY + 1.6 - h) / 2.2));
       // (색은 이미 선형 공간)
@@ -125,11 +127,11 @@ const Scenery = {
   },
 
   buildWater(scene) {
-    const geo = new THREE.PlaneGeometry(World.size * 1.6, World.size * 1.6, 1, 1);
+    const geo = new THREE.PlaneGeometry(World.size * 1.4, World.size * 1.4, 56, 56);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
-      color: srgb(0x2f5d78), transparent: true, opacity: 0.84,
-      roughness: 0.16, metalness: 0.35
+      color: srgb(0x2b5b76), transparent: true, opacity: 0.86,
+      roughness: 0.12, metalness: 0.4, flatShading: true
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = World.waterY;
@@ -173,12 +175,38 @@ const Scenery = {
     }
   },
 
+  /* 벽면에 창문과 문틀 같은 장식을 붙입니다 (충돌 없음) */
+  trim(cx, cz, yaw, lx, ly, lz, w, h, thick, color) {
+    const [x, z] = this.local(cx, cz, yaw, lx, lz);
+    this.boxDefs.push({ x, y: ly, z, sx: w, sy: h, sz: thick, yaw, color, solid: false });
+  },
+
+  windows(cx, cz, yaw, w, d, h, base, count, yOff) {
+    const frame = 0x6f7378, glass = 0x38505e;
+    for (let i = 0; i < count; i++) {
+      const t = (i + 1) / (count + 1) - 0.5;
+      for (const side of [-1, 1]) {
+        // 좌우 벽
+        const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.02), t * d * 0.8);
+        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 0.9, sz: 1.2, yaw, color: glass, solid: false });
+        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.08, sy: 1.05, sz: 1.35, yaw, color: frame, solid: false });
+      }
+      // 뒷벽
+      const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.02);
+      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.2, sy: 0.9, sz: 0.12, yaw, color: glass, solid: false });
+      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.35, sy: 1.05, sz: 0.08, yaw, color: frame, solid: false });
+    }
+  },
+
   warehouse(cx, cz, yaw) {
     const base = World.height(cx, cz);
     const w = 16, d = 11, h = 5.2;
     const wall = 0xb9b2a3;
     this.walls(cx, cz, yaw, w, d, h, 0.34, base, wall);
+    this.windows(cx, cz, yaw, w, d, h, base, 3, 3.4);
+    this.trim(cx, cz, yaw, 0, base + h * 0.5, -d / 2 - 0.02, 2.4, h - 0.3, 0.1, 0x5c5f63);  // 출입구 틀
     this.box(cx, base + h + 0.22, cz, w + 0.6, 0.44, d + 0.6, yaw, 0x8a5b47);   // 지붕 (올라설 수 있음)
+    this.trim(cx, cz, yaw, 0, base + h + 0.52, 0, w + 0.7, 0.16, d + 0.7, 0x6d4638);       // 처마
     // 내부 기둥
     for (const s of [-1, 1]) {
       const [x, z] = this.local(cx, cz, yaw, s * 4.6, 0);
@@ -191,6 +219,8 @@ const Scenery = {
     const w = 9.5, d = 7.5, h = 3.4;
     const wall = Math.random() < 0.5 ? 0xd8cfbc : 0xc3b8a2;
     this.walls(cx, cz, yaw, w, d, h, 0.3, base, wall);
+    this.windows(cx, cz, yaw, w, d, h, base, 2, 2.0);
+    this.trim(cx, cz, yaw, 0, base + h * 0.45, -d / 2 - 0.02, 2.2, h * 0.9, 0.1, 0x6b5a48);
     this.box(cx, base + h + 0.15, cz, w + 0.4, 0.3, d + 0.4, yaw, 0x8f6b52);
     // 박공 지붕 (장식, 충돌 없음)
     const roof = 0x7d4b3a;
@@ -248,12 +278,15 @@ const Scenery = {
       World.addCyl({ x: s0.x, z: s0.z, r: 1.05 * s, top: s0.y + 1.5 * s, h: 3 * s });
     }
 
-    for (let i = 0; i < Math.round(900 * density); i++) {
+    for (let i = 0; i < Math.round(2600 * density); i++) {
       const lim = World.half * 0.95;
       const x = (Math.random() * 2 - 1) * lim, z = (Math.random() * 2 - 1) * lim;
       const y = World.height(x, z);
       if (y < World.waterY + 0.8) continue;
-      this.bushes.push({ x, y, z, s: 0.6 + Math.random() * 0.9, rot: Math.random() * Math.PI * 2 });
+      const r = Math.random();
+      const s = r < 0.6 ? 0.22 + Math.random() * 0.28      // 잡초
+                        : 0.6 + Math.random() * 0.85;      // 수풀
+      this.bushes.push({ x, y, z, s, rot: Math.random() * Math.PI * 2, tall: r >= 0.6 });
     }
   },
 
@@ -286,17 +319,26 @@ const Scenery = {
     const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, this.trees.length);
     trunkMesh.castShadow = true;
 
-    // 침엽수 잎
+    // 침엽수 잎: 원뿔 세 단
     const pines = this.trees.filter(t => t.pine), leafs = this.trees.filter(t => !t.pine);
-    const pineGeo = new THREE.ConeGeometry(1, 1, 7);
-    pineGeo.translate(0, 0.5, 0);
-    const pineMat = new THREE.MeshStandardMaterial({ color: srgb(0x2f5133), roughness: 0.95, flatShading: true });
-    const pineMesh = new THREE.InstancedMesh(pineGeo, pineMat, Math.max(1, pines.length));
+    const B = Build;
+    const pineGeo = B.merge([
+      B.cone(1.00, 2.30, 0x2c4d31, 0, 0.95, 0),
+      B.cone(0.78, 1.90, 0x35583a, 0, 1.95, 0),
+      B.cone(0.54, 1.55, 0x3d6442, 0, 2.85, 0)
+    ]);
+    const foliageMat = Mats.vc({ roughness: 0.95, metalness: 0, flatShading: true });
+    const pineMesh = new THREE.InstancedMesh(pineGeo, foliageMat, Math.max(1, pines.length));
     pineMesh.castShadow = true;
 
-    const leafGeo = new THREE.IcosahedronGeometry(1, 0);
-    const leafMat = new THREE.MeshStandardMaterial({ color: srgb(0x496b34), roughness: 0.95, flatShading: true });
-    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, Math.max(1, leafs.length));
+    // 활엽수 잎: 덩어리 여러 개
+    const leafGeo = B.merge([
+      B.ico(1.05, 0x47692f, 0, 0, 0),
+      B.ico(0.78, 0x51763a, 0.85, 0.30, 0.18),
+      B.ico(0.70, 0x3f5e2b, -0.72, 0.16, -0.34),
+      B.ico(0.62, 0x577d3e, 0.10, 0.78, 0.48)
+    ]);
+    const leafMesh = new THREE.InstancedMesh(leafGeo, foliageMat, Math.max(1, leafs.length));
     leafMesh.castShadow = true;
 
     this.trees.forEach((t, i) => {
@@ -307,13 +349,14 @@ const Scenery = {
     });
     pines.forEach((t, i) => {
       e.set(0, t.rot, 0); q.setFromEuler(e);
-      m.compose(v.set(t.x, t.y + 4.6 * t.s, t.z), q, sv.set(2.3 * t.s, 6.4 * t.s, 2.3 * t.s));
+      const k = 2.0 * t.s;
+      m.compose(v.set(t.x, t.y + 2.2 * t.s, t.z), q, sv.set(k, k * 1.15, k));
       pineMesh.setMatrixAt(i, m);
     });
     leafs.forEach((t, i) => {
-      e.set(Math.random(), t.rot, 0); q.setFromEuler(e);
-      const r = 2.5 * t.s;
-      m.compose(v.set(t.x, t.y + 6.2 * t.s, t.z), q, sv.set(r, r * 0.85, r));
+      e.set(0, t.rot, 0); q.setFromEuler(e);
+      const r = 1.9 * t.s;
+      m.compose(v.set(t.x, t.y + 5.4 * t.s, t.z), q, sv.set(r, r * 0.92, r));
       leafMesh.setMatrixAt(i, m);
     });
     trunkMesh.instanceMatrix.needsUpdate = true;
@@ -335,13 +378,18 @@ const Scenery = {
     scene.add(rockMesh);
 
     // 수풀
-    const bushGeo = new THREE.IcosahedronGeometry(1, 0);
-    const bushMat = new THREE.MeshStandardMaterial({ color: srgb(0x3f5b2e), roughness: 1, flatShading: true });
+    const bushGeo = Build.merge([
+      Build.ico(0.95, 0x3f5b2e, 0, 0, 0),
+      Build.ico(0.66, 0x496a35, 0.62, 0.12, 0.2),
+      Build.ico(0.58, 0x37502a, -0.55, 0.05, -0.25)
+    ]);
+    const bushMat = Mats.vc({ roughness: 1, metalness: 0, flatShading: true });
     const bushMesh = new THREE.InstancedMesh(bushGeo, bushMat, Math.max(1, this.bushes.length));
     bushMesh.castShadow = true;
     this.bushes.forEach((b, i) => {
       e.set(0, b.rot, 0); q.setFromEuler(e);
-      m.compose(v.set(b.x, b.y + 0.35 * b.s, b.z), q, sv.set(1.1 * b.s, 0.75 * b.s, 1.1 * b.s));
+      const h = b.tall ? 0.8 : 0.55;
+      m.compose(v.set(b.x, b.y + 0.3 * b.s, b.z), q, sv.set(1.1 * b.s, h * b.s, 1.1 * b.s));
       bushMesh.setMatrixAt(i, m);
     });
     bushMesh.instanceMatrix.needsUpdate = true;

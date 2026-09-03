@@ -9,19 +9,20 @@ const Game = {
   look: { yaw: 0, pitch: -0.06 },
   ads: false, shooting: false,
   camDist: CFG.CAM_DIST,
-  recoilKick: 0,
+  recoilKick: 0, landDip: 0,
   hitMarker: 0, damageDir: null,
   feed: [],
   minimapImg: null,
   aimPoint: new THREE.Vector3(),
-  _v: new THREE.Vector3(), _v2: new THREE.Vector3(),
+  _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
 
   /* ---------- 초기화 ---------- */
   init(canvas) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    // 터치 기기(태블릿·휴대폰)는 해상도와 그림자를 낮춰 부드럽게 돌아가게 합니다
-    this.low = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer: coarse)').matches;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.low ? 1.15 : 1.75));
+    // 기본은 높은 품질로 시작하고, 프레임이 나쁘면 한 번만 낮춥니다
+    this.low = false;
+    this.perfSum = 0; this.perfN = 0; this.downgraded = false;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -30,7 +31,7 @@ const Game = {
     this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(0xbcc9d2), CFG.FOG_NEAR, this.low ? 260 : CFG.FOG_FAR);
+    this.scene.fog = new THREE.Fog(srgb(0xbcc9d2), CFG.FOG_NEAR, CFG.FOG_FAR);
     this.scene.background = new THREE.Color(0xa9c1d8);
 
     this.camera = new THREE.PerspectiveCamera(CFG.FOV, window.innerWidth / window.innerHeight, 0.12, 1400);
@@ -51,19 +52,95 @@ const Game = {
     this.skyDome = new THREE.Mesh(skyGeo, skyMat);
     this.scene.add(this.skyDome);
 
-    // 조명: 낮은 오후 해 + 하늘빛
-    this.sun = new THREE.DirectionalLight(0xffe4c0, 2.6);
+    // 조명: 낮은 오후 해 + 하늘빛 + 반대쪽에서 들어오는 옅은 반사광
+    this.sun = new THREE.DirectionalLight(0xfff0d6, 2.35);
     this.sun.position.set(70, 90, 40);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(this.low ? 1024 : 2048, this.low ? 1024 : 2048);
+    this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
     sc.near = 1; sc.far = 320; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70;
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
-    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.55));
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.10));
+    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.42));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+    this.fill = new THREE.DirectionalLight(0x9fc4ee, 0.55);   // 그림자 없는 보조광
+    this.fill.position.set(-60, 40, -70);
+    this.scene.add(this.fill);
+
+    this.buildSky();
+    this.buildEffects();
+
+    window.addEventListener('resize', () => this.resize());
+  },
+
+  /* 하늘: 해와 구름 */
+  buildSky() {
+    const sunDir = new THREE.Vector3(0.55, 0.62, 0.33).normalize();
+    this.sunDir = sunDir;
+
+    // 해 (빛나는 원)
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g2 = c.getContext('2d');
+    const grad = g2.createRadialGradient(64, 64, 4, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,245,1)');
+    grad.addColorStop(0.22, 'rgba(255,238,196,0.85)');
+    grad.addColorStop(0.55, 'rgba(255,220,160,0.22)');
+    grad.addColorStop(1, 'rgba(255,210,150,0)');
+    g2.fillStyle = grad; g2.fillRect(0, 0, 128, 128);
+    const sunTex = new THREE.CanvasTexture(c);
+    this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: sunTex, transparent: true, depthWrite: false, depthTest: false, fog: false
+    }));
+    this.sunSprite.scale.setScalar(220);
+    this.sunSprite.renderOrder = -1;
+    this.scene.add(this.sunSprite);
+
+    // 구름: 부드러운 얼룩 텍스처를 큰 판에 깔고 천천히 흘려보냅니다
+    const cc = document.createElement('canvas');
+    cc.width = cc.height = 512;
+    const g3 = cc.getContext('2d');
+    g3.clearRect(0, 0, 512, 512);
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * 512, y = Math.random() * 512;
+      const r = 26 + Math.random() * 70;
+      const blobs = 3 + Math.floor(Math.random() * 4);
+      for (let b = 0; b < blobs; b++) {
+        const gr = g3.createRadialGradient(x + (Math.random() - 0.5) * r, y + (Math.random() - 0.5) * r * 0.6, 2,
+                                           x, y, r);
+        gr.addColorStop(0, 'rgba(255,255,255,0.55)');
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g3.fillStyle = gr;
+        g3.beginPath(); g3.arc(x + (Math.random() - 0.5) * r, y + (Math.random() - 0.5) * r * 0.5, r, 0, Math.PI * 2); g3.fill();
+      }
+    }
+    const cloudTex = new THREE.CanvasTexture(cc);
+    cloudTex.wrapS = cloudTex.wrapT = THREE.RepeatWrapping;
+    cloudTex.repeat.set(5, 5);
+    const cloudGeo = new THREE.PlaneGeometry(7000, 7000);
+    cloudGeo.rotateX(Math.PI / 2);
+    this.clouds = new THREE.Mesh(cloudGeo, new THREE.MeshBasicMaterial({
+      map: cloudTex, transparent: true, opacity: 0.5, depthWrite: false, fog: false, side: THREE.DoubleSide
+    }));
+    this.clouds.position.y = 330;
+    this.clouds.renderOrder = -1;
+    this.scene.add(this.clouds);
+  },
+
+  buildEffects() {
+    // 총구 화염
+    const flashGeo = new THREE.ConeGeometry(0.09, 0.34, 6);
+    flashGeo.rotateX(-Math.PI / 2);
+    this.flash = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({
+      color: 0xffd98a, transparent: true, opacity: 0, depthWrite: false, fog: false
+    }));
+    this.flash.visible = false;
+    this.scene.add(this.flash);
+    this.flashLight = new THREE.PointLight(0xffce7a, 0, 14, 2);
+    this.scene.add(this.flashLight);
+    this.flashT = 0;
 
     // 총알 궤적 풀
     for (let i = 0; i < 28; i++) {
@@ -77,8 +154,8 @@ const Game = {
       this.tracers.push({ line, life: 0 });
     }
     // 피격 먼지 풀
-    const puffGeo = new THREE.SphereGeometry(0.16, 6, 5);
-    for (let i = 0; i < 26; i++) {
+    const puffGeo = new THREE.SphereGeometry(0.14, 6, 5);
+    for (let i = 0; i < 30; i++) {
       const mesh = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
         color: srgb(0xd9cdb6), transparent: true, opacity: 0, depthWrite: false
       }));
@@ -86,8 +163,6 @@ const Game = {
       this.scene.add(mesh);
       this.puffs.push({ mesh, life: 0, vel: new THREE.Vector3() });
     }
-
-    window.addEventListener('resize', () => this.resize());
   },
 
   resize() {
@@ -107,6 +182,7 @@ const Game = {
 
     this.chars = []; this.loots = []; this.feed = [];
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
+    this.deathWait = 0; this.landDip = 0;
 
     Scenery.build(this.scene);
 
@@ -202,7 +278,10 @@ const Game = {
     if (!this.player.dead) this.updatePlayer(dt, input);
 
     for (const c of this.chars) {
-      if (c.dead) continue;
+      if (c.dead) {
+        if (c.deadT < 1) c.syncMesh(dt, false);     // 쓰러지는 동작은 끝까지 재생
+        continue;
+      }
       if (c.cooldown > 0) c.cooldown -= dt;
       if (c.hitFlash > 0) c.hitFlash -= dt;
       if (c.reloading > 0) {
@@ -218,10 +297,17 @@ const Game = {
       const dz = Math.hypot(c.pos.x - this.zone.x, c.pos.z - this.zone.z);
       if (dz > this.zone.r) this.damage(c, this.zone.dps * dt, null, false, true);
 
-      c.syncMesh(dt);
+      c.syncMesh(dt, c === this.player ? this.ads : !!(c.ai && c.ai.state === 'fight'));
     }
 
-    for (const l of this.loots) if (!l.dead) l.update(this.time);
+    // 아이템: 멀면 숨기고, 지금 주울 수 있는 것은 강조
+    this.highlight = this.player.dead ? null : this.nearestLoot(this.player);
+    const cam = this.camera.position;
+    for (const l of this.loots) {
+      if (l.dead) continue;
+      const d = Math.hypot(l.pos.x - cam.x, l.pos.y - cam.y, l.pos.z - cam.z);
+      l.update(this.time, d, l === this.highlight);
+    }
 
     this.updateEffects(dt);
     this.updateCamera(dt);
@@ -233,10 +319,20 @@ const Game = {
 
     // 그림자 카메라를 플레이어 주변으로
     const p = this.player.pos;
-    this.sun.position.set(p.x + 70, p.y + 95, p.z + 42);
+    const sd = this.sunDir;
+    this.sun.position.set(p.x + sd.x * 120, p.y + sd.y * 120, p.z + sd.z * 120);
     this.sun.target.position.set(p.x, p.y, p.z);
     this.sun.target.updateMatrixWorld();
     this.skyDome.position.set(p.x, 0, p.z);
+
+    // 해와 구름은 카메라를 따라다닙니다
+    const cp = this.camera.position;
+    this.sunSprite.position.set(cp.x + sd.x * 800, cp.y + sd.y * 800, cp.z + sd.z * 800);
+    this.clouds.position.set(cp.x, 330, cp.z);
+    this.clouds.material.map.offset.x = (this.time * 0.0016) % 1;
+    this.clouds.material.map.offset.y = (this.time * 0.0007) % 1;
+
+    this.updateWater();
 
     for (const f of this.feed) f.life -= dt;
     this.feed = this.feed.filter(f => f.life > 0).slice(-6);
@@ -244,8 +340,13 @@ const Game = {
     if (this.damageDir) { this.damageDir.life -= dt; if (this.damageDir.life <= 0) this.damageDir = null; }
     if (this.recoilKick > 0) this.recoilKick = Math.max(0, this.recoilKick - dt * 2.6);
 
-    if (this.player.dead) this.finish(false);
-    else if (this.alive <= 1) this.finish(true);
+    this.checkPerf(dt);
+
+    // 쓰러지는 장면을 잠깐 보여준 뒤 결과 화면으로
+    if (this.player.dead) {
+      this.deathWait += dt;
+      if (this.deathWait > 1.6) this.finish(false);
+    } else if (this.alive <= 1) this.finish(true);
   },
 
   updatePlayer(dt, input) {
@@ -319,6 +420,8 @@ const Game = {
     const spec = ch.spec;
     ch.cooldown = 60 / spec.rpm;
     ch.mag--;
+    ch.recoil = 1;
+    this.muzzleFlash(ox, oy, oz, ch === this.player);
     const pellets = spec.pellets || 1;
     const spread = (ch.isPlayer && this.ads) ? spec.adsSpread : spec.spread;
     const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
@@ -390,6 +493,7 @@ const Game = {
         this.hitMarker = head ? 0.3 : 0.18;
         Sfx.hit(head);
       }
+      this.puff(target.pos.x, target.pos.y + 1.2, target.pos.z, 0xc23b32);
       if (target === this.player && src) {
         this.damageDir = { yaw: Math.atan2(src.pos.x - target.pos.x, src.pos.z - target.pos.z), life: 1.4 };
         Sfx.hurt();
@@ -402,7 +506,7 @@ const Game = {
     if (c.dead) return;
     c.dead = true; c.hp = 0;
     c.rank = this.alive + 1;
-    c.mesh.visible = false;
+    c.deadT = 0;
     if (src && src !== c) { src.kills++; if (src === this.player) Sfx.kill(); }
     this.dropLoot(c);
     if (isZone) this.pushFeed(c.name + ' 님이 자기장에 쓰러졌습니다');
@@ -449,14 +553,38 @@ const Game = {
     return true;
   },
 
+  /* 주울 대상: 발밑 반경 안이거나, 조준선이 향한 조금 떨어진 아이템 */
   nearestLoot(ch) {
-    let best = null, bd = CFG.PICK_RANGE * CFG.PICK_RANGE;
+    let best = null, bestScore = Infinity;
+    const aim = (ch === this.player) ? this.camera.getWorldDirection(this._v3) : null;
     for (const l of this.loots) {
       if (l.dead) continue;
-      const d = (l.pos.x - ch.pos.x) ** 2 + (l.pos.z - ch.pos.z) ** 2;
-      if (d < bd) { bd = d; best = l; }
+      const dx = l.pos.x - ch.pos.x, dz = l.pos.z - ch.pos.z;
+      const d = Math.hypot(dx, dz);
+      let score = Infinity;
+      if (d <= CFG.PICK_RANGE) {
+        score = d;
+      } else if (aim && d <= CFG.AIM_PICK) {
+        // 화면 가운데로 바라보고 있으면 조금 멀어도 집을 수 있게
+        const cx = l.pos.x - this.camera.position.x;
+        const cy = l.pos.y + 0.35 - this.camera.position.y;
+        const cz = l.pos.z - this.camera.position.z;
+        const len = Math.hypot(cx, cy, cz) || 1;
+        const dot = (cx * aim.x + cy * aim.y + cz * aim.z) / len;
+        if (dot > 0.972) score = d + 2;      // 약 13도 안쪽
+      }
+      if (score < bestScore) { bestScore = score; best = l; }
     }
     return best;
+  },
+
+  /* F 키(줍기) 처리. 실패하면 이유를 알려 줍니다 */
+  tryPickup() {
+    const p = this.player;
+    if (p.dead) return false;
+    const l = this.nearestLoot(p);
+    if (!l) { this.pushFeed('주울 물건이 없습니다 — 아이템 가까이 가세요'); return false; }
+    return this.pickUp(p, l);
   },
 
   /* ---------- 이동 ---------- */
@@ -474,7 +602,10 @@ const Game = {
     ch.vy -= CFG.GRAVITY * dt;
     ch.pos.y += ch.vy * dt;
     const g = World.groundY(ch.pos.x, ch.pos.z, ch.pos.y);
-    if (ch.pos.y <= g) { ch.pos.y = g; ch.vy = 0; ch.grounded = true; }
+    if (ch.pos.y <= g) {
+      if (ch === this.player && ch.vy < -6) this.landDip = Math.min(0.34, -ch.vy * 0.022);
+      ch.pos.y = g; ch.vy = 0; ch.grounded = true;
+    }
     else if (ch.vy < -0.2) ch.grounded = false;
 
     ch.speedNow = Math.hypot(ch.pos.x - before.x, ch.pos.z - before.z) / Math.max(dt, 1e-4);
@@ -494,7 +625,10 @@ const Game = {
     const side = this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE;
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
 
-    const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT);
+    const run = Math.min(1, p.speedNow / CFG.SPRINT);
+    if (this.landDip > 0.001) this.landDip *= 0.86; else this.landDip = 0;
+    const bob = p.grounded ? Math.sin(p.stepPhase * 2) * 0.028 * run : 0;
+    const pivotY = p.pos.y + (p.crouch ? 1.3 : CFG.CAM_HEIGHT) + bob - this.landDip;
     const right = this._v2.set(-dir.z, 0, dir.x).normalize();
     const px = p.pos.x + right.x * side, pz = p.pos.z + right.z * side;
 
@@ -514,14 +648,15 @@ const Game = {
     if (this.camera.position.y < minY) this.camera.position.y = minY;
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
-    const wantFov = this.ads ? CFG.ADS_FOV : CFG.FOV;
+    const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35;
+    const wantFov = this.ads ? CFG.ADS_FOV : CFG.FOV + (sprinting ? 5.5 : 0);
     if (Math.abs(this.camera.fov - wantFov) > 0.05) {
       this.camera.fov += (wantFov - this.camera.fov) * Math.min(1, dt * 11);
       this.camera.updateProjectionMatrix();
     }
 
-    // 1인칭처럼 가까울 때 머리 감추기
-    p.mesh.userData.head.visible = dist > 1.4;
+    // 카메라가 몸에 바짝 붙으면 아예 몸을 감춰 시야를 가리지 않게 합니다
+    p.mesh.visible = dist > 1.25;
   },
 
   /* 카메라 위치가 장애물 안(또는 아주 가까이)에 있는지 */
@@ -565,6 +700,37 @@ const Game = {
     }
   },
 
+  /* 물결: 정점을 사인파로 흔듭니다 (3프레임에 한 번) */
+  updateWater() {
+    const w = Scenery.water;
+    if (!w) return;
+    this.waterTick = (this.waterTick || 0) + 1;
+    if (this.waterTick % 3) return;
+    const pos = w.geometry.attributes.position;
+    const t = this.time;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setY(i, Math.sin(x * 0.055 + t * 1.1) * 0.16 + Math.sin(z * 0.041 - t * 0.8) * 0.13);
+    }
+    pos.needsUpdate = true;
+    w.geometry.computeVertexNormals();
+  },
+
+  /* 총구 화염 */
+  muzzleFlash(x, y, z, isPlayer) {
+    const d = Math.hypot(x - this.camera.position.x, y - this.camera.position.y, z - this.camera.position.z);
+    if (d > 90) return;
+    this.flash.position.set(x, y, z);
+    this.flash.lookAt(this.camera.position);
+    this.flash.rotation.z = Math.random() * Math.PI;
+    this.flash.scale.setScalar(0.8 + Math.random() * 0.6);
+    this.flash.visible = true;
+    this.flash.material.opacity = 0.95;
+    this.flashLight.position.set(x, y, z);
+    this.flashLight.intensity = isPlayer ? 7 : 4;
+    this.flashT = 0.055;
+  },
+
   /* ---------- 효과 ---------- */
   tracer(x1, y1, z1, x2, y2, z2, isPlayer) {
     const t = this.tracers.find(t => t.life <= 0) || this.tracers[0];
@@ -576,9 +742,10 @@ const Game = {
     t.life = 0.07;
   },
 
-  puff(x, y, z) {
+  puff(x, y, z, color) {
     const p = this.puffs.find(p => p.life <= 0);
     if (!p) return;
+    p.mesh.material.color.setHex(color || 0xd9cdb6).convertSRGBToLinear();
     p.mesh.position.set(x, y, z);
     p.mesh.scale.setScalar(1);
     p.mesh.visible = true;
@@ -587,6 +754,13 @@ const Game = {
   },
 
   updateEffects(dt) {
+    if (this.flashT > 0) {
+      this.flashT -= dt;
+      const k = Math.max(0, this.flashT / 0.055);
+      this.flash.material.opacity = k;
+      this.flashLight.intensity *= 0.72;
+      if (this.flashT <= 0) { this.flash.visible = false; this.flashLight.intensity = 0; }
+    }
     for (const t of this.tracers) {
       if (t.life > 0) {
         t.life -= dt;
@@ -656,6 +830,23 @@ const Game = {
       g.fillRect(i - w / 2, j - h / 2, w, h);
     }
     this.minimapImg = c;
+  },
+
+  /* 프레임이 계속 무거우면 해상도와 그림자를 한 단계 낮춥니다 */
+  checkPerf(dt) {
+    if (this.downgraded || this.state !== 'playing') return;
+    this.perfSum += dt; this.perfN++;
+    if (this.perfN < 120) return;
+    const avg = this.perfSum / this.perfN;
+    this.perfSum = 0; this.perfN = 0;
+    if (avg > 0.027) {                     // 37fps 미만이면
+      this.downgraded = true; this.low = true;
+      this.renderer.setPixelRatio(1);
+      this.sun.shadow.mapSize.set(1024, 1024);
+      if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+      this.scene.fog.far = 280;
+      this.pushFeed('그래픽 품질을 낮췄습니다 (프레임 확보)');
+    }
   },
 
   render() { if (this.renderer) this.renderer.render(this.scene, this.camera); }

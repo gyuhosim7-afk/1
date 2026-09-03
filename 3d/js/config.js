@@ -27,7 +27,8 @@ const CFG = {
   ADS_DIST: 2.4,
   ADS_SIDE: 0.95,
 
-  PICK_RANGE: 2.6,
+  PICK_RANGE: 4.2,        // 발밑 줍기 반경
+  AIM_PICK: 9.0,          // 조준선이 향한 아이템은 이 거리까지 주울 수 있음
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
   MAX_MEDS: 5,
