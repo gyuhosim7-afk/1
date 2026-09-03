@@ -449,12 +449,19 @@ class Char3D {
     this.chuteTilt = 0;
     this.speedNow = 0;
     this.stepPhase = 0;
-    this.lean = 0;
+    this.speedSmooth = 0;
     this.aimBlend = 0;
+    this.victory = 0;
+    this.pose = {
+      legLx: 0, legRx: 0, legLz: 0, legRz: 0, kneeLx: 0, kneeRx: 0,
+      armLx: 0, armLy: 0, armLz: 0, armRx: 0, armRy: 0, armRz: 0,
+      hipsX: 0, hipsZ: 0, bodyX: 0, bodyZ: 0, bodyY: 0, gunX: 0
+    };
 
     this.guns = [null, null];      // 무기 두 칸
     this.mags = [0, 0];
     this.scopes = [0, 0];          // 칸마다 달린 조준경 배율 (0 = 없음)
+    this.scopeOff = [false, false]; // 조준경을 떼어 둔 상태
     this.slot = 0;
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
@@ -533,7 +540,11 @@ class Char3D {
   get mag() { return this.mags[this.slot]; }
   set mag(v) { this.mags[this.slot] = v; }
   get other() { return this.guns[1 - this.slot]; }
-  get zoom() { return this.gun ? (this.scopes[this.slot] || 1) : 1; }
+  get zoom() {
+    if (!this.gun || this.scopeOff[this.slot]) return 1;
+    return this.scopes[this.slot] || 1;
+  }
+  get scopeStowed() { return !!(this.scopes[this.slot] && this.scopeOff[this.slot]); }
   get hasTwo() { return !!(this.guns[0] && this.guns[1]); }
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
@@ -551,6 +562,7 @@ class Char3D {
     this.guns[idx] = key;
     this.mags[idx] = GUNS[key].mag;
     this.scopes[idx] = 0;
+    this.scopeOff[idx] = false;
     this.reserve[key] = (this.reserve[key] || 0) + (ammo == null ? GUNS[key].ammoPer : ammo);
     this.reloading = 0;
     this.slot = idx;
@@ -580,18 +592,26 @@ class Char3D {
     return old;
   }
 
+  /* 조준경을 떼거나 다시 붙입니다. 상태(붙임/뗌)를 돌려줍니다 */
+  toggleScope() {
+    if (!this.gun || !this.scopes[this.slot]) return null;
+    this.scopeOff[this.slot] = !this.scopeOff[this.slot];
+    this.refreshGuns();
+    return !this.scopeOff[this.slot];
+  }
+
   refreshGuns() {
     const mat = Mats.vc({ roughness: 0.55, metalness: 0.25 });
     if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
     if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
     if (this.gun) {
-      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopes[this.slot]), mat);
+      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot]), mat);
       this.gunMesh.castShadow = true;
       this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
       this.gunMount.add(this.gunMesh);
     }
     if (this.other) {                            // 남는 무기는 등에 멥니다
-      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopes[1 - this.slot]), mat);
+      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot]), mat);
       this.backMesh.castShadow = true;
       this.backMount.add(this.backMesh);
     }
@@ -622,127 +642,144 @@ class Char3D {
     return true;
   }
 
-  /* ---------- 자세와 걷기 애니메이션 ---------- */
+  /* ---------- 자세와 애니메이션 ----------
+     상태별 '기본 자세'는 부드럽게 따라가고(감속 보간), 걷기 같은 주기 동작은
+     보간 뒤에 더해 또렷하게 남깁니다. 상태가 바뀌어도 자세가 튀지 않습니다. */
   syncMesh(dt, aiming) {
     const mesh = this.mesh;
     mesh.position.copy(this.pos);
     mesh.rotation.y = this.yaw;
 
-    if (this.flying) {                     // 낙하 중 자세
+    // 속도와 조준 정도를 부드럽게
+    this.speedSmooth += (this.speedNow - this.speedSmooth) * Math.min(1, dt * 9);
+    const run = Math.min(1, this.speedSmooth / CFG.SPRINT);
+    const mv = Math.min(1, this.speedSmooth / 1.8);   // 걷기 정도 (0~1, 부드럽게 변합니다)
+    const moving = mv > 0.35;
+
+    const t = this._t || (this._t = {});
+    let rate = 15;                                   // 기본 보간 속도
+    let swing = 0, swingAmp = 0, kneeL = 0, kneeR = 0, bob = 0;
+
+    if (this.dead) {                                  // 쓰러짐
+      this.deadT = Math.min(1, this.deadT + dt * 2.2);
+      const d = this.deadT * this.deadT * (3 - 2 * this.deadT);
+      t.bodyX = -1.48 * d; t.bodyZ = 0; t.bodyY = -0.12 * d;
+      t.hipsX = 0.2 * d; t.hipsZ = 0;
+      t.armLx = -0.4 * d; t.armLy = 0; t.armLz = 0.9 * d;
+      t.armRx = -0.4 * d; t.armRy = 0; t.armRz = -0.9 * d;
+      t.legLx = 0.35 * d; t.legRx = -0.2 * d; t.legLz = 0.1 * d; t.legRz = -0.1 * d;
+      t.kneeLx = -0.5 * d; t.kneeRx = -0.3 * d;
+      t.gunX = 0;
+      rate = 9;
+      this.chute.visible = false;
+    } else if (this.flying) {                         // 낙하
       this.chute.visible = this.flying === 'chute';
-      this.hips.rotation.set(0, 0, 0);
-      if (this.flying === 'freefall') {    // 엎드려 팔다리를 벌린 자세
-        this.body.rotation.x = -1.15;
-        this.body.position.y = 0.55;
-        this.armL.rotation.set(-1.25, 0, 0.95);
-        this.armR.rotation.set(-1.25, 0, -0.95);
-        this.legL.rotation.set(0.3, 0, 0.32);
-        this.legR.rotation.set(0.3, 0, -0.32);
-        this.kneeL.rotation.x = -0.55; this.kneeR.rotation.x = -0.55;
-      } else {                             // 낙하산에 매달린 자세
-        this.body.rotation.x = 0.14 + (this.chutePitch || 0) * 0.18;
-        this.body.rotation.z = -this.chuteTilt * 0.5;
-        this.body.position.y = 0;
-        this.armL.rotation.set(-2.45, 0, 0.5);
-        this.armR.rotation.set(-2.45, 0, -0.5);
-        this.legL.rotation.x = 0.4; this.legR.rotation.x = 0.22;
-        this.kneeL.rotation.x = -0.75; this.kneeR.rotation.x = -0.5;
-        this.chute.rotation.z = this.chuteTilt;
-        this.chute.rotation.x = Math.sin(this.stepPhase * 0.6) * 0.04;
-        this.stepPhase += dt;
+      const free = this.flying === 'freefall';
+      t.bodyX = free ? -1.15 : 0.14 + (this.chutePitch || 0) * 0.18;
+      t.bodyZ = free ? 0 : -this.chuteTilt * 0.5;
+      t.bodyY = free ? 0.55 : 0;
+      t.hipsX = 0; t.hipsZ = 0;
+      t.armLx = free ? -1.25 : -2.45; t.armLz = free ? 0.95 : 0.5; t.armLy = 0;
+      t.armRx = free ? -1.25 : -2.45; t.armRz = free ? -0.95 : -0.5; t.armRy = 0;
+      t.legLx = free ? 0.3 : 0.4; t.legRx = free ? 0.3 : 0.22;
+      t.legLz = free ? 0.32 : 0; t.legRz = free ? -0.32 : 0;
+      t.kneeLx = free ? -0.55 : -0.75; t.kneeRx = free ? -0.55 : -0.5;
+      t.gunX = 0;
+      rate = 7;
+      this.stepPhase += dt;
+      if (!free) { this.chute.rotation.z = this.chuteTilt; this.chute.rotation.x = Math.sin(this.stepPhase * 0.6) * 0.04; }
+    } else {
+      this.chute.visible = false;
+      const a = this.aimBlend;
+
+      if (this.victory > 0) {                         // 승리 세리머니
+        this.victory += dt;
+        const v = this.victory;
+        const hop = Math.max(0, Math.sin(v * 5.2));
+        const wave = Math.sin(v * 6.5);
+        t.bodyY = hop * 0.26;
+        t.bodyX = -0.06; t.bodyZ = Math.sin(v * 2.6) * 0.07;
+        t.hipsX = -0.12; t.hipsZ = Math.sin(v * 2.6) * 0.1;
+        t.armLx = -2.55 + wave * 0.25; t.armLz = 0.42 + wave * 0.12; t.armLy = 0.2;
+        t.armRx = -2.55 - wave * 0.25; t.armRz = -0.42 + wave * 0.12; t.armRy = -0.2;
+        t.legLx = -hop * 0.35; t.legRx = -hop * 0.35;
+        t.legLz = 0.08; t.legRz = -0.08;
+        t.kneeLx = -hop * 0.8; t.kneeRx = -hop * 0.8;
+        t.gunX = 0.5;
+        rate = 11;
+      } else {
+        // 걷기 주기: 빠를수록 빨라집니다
+        this.stepPhase += dt * (2.6 + run * 8.2) * (0.28 + 0.72 * mv);
+        swing = Math.sin(this.stepPhase);
+        const sw2 = Math.sin(this.stepPhase * 2);
+        swingAmp = (0.26 + run * 0.6) * (this.crouch ? 0.5 : 1) * (0.04 + 0.96 * mv);
+        kneeL = -Math.max(0, -swing) * (0.45 + run * 0.85) * (0.08 + 0.92 * mv);
+        kneeR = -Math.max(0, swing) * (0.45 + run * 0.85) * (0.08 + 0.92 * mv);
+        bob = Math.abs(sw2) * 0.035 * run * mv + Math.sin(this.stepPhase * 0.5) * 0.01 * (1 - mv);
+
+        const wantAim = this.gun ? (aiming ? 1 : 0.72) : 0;
+        this.aimBlend += (wantAim - this.aimBlend) * Math.min(1, dt * 7);
+        const aa = this.aimBlend;
+
+        t.legLx = this.crouch ? -0.75 : 0;
+        t.legRx = this.crouch ? -0.75 : 0;
+        t.legLz = 0; t.legRz = 0;
+        t.kneeLx = this.crouch ? -1.15 : 0;
+        t.kneeRx = this.crouch ? -1.15 : 0;
+        if (!this.grounded) {                          // 공중
+          t.legLx = -0.5; t.legRx = 0.28;
+          t.kneeLx = -0.85; t.kneeRx = -0.32;
+        }
+
+        t.armLx = -aa * (1.34 + (aiming ? 0.22 : 0));
+        t.armRx = -aa * (1.42 + (aiming ? 0.18 : 0)) - this.recoil * 0.35;
+        t.armLz = -aa * 0.62; t.armRz = aa * 0.16;
+        t.armLy = -aa * 0.34; t.armRy = aa * 0.10;
+
+        if (this.reloading > 0) {                      // 재장전: 왼손이 탄창으로
+          const r = Math.sin((1 - this.reloading / this.spec.reload) * Math.PI);
+          t.armLx -= r * 0.55; t.armLz += r * 0.35;
+        }
+        if (this.healing > 0) {                        // 치료: 두 손을 앞으로
+          t.armLx = -1.7; t.armLz = -0.5; t.armLy = 0;
+          t.armRx = -1.7; t.armRz = 0.5; t.armRy = 0;
+        }
+        if (this.swap > 0) {                           // 무기 교체: 총을 내렸다 올림
+          const s = Math.sin((1 - this.swap / CFG.SWAP_TIME) * Math.PI);
+          t.armRx += s * 0.9; t.armLx += s * 0.7;
+        }
+
+        const lean = run * 0.22 + (this.crouch ? 0.25 : 0);
+        t.hipsX = lean * 0.5;
+        t.hipsZ = 0;
+        t.bodyX = 0; t.bodyZ = 0;
+        t.bodyY = (this.crouch ? -0.34 : 0) + bob;
+        t.gunX = 0;
+        rate = 16;
       }
-      return;
-    }
-    this.chute.visible = false;
-
-    if (this.dead) {                       // 쓰러지는 연출
-      this.deadT = Math.min(1, this.deadT + dt * 2.6);
-      const t = this.deadT * this.deadT * (3 - 2 * this.deadT);
-      this.body.rotation.x = -1.48 * t;
-      this.body.position.y = -0.12 * t;
-      this.hips.rotation.x = 0.2 * t;
-      this.armL.rotation.set(-0.4 * t, 0, -0.9 * t);
-      this.armR.rotation.set(-0.4 * t, 0, 0.9 * t);
-      this.legL.rotation.x = 0.35 * t; this.legR.rotation.x = -0.2 * t;
-      this.kneeL.rotation.x = -0.5 * t; this.kneeR.rotation.x = -0.3 * t;
-      return;
     }
 
-    // 낙하·사망 자세에서 돌아올 때 남아 있는 회전을 먼저 지웁니다
-    this.legL.rotation.y = 0; this.legL.rotation.z = 0;
-    this.legR.rotation.y = 0; this.legR.rotation.z = 0;
-    this.kneeL.rotation.set(0, 0, 0); this.kneeR.rotation.set(0, 0, 0);
-    this.armL.rotation.y = 0; this.armL.rotation.z = 0;
-    this.armR.rotation.y = 0; this.armR.rotation.z = 0;
-    this.body.rotation.set(0, 0, 0);
+    // 목표 자세로 부드럽게 (프레임 수와 무관한 감속 보간)
+    const p = this.pose;
+    const k = 1 - Math.exp(-rate * Math.max(dt, 0.0001));
+    for (const key in t) p[key] += ((t[key] || 0) - p[key]) * k;
 
-    const run = Math.min(1, this.speedNow / CFG.SPRINT);
-    const moving = this.speedNow > 0.5;
+    // 보간된 기본 자세 + 걷기 흔들림
+    this.legL.rotation.set(p.legLx + swing * swingAmp, 0, p.legLz);
+    this.legR.rotation.set(p.legRx - swing * swingAmp, 0, p.legRz);
+    this.kneeL.rotation.x = p.kneeLx + kneeL;
+    this.kneeR.rotation.x = p.kneeRx + kneeR;
 
-    // 걸음 위상: 빠를수록 빠르게
-    this.stepPhase += dt * (2.6 + run * 8.5) * (moving ? 1 : 0);
-    if (!moving) this.stepPhase += dt * 1.2;      // 제자리에서도 미세하게 흔들리도록
-    const sw = Math.sin(this.stepPhase), sw2 = Math.sin(this.stepPhase * 2);
-    const amp = 0.28 + run * 0.62;
+    const armSwing = swing * swingAmp * 0.85 * (1 - this.aimBlend);
+    this.armL.rotation.set(p.armLx - armSwing, p.armLy, p.armLz);
+    this.armR.rotation.set(p.armRx + armSwing, p.armRy, p.armRz);
 
-    // 총을 들었거나 정조준하면 상체를 세우고 팔을 앞으로
-    const wantAim = this.gun ? (aiming ? 1 : 0.72) : 0;
-    this.aimBlend += (wantAim - this.aimBlend) * Math.min(1, dt * 8);
+    this.hips.rotation.set(p.hipsX, 0, p.hipsZ + swing * 0.04 * mv * (1 - this.aimBlend * 0.5));
+    this.body.rotation.set(p.bodyX, 0, p.bodyZ);
+    this.body.position.y = p.bodyY;
 
-    // 다리
-    const legAmp = (this.crouch ? amp * 0.5 : amp) * (moving ? 1 : 0.06);
-    this.legL.rotation.x = sw * legAmp;
-    this.legR.rotation.x = -sw * legAmp;
-    this.kneeL.rotation.x = -Math.max(0, -sw) * (0.5 + run * 0.9) - (this.crouch ? 1.15 : 0);
-    this.kneeR.rotation.x = -Math.max(0, sw) * (0.5 + run * 0.9) - (this.crouch ? 1.15 : 0);
-    if (this.crouch) { this.legL.rotation.x -= 0.75; this.legR.rotation.x -= 0.75; }
-
-    if (!this.grounded) {                  // 공중 자세
-      this.legL.rotation.x = -0.55; this.legR.rotation.x = 0.3;
-      this.kneeL.rotation.x = -0.9; this.kneeR.rotation.x = -0.35;
-    }
-
-    // 팔: 무기를 들면 앞으로 모으고, 맨손이면 앞뒤로 흔듭니다
-    const a = this.aimBlend;
-    const swingL = -sw * amp * 0.85 * (1 - a);
-    const swingR = sw * amp * 0.85 * (1 - a);
-    this.armL.rotation.x = swingL - a * (1.34 + (aiming ? 0.22 : 0));
-    this.armR.rotation.x = swingR - a * (1.42 + (aiming ? 0.18 : 0)) - this.recoil * 0.35;
-    this.armL.rotation.z = -a * 0.62;      // 왼팔은 안쪽으로 모아 총을 받칩니다
-    this.armR.rotation.z = a * 0.16;
-    this.armL.rotation.y = -a * 0.34;
-    this.armR.rotation.y = a * 0.10;
-
-    // 재장전하면 왼팔을 탄창 쪽으로
-    if (this.reloading > 0) {
-      const r = Math.sin((1 - this.reloading / this.spec.reload) * Math.PI);
-      this.armL.rotation.x -= r * 0.55;
-      this.armL.rotation.z += r * 0.35;
-    }
-    // 치료 중이면 두 팔을 몸 앞으로
-    if (this.healing > 0) {
-      this.armL.rotation.set(-1.7, 0, -0.5);
-      this.armR.rotation.set(-1.7, 0, 0.5);
-    }
-
-    // 몸통: 위아래로 흔들리고 달릴수록 앞으로 기울임
-    const targetLean = run * 0.22 + (this.crouch ? 0.25 : 0);
-    this.lean += (targetLean - this.lean) * Math.min(1, dt * 7);
-    this.hips.rotation.x = this.lean * 0.5;
-    this.hips.rotation.z = moving ? sw * 0.05 * (1 - a * 0.5) : 0;
-    this.body.rotation.x = 0;
-    this.body.rotation.z = 0;
-    this.body.position.y = (this.crouch ? -0.34 : 0) + (moving ? Math.abs(sw2) * 0.035 * run : Math.sin(this.stepPhase * 0.6) * 0.008);
-
-    // 무기 교체 중에는 총을 내렸다가 올립니다
-    if (this.swap > 0) {
-      const t = Math.sin((1 - this.swap / CFG.SWAP_TIME) * Math.PI);
-      this.armR.rotation.x += t * 0.9;
-      this.armL.rotation.x += t * 0.7;
-    }
-
-    // 팔 회전을 상쇄해 총이 늘 앞을 향하게 하고, 시선 위아래를 반영합니다
-    this.gunMount.rotation.x = -this.armR.rotation.x - this.pitch * 0.8 - 0.06;
+    // 총구는 팔 회전을 상쇄해 늘 앞을 봅니다
+    this.gunMount.rotation.x = -this.armR.rotation.x - this.pitch * 0.8 - 0.06 + p.gunX;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
   }
 }

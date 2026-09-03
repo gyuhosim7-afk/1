@@ -6,7 +6,8 @@ const Game = {
   chars: [], loots: [], tracers: [], puffs: [],
   player: null, zone: null, zoneMesh: null,
   state: 'menu', time: 0, result: null,
-  look: { yaw: 0, pitch: -0.06 },
+  look: { yaw: 0, pitch: -0.06 },      // 목표 시점
+  view: { yaw: 0, pitch: -0.06 },      // 실제로 보여지는 시점 (부드럽게 따라감)
   ads: false, shooting: false,
   camDist: CFG.CAM_DIST,
   recoilKick: 0, landDip: 0,
@@ -184,7 +185,7 @@ const Game = {
 
     this.chars = []; this.loots = []; this.feed = [];
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
-    this.deathWait = 0; this.landDip = 0;
+    this.deathWait = 0; this.winWait = 0; this.landDip = 0;
 
     Scenery.build(this.scene);
 
@@ -207,6 +208,7 @@ const Game = {
     this.chars.push(this.player);
     this.look.yaw = Math.random() * Math.PI * 2;
     this.look.pitch = -0.05;
+    this.view.yaw = this.look.yaw; this.view.pitch = this.look.pitch;
 
     // 봇
     const names = NAMES.slice();
@@ -385,11 +387,25 @@ const Game = {
     if (this.player.dead) {
       this.deathWait += dt;
       if (this.deathWait > 1.6) this.finish(false);
-    } else if (this.alive <= 1) this.finish(true);
+    } else if (this.alive <= 1) {
+      // 승리: 세리머니를 보여주고 카메라가 천천히 돌아갑니다
+      if (!this.player.victory) {
+        this.player.victory = 0.001;
+        this.winWait = 0;
+        this.pushFeed('마지막 생존자! 치킨 디너!');
+        Sfx.win();
+        UI.el.winBanner.classList.remove('hidden');
+      }
+      this.winWait += dt;
+      this.look.yaw += dt * 0.5;
+      this.look.pitch += (-0.16 - this.look.pitch) * Math.min(1, dt * 2);
+      if (this.winWait > 3.6) this.finish(true);
+    }
   },
 
   updatePlayer(dt, input) {
     const p = this.player;
+    if (p.victory > 0) { input.fire = false; return; }   // 승리 연출 중에는 조작을 멈춥니다
 
     // 시점
     // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
@@ -459,11 +475,16 @@ const Game = {
     const hitT = this.rayAll(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 500, p);
     const aim = this.aimPoint.copy(origin).addScaledVector(dir, Math.max(6, hitT));
 
-    // 총구 위치 (어깨 앞)
-    const fwd = this._v2.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
-    const mx = p.pos.x + fwd.x * 0.55 - fwd.z * 0.28;
-    const my = p.pos.y + (p.crouch ? 1.05 : 1.32);
-    const mz = p.pos.z + fwd.z * 0.55 + fwd.x * 0.28;
+    // 총구 위치 (1인칭이면 카메라 바로 앞, 3인칭이면 어깨 앞)
+    let mx, my, mz;
+    if (Settings.data.fpv) {
+      mx = origin.x + dir.x * 0.7; my = origin.y + dir.y * 0.7 - 0.06; mz = origin.z + dir.z * 0.7;
+    } else {
+      const fwd = this._v2.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+      mx = p.pos.x + fwd.x * 0.55 - fwd.z * 0.28;
+      my = p.pos.y + (p.crouch ? 1.05 : 1.32);
+      mz = p.pos.z + fwd.z * 0.55 + fwd.x * 0.28;
+    }
     const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
     this.fireShot(p, mx, my, mz, d);
     this.recoilKick = Math.min(1, this.recoilKick + 0.5);
@@ -743,7 +764,16 @@ const Game = {
   /* ---------- 카메라 ---------- */
   updateCamera(dt) {
     const p = this.player;
-    const yaw = this.look.yaw, pitch = this.look.pitch - this.recoilKick * 0.05;
+
+    // 목표 시점을 부드럽게 따라갑니다 (프레임이 흔들려도 회전이 매끄럽게 이어짐)
+    const k = 1 - Math.exp(-32 * Math.max(dt, 0.0001));
+    let dyaw = this.look.yaw - this.view.yaw;
+    while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+    while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    this.view.yaw += dyaw * k;
+    this.view.pitch += (this.look.pitch - this.view.pitch) * k;
+
+    const yaw = this.view.yaw, pitch = this.view.pitch - this.recoilKick * 0.05;
     const dir = this._v.set(
       Math.sin(yaw) * Math.cos(pitch),
       Math.sin(pitch),
@@ -751,6 +781,28 @@ const Game = {
     ).normalize();
 
     const scoped = this.ads && p.zoom >= 4;
+    const fpv = Settings.data.fpv && !p.flying && !p.victory;
+
+    if (fpv) {                                  // ---------- 1인칭 ----------
+      const eyeY = p.pos.y + (p.crouch ? 1.24 : CFG.EYE) + (p.grounded ? Math.sin(p.stepPhase * 2) * 0.022 * Math.min(1, p.speedSmooth / CFG.SPRINT) : 0) - this.landDip;
+      this.camera.position.set(p.pos.x, eyeY, p.pos.z);
+      this.camera.rotation.order = 'YXZ';
+      this.camera.rotation.set(pitch, yaw + Math.PI, 0);
+      p.mesh.visible = false;
+
+      const wantFovF = this.ads ? (p.zoom > 1 ? CFG.FOV / p.zoom : CFG.ADS_FOV)
+                                : CFG.FOV + (p.speedNow > CFG.WALK * 1.35 ? 5.5 : 0);
+      if (Math.abs(this.camera.fov - wantFovF) > 0.05) {
+        this.camera.fov += (wantFovF - this.camera.fov) * Math.min(1, dt * 11);
+        this.camera.updateProjectionMatrix();
+      }
+      this.updateViewGun(dt, scoped);
+      this.camera.updateMatrixWorld();
+      this.updateAimDir();
+      return;
+    }
+    if (this.viewGun) this.viewGun.visible = false;
+
     const wantDist = p.flying ? 7.6 : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST));
     const side = p.flying ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
@@ -776,6 +828,7 @@ const Game = {
     this.camera.position.set(px - dir.x * dist, pivotY - dir.y * dist, pz - dir.z * dist);
     const minY = World.height(this.camera.position.x, this.camera.position.z) + 0.45;
     if (this.camera.position.y < minY) this.camera.position.y = minY;
+    this.camera.rotation.order = 'XYZ';
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
     const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35 && !p.flying;
@@ -805,9 +858,56 @@ const Game = {
     return y < World.height(x, z) + 0.4;
   },
 
+  /* 1인칭에서 손에 든 총 (카메라에 붙입니다) */
+  updateViewGun(dt, scoped) {
+    const p = this.player;
+    if (!this.viewGun) {
+      this.viewGun = new THREE.Group();
+      this.camera.add(this.viewGun);
+      this.scene.add(this.camera);          // 카메라의 자식이 그려지려면 씬에 있어야 합니다
+      this.viewGunKey = '';
+    }
+    const key = p.gun ? p.gun + ':' + p.zoom : '';
+    if (key !== this.viewGunKey) {           // 무기나 조준경이 바뀌면 다시 만듭니다
+      this.viewGunKey = key;
+      while (this.viewGun.children.length) this.viewGun.remove(this.viewGun.children[0]);
+      if (p.gun) {
+        const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0),
+                                 Mats.vc({ roughness: 0.55, metalness: 0.25 }));
+        m.rotation.y = Math.PI + 0.05;       // 총구가 카메라 앞(-Z)을 보도록 (살짝 안쪽으로)
+        m.scale.setScalar(0.72);             // 화면을 가리지 않을 크기
+        this.viewGun.add(m);
+      }
+    }
+    this.viewGun.visible = !!p.gun && !(scoped && this.ads);
+
+    // 조준하면 가운데로, 평소에는 오른쪽 아래에서 살짝 흔들립니다
+    const t = this.time;
+    const run = Math.min(1, p.speedSmooth / CFG.SPRINT);
+    const bobX = Math.sin(p.stepPhase) * 0.012 * run;
+    const bobY = Math.abs(Math.sin(p.stepPhase * 2)) * 0.014 * run;
+    const swap = p.swap > 0 ? Math.sin((1 - p.swap / CFG.SWAP_TIME) * Math.PI) * 0.22 : 0;
+    const reload = p.reloading > 0 ? Math.sin((1 - p.reloading / p.spec.reload) * Math.PI) * 0.14 : 0;
+    const tx = this.ads ? 0 : 0.27 + bobX;
+    const ty = (this.ads ? -0.115 : -0.26 - bobY) - swap - reload;
+    const tz = this.ads ? -0.46 : -0.64;
+    const kk = Math.min(1, dt * 12);
+    this.viewGun.position.x += (tx - this.viewGun.position.x) * kk;
+    this.viewGun.position.y += (ty - this.viewGun.position.y) * kk;
+    this.viewGun.position.z += (tz - this.viewGun.position.z) * kk;
+    this.viewGun.rotation.z += ((this.ads ? 0 : 0.05) - this.viewGun.rotation.z) * kk;
+    this.viewGun.rotation.x += ((-p.recoil * 0.25 - reload * 0.5) - this.viewGun.rotation.x) * kk;
+  },
+
   /* ---------- 자기장 ---------- */
   updateZone(dt) {
     const z = this.zone;
+    // 마지막 단계가 끝나면 자기장이 끝까지 줄어들어 승부가 반드시 갈립니다
+    if (z.phase >= PHASES.length && !z.shrinking) {
+      z.r = Math.max(0, z.r - dt * 0.4);
+      z.dps = 24;
+      return;
+    }
     z.timer -= dt;
     if (!z.shrinking) {
       if (z.timer <= 0 && z.phase < PHASES.length) {

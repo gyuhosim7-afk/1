@@ -34,7 +34,12 @@ const Sfx = {
   reload() { this.tone(300, 0.07, 'triangle', 0.04); },
   swap() { this.tone(420, 0.06, 'triangle', 0.04); },
   chute() { this.tone(220, 0.35, 'sine', 0.05); },
-  land() { this.tone(110, 0.16, 'sine', 0.06); }
+  land() { this.tone(110, 0.16, 'sine', 0.06); },
+  win() {
+    [0, 0.13, 0.26, 0.44].forEach((d, i) => {
+      setTimeout(() => this.tone([523, 659, 784, 1047][i], i === 3 ? 0.5 : 0.16, 'triangle', 0.06), d * 1000);
+    });
+  }
 };
 
 /* ============================================================
@@ -42,7 +47,7 @@ const Sfx = {
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: true },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true },
   controls: [],
 
   load() {
@@ -58,6 +63,7 @@ const Settings = {
     this.data.ads = Math.max(0.2, Math.min(1.5, +this.data.ads || 0.65));
     this.data.invert = !!this.data.invert;
     this.data.edge = this.data.edge !== false;
+    this.data.fpv = this.data.fpv !== false;
   },
 
   /* data-set 이 붙은 조절기를 모두 연결하고, 값이 바뀌면 서로 맞춰 줍니다 */
@@ -95,7 +101,7 @@ const UI = {
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
-      'scope', 'alt', 'slots'];
+      'scope', 'alt', 'slots', 'winBanner'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -103,12 +109,14 @@ const UI = {
   },
   showMenu() { document.body.classList.remove('playing'); this.el.menu.classList.remove('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.add('hidden'); },
   showGame() {
+    this.el.winBanner.classList.add('hidden');
     this.el.menu.classList.add('hidden'); this.el.over.classList.add('hidden');
     this.el.hud.classList.remove('hidden');
     document.body.classList.add('playing');
   },
   showResult(r) {
     document.body.classList.remove('playing');
+    this.el.winBanner.classList.add('hidden');
     this.el.over.classList.remove('hidden');
     this.el.hud.classList.add('hidden');
     this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
@@ -134,7 +142,8 @@ const UI = {
     this.el.hpText.textContent = Math.max(0, Math.ceil(p.hp));
 
     if (p.gun) {
-      this.el.gunName.textContent = GUNS[p.gun].short + (p.zoom > 1 ? ' · ' + SCOPES[p.zoom].label : '');
+      this.el.gunName.textContent = GUNS[p.gun].short
+        + (p.zoom > 1 ? ' · ' + SCOPES[p.zoom].label : (p.scopeStowed ? ' · 조준경 분리' : ''));
       this.el.ammo.textContent = p.swap > 0 ? '교체 중'
         : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo));
     } else {
@@ -330,7 +339,7 @@ const Input = {
   ax: 0, az: 0,
   mode: 'lock',              // lock: 마우스 잠금 / free: 잠금 없이 움직인 만큼만 회전
   locked: false, settingsOpen: false,
-  mouseX: 0, mouseY: 0, inside: false,
+  mouseX: 0, mouseY: 0, inside: false, edgeX: 0, edgeY: 0, edgeAt: 0,
 
   init(canvas) {
     this.canvas = canvas;
@@ -374,7 +383,10 @@ const Input = {
       e.preventDefault();
       if (Game.player.swapSlot()) Sfx.swap();
     }, { passive: false });
-    window.addEventListener('blur', () => { this.keys = {}; this.fire = false; this.ads = false; });
+    window.addEventListener('blur', () => {
+      this.keys = {}; this.fire = false; this.ads = false;
+      this.edgeX = this.edgeY = 0;        // 창을 벗어나면 회전을 멈춥니다
+    });
 
     // 한글 입력 상태에서도 동작하도록 e.key 가 아니라 물리 키 위치(e.code)를 씁니다.
     // (한글 모드에서는 W 키가 'ㅈ' 으로 들어와 이동이 먹지 않습니다)
@@ -394,6 +406,15 @@ const Input = {
       if (c === 'Digit1' || c === 'Numpad1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
       if (c === 'Digit2' || c === 'Numpad2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
       if (c === 'KeyX') { if (Game.player.swapSlot()) Sfx.swap(); }
+      if (c === 'KeyT') {
+        const on = Game.player.toggleScope();
+        if (on === null) Game.pushFeed('뗄 수 있는 조준경이 없습니다');
+        else { Sfx.swap(); Game.pushFeed('조준경 ' + (on ? '장착' : '분리')); }
+      }
+      if (c === 'KeyV') {
+        Settings.data.fpv = !Settings.data.fpv; Settings.save(); Settings.sync();
+        Game.pushFeed(Settings.data.fpv ? '1인칭 시점' : '3인칭 시점');
+      }
     });
     window.addEventListener('keyup', e => { this.keys[e.code || ''] = false; });
   },
@@ -429,16 +450,23 @@ const Input = {
 
     if (Game.state !== 'playing' || this.settingsOpen) return;
 
-    // 조준점은 항상 화면 한가운데입니다. 마우스는 시야를 돌립니다.
-    // 잠금이 없을 때 커서가 화면 가장자리에 닿으면, 움직일 때와 같은 속도로 계속 돌아갑니다.
-    if (this.locked || !this.inside || !Settings.data.edge) return;
-    const W = window.innerWidth, H = window.innerHeight, band = 90;
-    const rate = 7.5;                     // 프레임당 회전량 (감도 설정이 그대로 곱해집니다)
-    const x = this.mouseX, y = this.mouseY;
-    if (x <= band) this.dx -= rate;
-    else if (x >= W - band) this.dx += rate;
-    if (y <= band) this.dy -= rate * 0.6;
-    else if (y >= H - band) this.dy += rate * 0.6;
+    // 조준점은 화면 한가운데 고정. 마우스가 시야를 돌립니다.
+    // 잠금이 없을 때는 커서가 가장자리에 닿거나 창 밖으로 나가도 같은 속도로 계속 돌아갑니다.
+    if (this.locked || !Settings.data.edge) { this.edgeX = this.edgeY = 0; return; }
+    const W = window.innerWidth, H = window.innerHeight, band = 110;
+    const rate = 8;                        // 프레임당 회전량 (감도 설정이 그대로 곱해집니다)
+
+    if (this.inside) {
+      const x = this.mouseX, y = this.mouseY;
+      this.edgeX = x <= band ? -1 : (x >= W - band ? 1 : 0);
+      this.edgeY = y <= band ? -1 : (y >= H - band ? 1 : 0);
+      this.edgeAt = performance.now();
+    } else if (performance.now() - (this.edgeAt || 0) > 4000) {
+      this.edgeX = this.edgeY = 0;         // 오래 창 밖에 있으면 멈춥니다
+    }
+
+    if (this.edgeX) this.dx += this.edgeX * rate;
+    if (this.edgeY) this.dy += this.edgeY * rate * 0.6;
   }
 };
 
