@@ -73,6 +73,7 @@ const Game = {
     this.scene.add(this.fill);
 
     this.buildSky();
+    this.buildViewLayer();
     this.buildEffects();
 
     window.addEventListener('resize', () => this.resize());
@@ -132,6 +133,20 @@ const Game = {
     this.scene.add(this.clouds);
   },
 
+  /* 1인칭 총은 별도 씬에 두고 좁은 시야각으로 겹쳐 그립니다.
+     시야각이 넓은 본 화면에 그리면 총이 지나치게 커 보이고 벽에 파묻히기 때문입니다. */
+  buildViewLayer() {
+    this.viewScene = new THREE.Scene();
+    this.viewScene.add(new THREE.HemisphereLight(0xbcd7f0, 0x50543f, 1.0));
+    const vl = new THREE.DirectionalLight(0xfff0d6, 1.5);
+    vl.position.set(0.7, 1.2, 0.9);
+    this.viewScene.add(vl);
+    this.viewCamera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.01, 12);
+    this.viewGun = new THREE.Group();
+    this.viewScene.add(this.viewGun);
+    this.viewGunKey = '';
+  },
+
   buildEffects() {
     // 총구 화염
     const flashGeo = new THREE.ConeGeometry(0.09, 0.34, 6);
@@ -170,8 +185,10 @@ const Game = {
 
   resize() {
     if (!this.renderer) return;
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const aspect = window.innerWidth / window.innerHeight;
+    this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
+    if (this.viewCamera) { this.viewCamera.aspect = aspect; this.viewCamera.updateProjectionMatrix(); }
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   },
 
@@ -796,6 +813,13 @@ const Game = {
         this.camera.fov += (wantFovF - this.camera.fov) * Math.min(1, dt * 11);
         this.camera.updateProjectionMatrix();
       }
+      // 벽이나 바위에 바짝 붙었을 때 카메라가 안으로 들어가지 않도록 살짝 뒤로 뺍니다
+      for (let i = 0; i < 3; i++) {
+        const c = this.camera.position;
+        if (!this.camBlocked(c.x, c.y, c.z)) break;
+        const back = this._v.set(Math.sin(yaw), 0, Math.cos(yaw));
+        c.x -= back.x * 0.16; c.z -= back.z * 0.16;
+      }
       this.updateViewGun(dt, scoped);
       this.camera.updateMatrixWorld();
       this.updateAimDir();
@@ -861,12 +885,6 @@ const Game = {
   /* 1인칭에서 손에 든 총 (카메라에 붙입니다) */
   updateViewGun(dt, scoped) {
     const p = this.player;
-    if (!this.viewGun) {
-      this.viewGun = new THREE.Group();
-      this.camera.add(this.viewGun);
-      this.scene.add(this.camera);          // 카메라의 자식이 그려지려면 씬에 있어야 합니다
-      this.viewGunKey = '';
-    }
     const key = p.gun ? p.gun + ':' + p.zoom : '';
     if (key !== this.viewGunKey) {           // 무기나 조준경이 바뀌면 다시 만듭니다
       this.viewGunKey = key;
@@ -875,7 +893,7 @@ const Game = {
         const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0),
                                  Mats.vc({ roughness: 0.55, metalness: 0.25 }));
         m.rotation.y = Math.PI + 0.05;       // 총구가 카메라 앞(-Z)을 보도록 (살짝 안쪽으로)
-        m.scale.setScalar(0.72);             // 화면을 가리지 않을 크기
+        m.scale.setScalar(0.58);             // 화면을 가리지 않을 크기
         this.viewGun.add(m);
       }
     }
@@ -888,9 +906,9 @@ const Game = {
     const bobY = Math.abs(Math.sin(p.stepPhase * 2)) * 0.014 * run;
     const swap = p.swap > 0 ? Math.sin((1 - p.swap / CFG.SWAP_TIME) * Math.PI) * 0.22 : 0;
     const reload = p.reloading > 0 ? Math.sin((1 - p.reloading / p.spec.reload) * Math.PI) * 0.14 : 0;
-    const tx = this.ads ? 0 : 0.27 + bobX;
-    const ty = (this.ads ? -0.115 : -0.26 - bobY) - swap - reload;
-    const tz = this.ads ? -0.46 : -0.64;
+    const tx = this.ads ? 0 : 0.245 + bobX;
+    const ty = (this.ads ? -0.10 : -0.235 - bobY) - swap - reload;
+    const tz = this.ads ? -0.44 : -0.60;
     const kk = Math.min(1, dt * 12);
     this.viewGun.position.x += (tx - this.viewGun.position.x) * kk;
     this.viewGun.position.y += (ty - this.viewGun.position.y) * kk;
@@ -1084,5 +1102,15 @@ const Game = {
     }
   },
 
-  render() { if (this.renderer) this.renderer.render(this.scene, this.camera); }
+  render() {
+    if (!this.renderer) return;
+    this.renderer.render(this.scene, this.camera);
+    // 손에 든 총은 깊이를 지우고 위에 덧그려 벽에 파묻히지 않게 합니다
+    if (this.viewGun && this.viewGun.visible && this.state === 'playing') {
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      this.renderer.render(this.viewScene, this.viewCamera);
+      this.renderer.autoClear = true;
+    }
+  }
 };

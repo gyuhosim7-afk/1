@@ -268,14 +268,15 @@ const Scenery = {
       const pine = Math.random() < 0.55;
       const s = 0.8 + Math.random() * 0.7;
       this.trees.push({ x, y, z, s, pine, rot: Math.random() * Math.PI * 2 });
-      World.addCyl({ x, z, r: 0.45 * s, top: y + 8 * s, h: 8 * s });
+      World.addCyl({ x, z, r: 0.5 * s, top: y + 8 * s, h: 8 * s });
     }
 
     for (let i = 0; i < 420; i++) {
       const s0 = World.freeSpot(3);
       const s = 0.7 + Math.random() * 1.5;
       this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: Math.random() * Math.PI * 2 });
-      World.addCyl({ x: s0.x, z: s0.z, r: 1.05 * s, top: s0.y + 1.5 * s, h: 3 * s });
+      // 보이는 크기(가로 1.5s)에 맞춰 충돌 반지름을 잡아야 1인칭에서 바위에 파묻히지 않습니다
+      World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
     }
 
     for (let i = 0; i < Math.round(2600 * density); i++) {

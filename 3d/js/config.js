@@ -18,7 +18,7 @@ const CFG = {
   SPRINT: 7.8,
   CROUCH: 2.2,
   EYE: 1.62,            // 눈높이
-  BODY_R: 0.42,         // 몸통 반지름 (충돌)
+  BODY_R: 0.46,         // 몸통 반지름 (충돌)
   BODY_H: 1.8,
 
   CAM_DIST: 4.6,        // 3인칭 카메라 거리
