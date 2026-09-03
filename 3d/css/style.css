@@ -54,17 +54,21 @@ html, body {
   font-size: 13px; line-height: 1.75; text-shadow: 0 1px 4px #000; max-width: 300px;
 }
 
-/* --- 조준선 --- */
+/* --- 레드도트 조준점 (화면 중앙 고정) --- */
 #cross {
-  --gap: 8px;
-  position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+  --ring: 18px;
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 9;
 }
-#cross i { position: absolute; background: rgba(255, 255, 255, .92); box-shadow: 0 0 2px #000; }
-#cross .t { left: -1px; top: calc(-1 * var(--gap) - 9px); width: 2px; height: 9px; }
-#cross .b { left: -1px; top: var(--gap); width: 2px; height: 9px; }
-#cross .l { top: -1px; left: calc(-1 * var(--gap) - 9px); height: 2px; width: 9px; }
-#cross .r { top: -1px; left: var(--gap); height: 2px; width: 9px; }
-#cross .dot { left: -1.5px; top: -1.5px; width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.75); }
+#cross .ring {
+  position: absolute; left: 50%; top: 50%;
+  width: var(--ring); height: var(--ring); margin-left: calc(var(--ring) / -2); margin-top: calc(var(--ring) / -2);
+  border: 1.5px solid rgba(255, 90, 74, .55); border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0, 0, 0, .8);
+}
+#cross .dot {
+  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  background: #ff4b3a; box-shadow: 0 0 6px rgba(255, 75, 58, .9), 0 0 2px #000;
+}
 
 #hitmark { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; transition: opacity .08s linear; }
 #hitmark i { position: absolute; width: 16px; height: 2px; background: #ff5a5a; left: -8px; top: -1px; }
@@ -260,20 +264,24 @@ button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 }
 
 #scene { touch-action: none; }
+body.playing { cursor: none; }
+body.playing.paused { cursor: default; }
 
 /* ============================================================
    조준경, 무기 칸, 낙하 고도
    ============================================================ */
+/* 조준경: 바깥을 까맣게 덮지 않고, 렌즈 테두리만 그립니다 */
 #scope {
   position: absolute; inset: 0; z-index: 7; pointer-events: none;
   background: radial-gradient(circle at 50% 50%,
     rgba(0,0,0,0) 0, rgba(0,0,0,0) 33vmin,
-    rgba(0,0,0,.55) 33.2vmin, rgba(0,0,0,.96) 35vmin, #05070a 38vmin);
+    rgba(0,0,0,.22) 34vmin, rgba(0,0,0,.34) 46vmin, rgba(0,0,0,.42) 75vmin);
 }
 #scope .lens {
   position: absolute; left: 50%; top: 50%; width: 66vmin; height: 66vmin;
   transform: translate(-50%, -50%); border-radius: 50%;
-  box-shadow: inset 0 0 6vmin rgba(0,0,0,.75), inset 0 0 0 2px rgba(255,255,255,.18);
+  box-shadow: inset 0 0 3vmin rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.22),
+              0 0 0 2px rgba(10,12,16,.55);
 }
 #scope .lens i { position: absolute; background: rgba(15, 18, 22, .92); }
 #scope .lens .v { left: 50%; top: 6%; width: 1.5px; height: 88%; margin-left: -0.75px; }

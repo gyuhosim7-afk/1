@@ -14,6 +14,8 @@ const Game = {
   feed: [],
   minimapImg: null,
   aimPoint: new THREE.Vector3(),
+  aim: { x: 0, y: 0 },              // 화면 안 조준점 위치 (-1~1)
+  aimDir: new THREE.Vector3(0, 0, 1),
   _v: new THREE.Vector3(), _v2: new THREE.Vector3(), _v3: new THREE.Vector3(),
 
   /* ---------- 초기화 ---------- */
@@ -261,12 +263,15 @@ const Game = {
     const add = (x, z) => {
       const roll = Math.random();
       let l;
-      if (roll < 0.44) {
+      if (roll < 0.40) {
         const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
         l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer);
-      } else if (roll < 0.76) {
+      } else if (roll < 0.68) {
         const g = LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)];
         l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5));
+      } else if (roll < 0.85) {
+        const lv = SCOPE_LEVELS[Math.floor(Math.random() * SCOPE_LEVELS.length)];
+        l = new Loot(x, z, 'scope', null, 0, lv);
       } else {
         l = new Loot(x, z, 'med', null, 1);
       }
@@ -440,10 +445,16 @@ const Game = {
   },
 
   /* 화면 중앙 조준선이 가리키는 지점으로 발사 */
+  /* 조준점이 가리키는 방향 (마우스가 잠기지 않았을 때는 화면 안 조준점 기준) */
+  updateAimDir() {
+    this._v3.set(this.aim.x, this.aim.y, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    this.aimDir.copy(this._v3);
+  },
+
   playerShoot() {
     const p = this.player;
     const cam = this.camera;
-    const dir = cam.getWorldDirection(this._v).clone();
+    const dir = this.aimDir.clone();
     const origin = cam.position;
     const hitT = this.rayAll(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 500, p);
     const aim = this.aimPoint.copy(origin).addScaledVector(dir, Math.max(6, hitT));
@@ -564,6 +575,10 @@ const Game = {
       const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
                          Math.max(15, c.mags[i] + (c.reserve[key] || 0)));
       this.scene.add(l.mesh); this.loots.push(l);
+      if (c.scopes[i]) {
+        const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i]);
+        this.scene.add(s.mesh); this.loots.push(s);
+      }
     });
     if (c.meds > 0) {
       const l = new Loot(c.pos.x - 0.8, c.pos.z + 0.5, 'med', null, 1);
@@ -592,6 +607,19 @@ const Game = {
         this.scene.add(d.mesh); this.loots.push(d);
         if (ch === this.player) this.pushFeed(GUNS[old].short + ' → ' + GUNS[l.gun].name + ' 교체');
       }
+    } else if (l.kind === 'scope') {
+      if (!ch.gun) { if (ch === this.player) this.pushFeed('무기를 먼저 챙기세요'); return false; }
+      if (!GUNS[ch.gun].canScope) {
+        if (ch === this.player) this.pushFeed(GUNS[ch.gun].name + ' 에는 조준경을 달 수 없습니다');
+        return false;
+      }
+      const old = ch.attachScope(l.level);
+      if (old < 0) return false;
+      if (old > 0) {                       // 쓰던 조준경은 바닥에 내려놓습니다
+        const d = new Loot(l.pos.x + 1.0, l.pos.z, 'scope', null, 0, old);
+        this.scene.add(d.mesh); this.loots.push(d);
+      }
+      if (ch === this.player) this.pushFeed(SCOPES[l.level].name + ' 장착 (' + GUNS[ch.gun].short + ')');
     } else if (l.kind === 'ammo') {
       if (!ch.gun) return false;
       ch.reserve[l.gun] = (ch.reserve[l.gun] || 0) + l.amount;
@@ -610,7 +638,7 @@ const Game = {
   /* 주울 대상: 발밑 반경 안이거나, 조준선이 향한 조금 떨어진 아이템 */
   nearestLoot(ch) {
     let best = null, bestScore = Infinity;
-    const aim = (ch === this.player) ? this.camera.getWorldDirection(this._v3) : null;
+    const aim = (ch === this.player) ? this.aimDir : null;
     for (const l of this.loots) {
       if (l.dead) continue;
       const dx = l.pos.x - ch.pos.x, dz = l.pos.z - ch.pos.z;
@@ -675,6 +703,11 @@ const Game = {
     const gy = World.groundY(c.pos.x, c.pos.z, c.pos.y);
     if (c.pos.y <= gy) {                    // 착지
       c.pos.y = gy; c.vy = 0; c.grounded = true; c.flying = null;
+      c.chuteTilt = 0; c.chutePitch = 0;
+      // 구조물 안에 끼어 들어가지 않도록 한 번 밀어냅니다
+      const fix = World.resolve(c.pos.x, c.pos.z, CFG.BODY_R, c.pos.y, c.pos.y + CFG.BODY_H);
+      c.pos.x = fix.x; c.pos.z = fix.z;
+      c.pos.y = Math.max(c.pos.y, World.groundY(c.pos.x, c.pos.z, c.pos.y));
       if (c === this.player) {
         this.landDip = 0.25;
         this.pushFeed('착지 완료 — 무기를 찾으세요');
@@ -717,7 +750,7 @@ const Game = {
       Math.cos(yaw) * Math.cos(pitch)
     ).normalize();
 
-    const scoped = this.ads && p.gun && GUNS[p.gun].scope >= 3;
+    const scoped = this.ads && p.zoom >= 4;
     const wantDist = p.flying ? 7.6 : (scoped ? 0.01 : (this.ads ? CFG.ADS_DIST : CFG.CAM_DIST));
     const side = p.flying ? 0 : (scoped ? 0 : (this.ads ? CFG.ADS_SIDE : CFG.CAM_SIDE));
     this.camDist += (wantDist - this.camDist) * Math.min(1, dt * 9);
@@ -746,7 +779,7 @@ const Game = {
     this.camera.lookAt(px + dir.x * 60, pivotY + dir.y * 60, pz + dir.z * 60);
 
     const sprinting = !this.ads && p.speedNow > CFG.WALK * 1.35 && !p.flying;
-    const zoom = p.gun ? (GUNS[p.gun].scope || 1) : 1;
+    const zoom = p.zoom;
     const wantFov = this.ads ? (zoom > 1 ? CFG.FOV / zoom : CFG.ADS_FOV)
                              : CFG.FOV + (sprinting ? 5.5 : 0) + (p.flying ? 8 : 0);
     if (Math.abs(this.camera.fov - wantFov) > 0.05) {
@@ -756,6 +789,9 @@ const Game = {
 
     // 카메라가 몸에 바짝 붙으면 아예 몸을 감춰 시야를 가리지 않게 합니다
     p.mesh.visible = dist > 1.25 && !scoped;
+
+    this.camera.updateMatrixWorld();
+    this.updateAimDir();
   },
 
   /* 카메라 위치가 장애물 안(또는 아주 가까이)에 있는지 */

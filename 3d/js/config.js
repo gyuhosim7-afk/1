@@ -31,8 +31,8 @@ const CFG = {
   CHUTE_OPEN: 75,         // 이 고도에서 낙하산이 자동으로 펴집니다
   FREEFALL_SPEED: 52,     // 자유낙하 최고 속도
   CHUTE_SPEED: 7.5,       // 낙하산 하강 속도
-  FREEFALL_MOVE: 24,      // 자유낙하 중 수평 이동
-  CHUTE_MOVE: 13,         // 낙하산 수평 이동
+  FREEFALL_MOVE: 34,      // 자유낙하 중 수평 이동
+  CHUTE_MOVE: 17,         // 낙하산 수평 이동
   SLOTS: 2,               // 무기 칸 수
   SWAP_TIME: 0.45,        // 무기 교체 시간
 
@@ -48,18 +48,26 @@ const CFG = {
 /* 무기: dmg 발당 피해, rpm 분당 발사수, spread 탄퍼짐(rad),
    range 유효사거리(m), recoil 반동(rad) */
 const GUNS = {
-  pistol:  { name:'권총',     short:'P92',   dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, ammoPer:60,  auto:false, scope:1, color:0xc9d1d9 },
-  smg:     { name:'기관단총', short:'UMP',   dmg:16, rpm:720,  mag:30, reload:2.0, spread:0.045, adsSpread:0.020, range:110, recoil:0.014, ammoPer:120, auto:true,  scope:1, color:0x7ee787 },
-  shotgun: { name:'산탄총',   short:'S686',  dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, ammoPer:40,  auto:false, pellets:8, scope:1, color:0xffa657 },
-  rifle:   { name:'돌격소총', short:'M416',  dmg:27, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, ammoPer:120, auto:true,  scope:2, color:0x79c0ff },
-  dmr:     { name:'지정사수총',short:'SKS',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, ammoPer:80,  auto:false, scope:4, color:0xffd166 },
-  sniper:  { name:'저격총',   short:'AWM',   dmg:95, rpm:38,   mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018,range:500, recoil:0.070, ammoPer:25,  auto:false, scope:8, color:0xd2a8ff }
+  pistol:  { name:'권총',     short:'P92',   dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, ammoPer:60,  auto:false, scope:1, canScope:false, color:0xc9d1d9 },
+  smg:     { name:'기관단총', short:'UMP',   dmg:16, rpm:720,  mag:30, reload:2.0, spread:0.045, adsSpread:0.020, range:110, recoil:0.014, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x7ee787 },
+  shotgun: { name:'산탄총',   short:'S686',  dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, ammoPer:40,  auto:false, pellets:8, scope:1, canScope:false, color:0xffa657 },
+  rifle:   { name:'돌격소총', short:'M416',  dmg:27, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x79c0ff },
+  dmr:     { name:'지정사수총',short:'SKS',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, ammoPer:80,  auto:false, scope:1, canScope:true, color:0xffd166 },
+  sniper:  { name:'저격총',   short:'AWM',   dmg:95, rpm:38,   mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018,range:500, recoil:0.070, ammoPer:25,  auto:false, scope:1, canScope:true, color:0xd2a8ff }
 };
 
 const GUN_KEYS = Object.keys(GUNS);
 const LOOT_GUNS = ['pistol','pistol','smg','smg','shotgun','rifle','rifle','dmr','sniper'];
 
 const HEADSHOT = 2.1;   // 헤드샷 배수
+
+/* 주워서 무기에 다는 조준경 */
+const SCOPES = {
+  2: { name: '레드도트', label: '2x', color: 0xff5a4a },
+  4: { name: '4배율 조준경', label: '4x', color: 0x7ee787 },
+  8: { name: '8배율 조준경', label: '8x', color: 0xd2a8ff }
+};
+const SCOPE_LEVELS = [2, 2, 2, 4, 4, 8];
 
 /* 자기장 단계 */
 const PHASES = [

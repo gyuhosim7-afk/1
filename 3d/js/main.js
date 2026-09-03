@@ -101,9 +101,14 @@ const UI = {
     this.cctx = this.el.compass.getContext('2d');
     this.bctx = this.el.bigmapCanvas.getContext('2d');
   },
-  showMenu() { this.el.menu.classList.remove('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.add('hidden'); },
-  showGame() { this.el.menu.classList.add('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.remove('hidden'); },
+  showMenu() { document.body.classList.remove('playing'); this.el.menu.classList.remove('hidden'); this.el.over.classList.add('hidden'); this.el.hud.classList.add('hidden'); },
+  showGame() {
+    this.el.menu.classList.add('hidden'); this.el.over.classList.add('hidden');
+    this.el.hud.classList.remove('hidden');
+    document.body.classList.add('playing');
+  },
   showResult(r) {
+    document.body.classList.remove('playing');
     this.el.over.classList.remove('hidden');
     this.el.hud.classList.add('hidden');
     this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
@@ -129,7 +134,7 @@ const UI = {
     this.el.hpText.textContent = Math.max(0, Math.ceil(p.hp));
 
     if (p.gun) {
-      this.el.gunName.textContent = GUNS[p.gun].short;
+      this.el.gunName.textContent = GUNS[p.gun].short + (p.zoom > 1 ? ' · ' + SCOPES[p.zoom].label : '');
       this.el.ammo.textContent = p.swap > 0 ? '교체 중'
         : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo));
     } else {
@@ -141,7 +146,9 @@ const UI = {
     for (const el of this.el.slots.children) {
       const i = +el.dataset.slot;
       const key = p.guns[i];
-      el.querySelector('b').textContent = key ? GUNS[key].short : '비어 있음';
+      const lv = p.scopes[i];
+      el.querySelector('b').textContent = key
+        ? GUNS[key].short + (lv ? ' ' + SCOPES[lv].label : '') : '비어 있음';
       el.classList.toggle('active', i === p.slot && !!key);
       el.classList.toggle('empty', !key);
       el.style.borderColor = key && i === p.slot
@@ -157,10 +164,10 @@ const UI = {
     } else this.el.alt.classList.add('hidden');
 
     // 조준경
-    const zoom = p.gun ? (GUNS[p.gun].scope || 1) : 1;
-    const scoped = Game.ads && zoom >= 3 && !p.flying;
+    const zoom = p.zoom;
+    const scoped = Game.ads && zoom >= 4 && !p.flying;
     this.el.scope.classList.toggle('hidden', !scoped);
-    if (scoped) this.el.scope.querySelector('.zoom').textContent = zoom + 'x';
+    if (scoped) this.el.scope.querySelector('.zoom').textContent = SCOPES[zoom].label;
     this.el.meds.textContent = p.meds;
     this.el.alive.textContent = g.alive;
     this.el.kills.textContent = p.kills;
@@ -179,11 +186,11 @@ const UI = {
       this.el.prompt.innerHTML = '<kbd>F</kbd> ' + near.label;
     } else this.el.prompt.classList.add('hidden');
 
-    // 조준선: 이동 중이면 벌어짐
+    // 레드도트 조준점 (화면 중앙 고정) — 탄퍼짐에 따라 링이 커집니다
     const spread = p.gun ? (Game.ads ? GUNS[p.gun].adsSpread : GUNS[p.gun].spread) : 0.05;
-    const gapPx = 4 + spread * 460 * (p.speedNow > 2.5 ? 1.7 : 1);
-    this.el.cross.style.setProperty('--gap', gapPx.toFixed(1) + 'px');
-    this.el.cross.style.opacity = (p.flying || (Game.ads && zoom >= 3)) ? 0 : 1;
+    const ring = 14 + spread * 620 * (p.speedNow > 2.5 ? 1.6 : 1);
+    this.el.cross.style.setProperty('--ring', ring.toFixed(1) + 'px');
+    this.el.cross.style.opacity = (p.flying || scoped) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
 
@@ -328,6 +335,7 @@ const Input = {
 
     canvas.addEventListener('click', () => {
       Sfx.init();
+      try { window.focus(); } catch (e) { /* 무시 */ }
       if (Game.state === 'playing' && this.mode === 'lock' && !this.locked) canvas.requestPointerLock();
     });
     document.addEventListener('pointerlockchange', () => {
@@ -415,16 +423,18 @@ const Input = {
     this.sprint = !!k['shift'];
     this.crouch = !!(k['c'] || k['control']);
 
-    // 마우스가 잠겨 있지 않을 때: 커서가 화면 가장자리에 닿으면 그 방향으로 계속 돌립니다.
-    // (가운데 기준이 아니라 가장자리 띠 안에서만 작동하므로, 가운데서는 멈춰 있습니다)
-    if (!this.locked && Settings.data.edge && this.inside && Game.state === 'playing' && !this.settingsOpen) {
-      const W = window.innerWidth, H = window.innerHeight, band = 72;
-      const x = this.mouseX, y = this.mouseY;
-      if (x < band) this.dx -= (band - x) * 0.10;
-      else if (x > W - band) this.dx += (x - (W - band)) * 0.10;
-      if (y < band) this.dy -= (band - y) * 0.07;
-      else if (y > H - band) this.dy += (y - (H - band)) * 0.07;
-    }
+    if (Game.state !== 'playing' || this.settingsOpen) return;
+
+    // 조준점은 항상 화면 한가운데입니다. 마우스는 시야를 돌립니다.
+    // 잠금이 없을 때 커서가 화면 가장자리에 닿으면, 움직일 때와 같은 속도로 계속 돌아갑니다.
+    if (this.locked || !this.inside || !Settings.data.edge) return;
+    const W = window.innerWidth, H = window.innerHeight, band = 90;
+    const rate = 7.5;                     // 프레임당 회전량 (감도 설정이 그대로 곱해집니다)
+    const x = this.mouseX, y = this.mouseY;
+    if (x <= band) this.dx -= rate;
+    else if (x >= W - band) this.dx += rate;
+    if (y <= band) this.dy -= rate * 0.6;
+    else if (y >= H - band) this.dy += rate * 0.6;
   }
 };
 
@@ -447,6 +457,7 @@ const Main = {
 
   startGame() {
     Sfx.init();
+    try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
     const n = Math.max(4, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
@@ -465,6 +476,7 @@ const Main = {
     if (Game.state === 'playing') {
       const paused = Input.settingsOpen || (Input.mode === 'lock' && !Input.locked);
       UI.el.pause.classList.toggle('hidden', !paused);
+      document.body.classList.toggle('paused', paused);
       if (!paused) {
         Input.poll();
         Game.update(dt, Input);

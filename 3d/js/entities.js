@@ -94,9 +94,34 @@ const GunArt = {
   cache: {},
   METAL: 0x33383f, DARK: 0x1f2227, WOOD: 0x7a5433, OLIVE: 0x4a5340,
 
-  geo(key) {
-    if (!this.cache[key]) this.cache[key] = Build.merge(this.parts(key));
-    return this.cache[key];
+  geo(key, scope) {
+    const id = key + ':' + (scope || 0);
+    if (!this.cache[id]) {
+      const parts = this.parts(key);
+      if (scope > 1) parts.push.apply(parts, this.scopeParts(scope));
+      this.cache[id] = Build.merge(parts);
+    }
+    return this.cache[id];
+  },
+
+  /* 무기 위에 얹는 조준경 (배율이 클수록 길고 큽니다) */
+  scopeParts(level) {
+    const B = Build, D = this.DARK, M = this.METAL;
+    const tint = SCOPES[level].color;
+    if (level <= 2) return [                       // 레드도트
+      B.box(0.05, 0.055, 0.05, D, 0, 0.115, -0.02),
+      B.box(0.075, 0.09, 0.09, D, 0, 0.185, 0.0),
+      B.box(0.055, 0.065, 0.012, tint, 0, 0.185, 0.045)
+    ];
+    const len = level >= 8 ? 0.30 : 0.22;
+    const rad = level >= 8 ? 0.042 : 0.034;
+    return [
+      B.tube(rad, len, D, 0, 0.175, 0.03),
+      B.tube(rad * 1.25, 0.035, M, 0, 0.175, 0.03 + len / 2),
+      B.box(0.03, 0.07, 0.03, D, 0, 0.12, 0.03 - len / 2 + 0.04),
+      B.box(0.03, 0.07, 0.03, D, 0, 0.12, 0.03 + len / 2 - 0.04),
+      B.box(0.02, 0.016, 0.02, tint, 0, 0.215, 0.03)
+    ];
   },
 
   parts(key) {
@@ -146,10 +171,7 @@ const GunArt = {
         B.box(0.068, 0.13, 0.34, W, 0, -0.035, -0.30, -0.05),
         B.box(0.07, 0.06, 0.22, W, 0, 0.045, 0.26),
         B.box(0.05, 0.145, 0.09, D, 0, -0.10, 0.10, 0.12),
-        B.tube(0.034, 0.22, D, 0, 0.155, 0.02),
-        B.box(0.03, 0.06, 0.03, D, 0, 0.11, -0.05),
-        B.box(0.03, 0.06, 0.03, D, 0, 0.11, 0.09),
-        B.box(0.03, 0.02, 0.20, A, 0, 0.20, 0.02)
+        B.box(0.05, 0.022, 0.30, A, 0, 0.088, 0.02)
       ];
       case 'sniper': return [
         B.box(0.08, 0.13, 0.42, O, 0, 0.02, 0.04),
@@ -157,10 +179,7 @@ const GunArt = {
         B.box(0.055, 0.055, 0.10, D, 0, 0.03, 0.85),
         B.box(0.075, 0.15, 0.42, O, 0, -0.02, -0.34, -0.04),
         B.box(0.05, 0.12, 0.10, D, 0, -0.10, 0.06),
-        B.tube(0.042, 0.30, D, 0, 0.175, 0.06),
-        B.box(0.032, 0.07, 0.032, D, 0, 0.12, -0.04),
-        B.box(0.032, 0.07, 0.032, D, 0, 0.12, 0.16),
-        B.box(0.03, 0.02, 0.24, A, 0, 0.225, 0.06),
+        B.box(0.05, 0.024, 0.34, A, 0, 0.095, 0.06),
         B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
         B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
       ];
@@ -176,14 +195,34 @@ const LootArt = {
   cache: {},
   beamGeo: null,
 
-  geo(kind, gun) {
-    const key = kind + ':' + (gun || '');
+  geo(kind, gun, level) {
+    const key = kind + ':' + (gun || '') + ':' + (level || 0);
     if (!this.cache[key]) {
-      if (kind === 'gun') this.cache[key] = GunArt.geo(gun);
+      if (kind === 'gun') this.cache[key] = GunArt.geo(gun, 0);
       else if (kind === 'ammo') this.cache[key] = Build.merge(this.ammoParts(gun));
+      else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
     return this.cache[key];
+  },
+
+  /* 바닥에 떨어진 조준경 */
+  scopeItemParts(level) {
+    const B = Build, D = 0x25282e, M = 0x3d434b;
+    const tint = SCOPES[level].color;
+    if (level <= 2) return [
+      B.box(0.20, 0.20, 0.16, D, 0, 0.12, 0),
+      B.box(0.15, 0.15, 0.02, tint, 0, 0.12, 0.09),
+      B.box(0.13, 0.05, 0.13, M, 0, 0.01, 0)
+    ];
+    const len = level >= 8 ? 0.46 : 0.34;
+    return [
+      B.tube(level >= 8 ? 0.075 : 0.06, len, D, 0, 0.13, 0),
+      B.tube(level >= 8 ? 0.095 : 0.08, 0.06, M, 0, 0.13, len / 2),
+      B.tube(0.055, 0.05, tint, 0, 0.13, -len / 2 - 0.01),
+      B.box(0.05, 0.09, 0.05, M, 0, 0.05, len * 0.2),
+      B.box(0.05, 0.09, 0.05, M, 0, 0.05, -len * 0.2)
+    ];
   },
 
   ammoParts(gun) {
@@ -224,22 +263,24 @@ const LootArt = {
 };
 
 class Loot {
-  constructor(x, z, kind, gun, amount) {
+  constructor(x, z, kind, gun, amount, level) {
     const y = World.height(x, z);
     this.pos = new THREE.Vector3(x, y, z);
-    this.kind = kind;                 // 'gun' | 'ammo' | 'med'
+    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope'
     this.gun = gun || null;
     this.amount = amount || 0;
+    this.level = level || 0;          // 조준경 배율
     this.dead = false;
     this.spin = Math.random() * Math.PI * 2;
 
-    const color = kind === 'gun' ? GUNS[gun].color : (kind === 'ammo' ? 0xf2cc60 : 0xff6b6b);
+    const color = kind === 'gun' ? GUNS[gun].color
+      : (kind === 'ammo' ? 0xf2cc60 : (kind === 'scope' ? SCOPES[this.level].color : 0xff6b6b));
     this.color = color;
 
     this.mesh = new THREE.Group();
-    this.model = new THREE.Mesh(LootArt.geo(kind, gun), Mats.vc({ roughness: 0.55, metalness: 0.25 }));
+    this.model = new THREE.Mesh(LootArt.geo(kind, gun, this.level), Mats.vc({ roughness: 0.55, metalness: 0.25 }));
     this.model.castShadow = true;
-    this.model.position.y = kind === 'gun' ? 0.55 : 0.35;
+    this.model.position.y = kind === 'gun' ? 0.55 : (kind === 'scope' ? 0.45 : 0.35);
     if (kind === 'gun') this.model.rotation.z = 0.22;
 
     this.beam = new THREE.Mesh(LootArt.beam(), new THREE.MeshBasicMaterial({
@@ -255,6 +296,7 @@ class Loot {
   get label() {
     if (this.kind === 'gun') return GUNS[this.gun].name + ' · ' + GUNS[this.gun].short;
     if (this.kind === 'ammo') return GUNS[this.gun].short + ' 탄약 ' + this.amount + '발';
+    if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
     return '구급상자';
   }
 
@@ -268,7 +310,7 @@ class Loot {
 
     this.spin += 0.012;
     this.model.rotation.y = this.spin;
-    const base = this.kind === 'gun' ? 0.55 : 0.35;
+    const base = this.kind === 'gun' ? 0.55 : (this.kind === 'scope' ? 0.45 : 0.35);
     this.model.position.y = base + Math.sin(t * 2 + this.spin) * 0.07;
     const s = highlighted ? 1.18 : 1;
     this.model.scale.setScalar(s);
@@ -412,6 +454,7 @@ class Char3D {
 
     this.guns = [null, null];      // 무기 두 칸
     this.mags = [0, 0];
+    this.scopes = [0, 0];          // 칸마다 달린 조준경 배율 (0 = 없음)
     this.slot = 0;
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
@@ -490,6 +533,7 @@ class Char3D {
   get mag() { return this.mags[this.slot]; }
   set mag(v) { this.mags[this.slot] = v; }
   get other() { return this.guns[1 - this.slot]; }
+  get zoom() { return this.gun ? (this.scopes[this.slot] || 1) : 1; }
   get hasTwo() { return !!(this.guns[0] && this.guns[1]); }
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
@@ -506,6 +550,7 @@ class Char3D {
     if (idx < 0) idx = this.slot;
     this.guns[idx] = key;
     this.mags[idx] = GUNS[key].mag;
+    this.scopes[idx] = 0;
     this.reserve[key] = (this.reserve[key] || 0) + (ammo == null ? GUNS[key].ammoPer : ammo);
     this.reloading = 0;
     this.slot = idx;
@@ -525,18 +570,28 @@ class Char3D {
   swapSlot() { return this.selectSlot(1 - this.slot); }
 
   /* 든 무기와 등에 멘 무기 모델을 다시 붙입니다 */
+  /* 지금 든 무기에 조준경을 답니다. 이전 조준경 배율을 돌려줍니다 (없으면 0) */
+  attachScope(level) {
+    if (!this.gun || !GUNS[this.gun].canScope) return -1;
+    const old = this.scopes[this.slot] || 0;
+    if (old === level) return -1;
+    this.scopes[this.slot] = level;
+    this.refreshGuns();
+    return old;
+  }
+
   refreshGuns() {
     const mat = Mats.vc({ roughness: 0.55, metalness: 0.25 });
     if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
     if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
     if (this.gun) {
-      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun), mat);
+      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopes[this.slot]), mat);
       this.gunMesh.castShadow = true;
       this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
       this.gunMount.add(this.gunMesh);
     }
     if (this.other) {                            // 남는 무기는 등에 멥니다
-      this.backMesh = new THREE.Mesh(GunArt.geo(this.other), mat);
+      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopes[1 - this.slot]), mat);
       this.backMesh.castShadow = true;
       this.backMount.add(this.backMesh);
     }
@@ -585,7 +640,8 @@ class Char3D {
         this.legR.rotation.set(0.3, 0, -0.32);
         this.kneeL.rotation.x = -0.55; this.kneeR.rotation.x = -0.55;
       } else {                             // 낙하산에 매달린 자세
-        this.body.rotation.x = 0.14;
+        this.body.rotation.x = 0.14 + (this.chutePitch || 0) * 0.18;
+        this.body.rotation.z = -this.chuteTilt * 0.5;
         this.body.position.y = 0;
         this.armL.rotation.set(-2.45, 0, 0.5);
         this.armR.rotation.set(-2.45, 0, -0.5);
@@ -612,11 +668,20 @@ class Char3D {
       return;
     }
 
+    // 낙하·사망 자세에서 돌아올 때 남아 있는 회전을 먼저 지웁니다
+    this.legL.rotation.y = 0; this.legL.rotation.z = 0;
+    this.legR.rotation.y = 0; this.legR.rotation.z = 0;
+    this.kneeL.rotation.set(0, 0, 0); this.kneeR.rotation.set(0, 0, 0);
+    this.armL.rotation.y = 0; this.armL.rotation.z = 0;
+    this.armR.rotation.y = 0; this.armR.rotation.z = 0;
+    this.body.rotation.set(0, 0, 0);
+
     const run = Math.min(1, this.speedNow / CFG.SPRINT);
     const moving = this.speedNow > 0.5;
 
     // 걸음 위상: 빠를수록 빠르게
     this.stepPhase += dt * (2.6 + run * 8.5) * (moving ? 1 : 0);
+    if (!moving) this.stepPhase += dt * 1.2;      // 제자리에서도 미세하게 흔들리도록
     const sw = Math.sin(this.stepPhase), sw2 = Math.sin(this.stepPhase * 2);
     const amp = 0.28 + run * 0.62;
 
@@ -625,7 +690,7 @@ class Char3D {
     this.aimBlend += (wantAim - this.aimBlend) * Math.min(1, dt * 8);
 
     // 다리
-    const legAmp = this.crouch ? amp * 0.5 : amp;
+    const legAmp = (this.crouch ? amp * 0.5 : amp) * (moving ? 1 : 0.06);
     this.legL.rotation.x = sw * legAmp;
     this.legR.rotation.x = -sw * legAmp;
     this.kneeL.rotation.x = -Math.max(0, -sw) * (0.5 + run * 0.9) - (this.crouch ? 1.15 : 0);

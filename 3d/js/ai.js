@@ -140,6 +140,8 @@ const AI = {
         if (l.dead) continue;
         if (l.kind === 'ammo' && (!bot.gun || l.gun !== bot.gun)) continue;
         if (l.kind === 'med' && bot.meds >= 2) continue;
+        if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
+            (bot.scopes[bot.slot] || 0) >= l.level)) continue;
         const d = (l.pos.x - bot.pos.x) ** 2 + (l.pos.z - bot.pos.z) ** 2;
         if (d < bd) { bd = d; target = l; }
       }
