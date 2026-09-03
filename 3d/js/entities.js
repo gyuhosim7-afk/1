@@ -58,6 +58,9 @@ const Build = {
     return { geo: g, color, x, y, z, rx: 0, ry: 0, rz: 0 };
   },
 
+  /* 조각을 눌러 납작하게 (사람 몸통처럼 타원으로 만들 때 씁니다) */
+  sc(part, sx, sy, sz) { part.sx = sx; part.sy = sy == null ? 1 : sy; part.sz = sz == null ? sx : sz; return part; },
+
   /* 조각 배열 → 정점 색이 들어간 하나의 지오메트리 */
   merge(parts) {
     const pos = [], nor = [], col = [];
@@ -65,7 +68,8 @@ const Build = {
     for (const p of parts) {
       this._e.set(p.rx, p.ry, p.rz);
       this._q.setFromEuler(this._e);
-      this._m.compose(this._p.set(p.x, p.y, p.z), this._q, this._s.set(1, 1, 1));
+      this._m.compose(this._p.set(p.x, p.y, p.z), this._q,
+                      this._s.set(p.sx || 1, p.sy || 1, p.sz || 1));
       const g = p.geo.clone().applyMatrix4(this._m);
       const ng = g.index ? g.toNonIndexed() : g;
       const ap = ng.attributes.position.array, an = ng.attributes.normal.array;
@@ -94,19 +98,20 @@ const GunArt = {
   cache: {},
   METAL: 0x33383f, DARK: 0x1f2227, WOOD: 0x7a5433, OLIVE: 0x4a5340,
 
-  geo(key, scope) {
-    const id = key + ':' + (scope || 0);
+  geo(key, scope, skinKey) {
+    const sk = GUN_SKINS[skinKey] || GUN_SKINS.stock;
+    const id = key + ':' + (scope || 0) + ':' + (skinKey || 'stock');
     if (!this.cache[id]) {
-      const parts = this.parts(key);
-      if (scope > 1) parts.push.apply(parts, this.scopeParts(scope));
+      const parts = this.parts(key, sk);
+      if (scope > 1) parts.push.apply(parts, this.scopeParts(scope, sk));
       this.cache[id] = Build.merge(parts);
     }
     return this.cache[id];
   },
 
   /* 무기 위에 얹는 조준경 (배율이 클수록 길고 큽니다) */
-  scopeParts(level) {
-    const B = Build, D = this.DARK, M = this.METAL;
+  scopeParts(level, sk) {
+    const B = Build, D = (sk || GUN_SKINS.stock).dark, M = (sk || GUN_SKINS.stock).metal;
     const tint = SCOPES[level].color;
     if (level <= 2) return [                       // 레드도트
       B.box(0.05, 0.055, 0.05, D, 0, 0.115, -0.02),
@@ -124,8 +129,9 @@ const GunArt = {
     ];
   },
 
-  parts(key) {
-    const B = Build, M = this.METAL, D = this.DARK, W = this.WOOD, O = this.OLIVE;
+  parts(key, sk) {
+    sk = sk || GUN_SKINS.stock;
+    const B = Build, M = sk.metal, D = sk.dark, W = sk.wood, O = this.OLIVE;
     const A = GUNS[key].color;
     switch (key) {
       case 'pistol': return [
@@ -325,55 +331,81 @@ class Loot {
 const CharArt = {
   cache: {},
 
-  /* 옷차림별 지오메트리 (봇끼리 공유) */
-  get(outfit, isPlayer) {
-    const key = (isPlayer ? 'p' : '') + outfit.top + '_' + outfit.pants;
-    if (!this.cache[key]) this.cache[key] = this.build(outfit, isPlayer);
+  /* 스킨별 지오메트리 (같은 스킨을 입은 캐릭터끼리 공유) */
+  get(skin) {
+    const key = skin.name || 'default';
+    if (!this.cache[key]) this.cache[key] = this.build(skin);
     return this.cache[key];
   },
 
-  build(outfit, isPlayer) {
-    const B = Build;
-    const skin = 0xc39a72, dark = 0x2b2f36;
-    const top = isPlayer ? 0x3d6285 : outfit.top;
-    const pants = isPlayer ? 0x2f3a46 : outfit.pants;
-    const vest = isPlayer ? 0x2c3c4c : 0x4b4a3f;
-    const helmet = isPlayer ? 0x2f4c6b : 0x50503f;
-    const boot = 0x24262b;
+  /* 사람 비율에 맞춘 저폴리 인체
+     키 1.8m 기준: 골반 0.92, 어깨 1.54, 눈 1.62, 정수리 1.80 */
+  build(S) {
+    const B = Build, sc = B.sc.bind(B);
+    const top = S.top, pants = S.pants, vest = S.vest || 0x4a4a42;
+    const boots = S.boots || 0x24262b, tone = S.tone || 0xc39a72, hair = S.hair || 0x2b2119;
+    const gear = 0x2a2d33;
 
-    // 몸통: 골반 기준 (골반 그룹은 y=0.92 에 놓입니다)
-    const torso = B.merge([
-      B.box(0.44, 0.40, 0.26, top, 0, 0.20, 0),                  // 배
-      B.box(0.50, 0.30, 0.28, top, 0, 0.50, 0),                  // 가슴
-      B.box(0.53, 0.26, 0.31, vest, 0, 0.50, 0),                 // 방탄복
-      B.box(0.10, 0.30, 0.33, dark, -0.14, 0.50, 0),             // 멜빵
-      B.box(0.10, 0.30, 0.33, dark, 0.14, 0.50, 0),
-      B.box(0.34, 0.40, 0.18, 0x50503f, 0, 0.46, -0.24),         // 배낭
-      B.box(0.30, 0.10, 0.16, dark, 0, 0.28, -0.25),
-      B.box(0.15, 0.10, 0.16, skin, 0, 0.70, 0),                 // 목
-      B.box(0.26, 0.27, 0.26, skin, 0, 0.88, 0),                 // 머리
-      B.box(0.30, 0.13, 0.30, helmet, 0, 1.02, 0),               // 헬멧
-      B.sphere(0.16, helmet, 0, 1.03, 0, 1, 0.75, 1),
-      B.box(0.22, 0.07, 0.04, 0x1a1c20, 0, 0.92, 0.14)           // 고글
-    ]);
+    /* 몸통 (골반 그룹 기준) */
+    const torsoParts = [
+      sc(B.pillar(0.155, 0.145, 0.20, pants, 0, 0.09, 0), 1, 1, 0.72),      // 골반
+      B.box(0.33, 0.055, 0.24, gear, 0, 0.19, 0),                            // 허리띠
+      sc(B.pillar(0.145, 0.185, 0.30, top, 0, 0.36, 0), 1, 1, 0.70),         // 배
+      sc(B.pillar(0.185, 0.19, 0.22, top, 0, 0.60, 0), 1, 1, 0.68),          // 가슴
+      sc(B.box(0.38, 0.30, 0.27, vest, 0, 0.55, 0.005), 1, 1, 1),            // 방탄복
+      B.box(0.09, 0.26, 0.29, gear, -0.15, 0.60, 0),                         // 어깨끈
+      B.box(0.09, 0.26, 0.29, gear, 0.15, 0.60, 0),
+      B.box(0.13, 0.10, 0.09, gear, 0, 0.44, 0.14),                          // 탄창 주머니
+      sc(B.sphere(0.085, top, -0.195, 0.615, 0), 1, 1, 1),                   // 어깨
+      sc(B.sphere(0.085, top, 0.195, 0.615, 0), 1, 1, 1),
+      B.box(0.28, 0.34, 0.15, 0x4a4a3e, 0, 0.46, -0.20),                     // 배낭
+      B.box(0.30, 0.09, 0.17, gear, 0, 0.30, -0.20),
+      sc(B.pillar(0.058, 0.065, 0.10, tone, 0, 0.72, 0), 1, 1, 1),           // 목
+      sc(B.sphere(0.115, tone, 0, 0.845, 0.005), 1, 1.1, 0.97),              // 머리
+      B.box(0.155, 0.10, 0.16, tone, 0, 0.785, 0.02),                        // 턱
+      sc(B.sphere(0.03, tone, -0.113, 0.845, 0), 0.6, 1, 1),                 // 귀
+      sc(B.sphere(0.03, tone, 0.113, 0.845, 0), 0.6, 1, 1),
+      sc(B.sphere(0.121, hair, 0, 0.868, -0.01), 1, 0.85, 1),                // 머리카락
+      B.box(0.035, 0.026, 0.02, 0x1a1a20, -0.048, 0.855, 0.104),             // 눈
+      B.box(0.035, 0.026, 0.02, 0x1a1a20, 0.048, 0.855, 0.104),
+      B.box(0.046, 0.013, 0.02, hair, -0.048, 0.888, 0.103),                 // 눈썹
+      B.box(0.046, 0.013, 0.02, hair, 0.048, 0.888, 0.103),
+      B.box(0.048, 0.012, 0.02, 0x8a5148, 0, 0.792, 0.096)                   // 입
+    ];
+    if (S.helmet) {                                                          // 헬멧
+      torsoParts.push(sc(B.sphere(0.133, S.helmet, 0, 0.872, 0), 1, 0.78, 1.02));
+      torsoParts.push(B.box(0.26, 0.03, 0.10, S.helmet, 0, 0.855, 0.10));
+      torsoParts.push(B.box(0.05, 0.05, 0.06, gear, 0.12, 0.885, 0.02));
+    }
 
-    // 팔: 어깨 관절이 원점, 아래로 뻗음
-    const arm = B.merge([
-      B.box(0.15, 0.26, 0.15, top, 0, -0.13, 0),                 // 윗팔
-      B.box(0.135, 0.26, 0.135, top, 0, -0.37, 0.01),            // 아래팔
-      B.box(0.14, 0.10, 0.15, dark, 0, -0.54, 0.02)              // 장갑
-    ]);
+    /* 팔 (어깨 관절이 원점) */
+    const arm = [
+      sc(B.pillar(0.06, 0.052, 0.30, top, 0, -0.17, 0), 1, 1, 1),            // 윗팔
+      B.sphere(0.05, top, 0, -0.32, 0),                                      // 팔꿈치
+      sc(B.pillar(0.05, 0.043, 0.28, top, 0, -0.46, 0.005), 1, 1, 1),        // 아래팔
+      B.box(0.072, 0.045, 0.08, gear, 0, -0.60, 0.005),                      // 손목
+      B.box(0.078, 0.10, 0.085, gear, 0, -0.655, 0.012)                      // 장갑
+    ];
 
-    // 다리: 엉덩이 관절이 원점
-    const thigh = B.merge([
-      B.box(0.19, 0.30, 0.20, pants, 0, -0.16, 0)
-    ]);
-    const shin = B.merge([
-      B.box(0.165, 0.30, 0.175, pants, 0, -0.16, 0),
-      B.box(0.18, 0.10, 0.26, boot, 0, -0.34, 0.03)              // 군화
-    ]);
+    /* 다리 (엉덩이 관절이 원점, 무릎은 -0.44) */
+    const thigh = [
+      sc(B.pillar(0.098, 0.078, 0.42, pants, 0, -0.21, 0), 1, 1, 0.95),
+      B.sphere(0.072, pants, 0, -0.42, 0),                                   // 무릎
+      B.box(0.10, 0.09, 0.045, gear, 0, -0.41, 0.062)                        // 무릎 보호대
+    ];
+    const shin = [
+      sc(B.pillar(0.074, 0.06, 0.34, pants, 0, -0.17, 0), 1, 1, 0.95),
+      B.box(0.108, 0.16, 0.115, boots, 0, -0.40, 0),                         // 군화 목
+      B.box(0.115, 0.09, 0.24, boots, 0, -0.475, 0.03),
+      B.box(0.10, 0.06, 0.09, boots, 0, -0.49, 0.15)
+    ];
 
-    return { torso, arm, thigh, shin };
+    return {
+      torso: B.merge(torsoParts),
+      arm: B.merge(arm),
+      thigh: B.merge(thigh),
+      shin: B.merge(shin)
+    };
   }
 };
 
@@ -390,7 +422,7 @@ const ChuteArt = {
     const a = new THREE.Color(0xe8552f).convertSRGBToLinear();
     const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
     for (let i = 0; i < pos.count; i += 3) {
-      // 삼각형 하나씩 방위각으로 나눠 색을 번갈아 칠합니다
+      // 삼각형마다 방위각을 보고 색을 번갈아 칠합니다
       let mx = 0, mz = 0;
       for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
       const ang = Math.atan2(mz / 3, mx / 3);
@@ -404,12 +436,13 @@ const ChuteArt = {
     }
     dome.dispose(); if (nd !== dome) nd.dispose();
 
-    // 줄: 캐릭터 어깨에서 지붕 가장자리로
+    // 줄: 어깨에서 지붕 가장자리로
     const lineParts = [];
     for (let i = 0; i < 8; i++) {
       const ang = (i / 8) * Math.PI * 2;
       const x = Math.cos(ang) * 1.35, z = Math.sin(ang) * 1.35;
-      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z, Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
+      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z,
+                               Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
     }
     const lines = Build.merge(lineParts);
     const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
@@ -472,6 +505,7 @@ class Char3D {
     this.hitFlash = 0;
     this.recoil = 0;
 
+    this.gunSkin = 'stock';
     this.buildMesh(outfit || OUTFITS[0]);
 
     this.ai = isPlayer ? null : {
@@ -483,7 +517,7 @@ class Char3D {
   }
 
   buildMesh(outfit) {
-    const art = CharArt.get(outfit, this.isPlayer);
+    const art = CharArt.get(outfit);
     const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
     const mesh = m => { const o = new THREE.Mesh(m, mat); o.castShadow = true; return o; };
 
@@ -496,28 +530,28 @@ class Char3D {
     this.hips.add(this.torso);
 
     // 정면이 +Z 이므로 캐릭터의 오른쪽은 로컬 -X 입니다
-    this.armR = new THREE.Group(); this.armR.position.set(-0.31, 0.55, 0);
-    this.armL = new THREE.Group(); this.armL.position.set(0.31, 0.55, 0);
+    this.armR = new THREE.Group(); this.armR.position.set(-0.21, 0.615, 0);
+    this.armL = new THREE.Group(); this.armL.position.set(0.21, 0.615, 0);
     this.armL.add(mesh(art.arm)); this.armR.add(mesh(art.arm));
     this.hips.add(this.armL); this.hips.add(this.armR);
 
     // 총은 오른손 앞에 붙입니다
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(-0.03, -0.52, 0.26);
+    this.gunMount.position.set(-0.02, -0.60, 0.22);
     this.armR.add(this.gunMount);
     this.gunMesh = null;
 
     // 등에 메는 두 번째 무기
     this.backMount = new THREE.Group();
-    this.backMount.position.set(0.05, 0.45, -0.33);
+    this.backMount.position.set(0.05, 0.50, -0.30);
     this.backMount.rotation.set(Math.PI / 2, 0.25, 0.6);
     this.hips.add(this.backMount);
     this.backMesh = null;
 
-    this.legL = new THREE.Group(); this.legL.position.set(-0.11, 0.92, 0);
-    this.legR = new THREE.Group(); this.legR.position.set(0.11, 0.92, 0);
-    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.33;
-    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.33;
+    this.legL = new THREE.Group(); this.legL.position.set(-0.105, 0.92, 0);
+    this.legR = new THREE.Group(); this.legR.position.set(0.105, 0.92, 0);
+    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.44;
+    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.44;
     this.legL.add(mesh(art.thigh)); this.legL.add(this.kneeL); this.kneeL.add(mesh(art.shin));
     this.legR.add(mesh(art.thigh)); this.legR.add(this.kneeR); this.kneeR.add(mesh(art.shin));
 
@@ -605,13 +639,13 @@ class Char3D {
     if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
     if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
     if (this.gun) {
-      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot]), mat);
+      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot], this.gunSkin), mat);
       this.gunMesh.castShadow = true;
       this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
       this.gunMount.add(this.gunMesh);
     }
     if (this.other) {                            // 남는 무기는 등에 멥니다
-      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot]), mat);
+      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot], this.gunSkin), mat);
       this.backMesh.castShadow = true;
       this.backMount.add(this.backMesh);
     }

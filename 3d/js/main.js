@@ -101,7 +101,7 @@ const UI = {
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
-      'scope', 'alt', 'slots', 'winBanner'];
+      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -119,6 +119,17 @@ const UI = {
     this.el.winBanner.classList.add('hidden');
     this.el.over.classList.remove('hidden');
     this.el.hud.classList.add('hidden');
+
+    // 보상 지급과 전적 반영
+    const rw = Profile.reward(r, r.total);
+    this.el.rewardBox.innerHTML =
+      '<div class="row"><span>참가 보상</span><b>+' + rw.base + '</b></div>' +
+      '<div class="row"><span>처치 ' + r.kills + '명</span><b>+' + rw.kills + '</b></div>' +
+      '<div class="row"><span>순위 보너스</span><b>+' + rw.rankBonus + '</b></div>' +
+      (rw.win ? '<div class="row"><span>우승 보너스</span><b>+' + rw.win + '</b></div>' : '') +
+      '<div class="row total"><span>획득 BP</span><b>+' + rw.total.toLocaleString() + '</b></div>';
+    Lobby.refresh();
+    Lobby.refreshUI();
     this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
     this.el.result.className = r.won ? 'win' : 'lose';
     this.el.resultSub.textContent = r.won ? '마지막까지 살아남았습니다' : r.rank + '위 / ' + r.total + '명';
@@ -476,12 +487,17 @@ const Main = {
     UI.init();
     Settings.load();
     Settings.bind();
+    Profile.load();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);
+    Lobby.init();
+    Lobby.refresh();
+    window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
     UI.el.resumeBtn.addEventListener('click', e => { e.stopPropagation(); Input.toggleSettings(false); });
+    UI.el.lobbyBtn.addEventListener('click', () => { Game.state = 'menu'; UI.showMenu(); Lobby.tab('play'); });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
@@ -515,6 +531,10 @@ const Main = {
         UI.update(Game, dt);
       }
       Game.render();
+    } else if (Game.state === 'menu') {
+      UI.el.pause.classList.add('hidden');
+      Lobby.update(dt);
+      Lobby.render(Game.renderer);
     } else if (Game.scene && Game.player) {
       UI.el.pause.classList.add('hidden');
       Game.render();

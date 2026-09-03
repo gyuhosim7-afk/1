@@ -364,6 +364,146 @@ body.playing.paused { cursor: default; }
 }
 @media (prefers-reduced-motion: reduce) { #winBanner { animation: none; } }
 
+/* ============================================================
+   로비
+   ============================================================ */
+.lobbyOverlay {
+  background: linear-gradient(100deg, rgba(6, 9, 13, .97) 0%, rgba(6, 9, 13, .93) 38%,
+              rgba(6, 9, 13, .55) 56%, rgba(6, 9, 13, .1) 74%, rgba(6, 9, 13, 0) 100%);
+  backdrop-filter: none;
+  align-items: stretch; justify-content: flex-start;
+}
+#lobby {
+  width: min(560px, 94vw); height: 100%;
+  padding: 26px 30px 24px; display: flex; flex-direction: column; gap: 16px;
+  overflow-y: auto;
+}
+.lobbyTop { display: flex; align-items: center; justify-content: space-between; }
+.lobbyTop .brand { font-family: var(--display); font-size: 26px; letter-spacing: .01em; }
+.lobbyTop .brand em { font-style: normal; color: var(--accent); }
+.wallet {
+  display: flex; align-items: baseline; gap: 8px;
+  background: rgba(255, 255, 255, .06); border: 1px solid var(--line);
+  border-radius: 9px; padding: 6px 14px;
+}
+.wallet span { font-size: 10px; color: var(--muted); letter-spacing: .1em; }
+.wallet b { font-size: 19px; color: #f0c674; font-variant-numeric: tabular-nums; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  width: auto; flex: 1; padding: 10px 8px; font-size: 13px; font-weight: 600;
+  background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--muted); border-radius: 0; cursor: pointer;
+}
+.tabs button:hover { color: var(--text); filter: none; }
+.tabs button.on { color: #fff; border-bottom-color: var(--accent); }
+
+#lobby .panel { display: flex; flex-direction: column; gap: 14px; }
+#lobby .lead { font-size: 13px; color: #cbd6e2; line-height: 1.7; }
+#lobby h3 { font-size: 12px; color: var(--muted); letter-spacing: .06em; font-weight: 600; }
+#lobby button.primary { padding: 14px; font-size: 16px; }
+#lobby .field { margin-bottom: 0; }
+
+/* 상자 */
+.crate {
+  display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 14px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px;
+}
+.crateIcon {
+  width: 46px; height: 46px; border-radius: 8px;
+  background: linear-gradient(150deg, #4b566b, #232a36);
+  border: 1px solid rgba(255, 255, 255, .16); position: relative;
+}
+.crateIcon::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 46%; height: 5px;
+  background: rgba(240, 198, 116, .8);
+}
+.crateBody b { display: block; font-size: 14px; }
+.crateBody span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.bars { display: flex; height: 5px; margin-top: 8px; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,.4); }
+.bars .bar { height: 100%; }
+.crate .buy {
+  width: auto; padding: 9px 14px; font-size: 12px; white-space: nowrap;
+  background: linear-gradient(180deg, #2f81f7, #1f6feb);
+}
+
+.rates { background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.rates summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+.rates table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+.rates th, .rates td { padding: 6px 4px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.07); }
+.rates th:first-child, .rates td:first-child { text-align: left; color: var(--muted); }
+.rates td { font-variant-numeric: tabular-nums; }
+.pool { margin-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+.poolRow { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; font-size: 11px; align-items: baseline; }
+.poolRow span { color: #b9c6d4; line-height: 1.5; }
+.poolRow em { font-style: normal; color: var(--muted); white-space: nowrap; }
+
+/* 스킨 목록 */
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.item {
+  width: auto; text-align: left; padding: 11px 12px; border-radius: 10px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  color: var(--text); font-family: inherit; cursor: pointer; position: relative;
+}
+.item .itemChip {
+  position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+  border-radius: 2px; padding: 0; min-width: 0; display: block;
+}
+.item b { display: block; font-size: 13px; margin-left: 8px; }
+.item .tag { display: block; font-size: 10px; margin: 3px 0 0 8px; }
+.item .state { display: block; font-size: 10px; color: var(--muted); margin: 4px 0 0 8px; }
+.item.locked { opacity: .45; }
+.item.on { background: rgba(47, 129, 247, .18); border-color: var(--accent); }
+.item.on .state { color: var(--accent); }
+
+/* 전적 */
+.statRow {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 9px 2px; border-bottom: 1px solid rgba(255, 255, 255, .07); font-size: 13px;
+}
+.statRow span { color: var(--muted); }
+.statRow b { font-variant-numeric: tabular-nums; }
+
+/* 상자 결과 */
+#reveal { z-index: 40; background: rgba(4, 6, 10, .82); cursor: pointer; }
+.revealBox { text-align: center; }
+.revealCard {
+  width: min(360px, 88vw); padding: 30px 24px;
+  background: rgba(13, 17, 23, .96); border: 1px solid var(--line); border-radius: 16px;
+  animation: revealPop .45s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.revealCard.rare { box-shadow: 0 0 40px rgba(88, 166, 255, .3); border-color: #58a6ff; }
+.revealCard.epic { box-shadow: 0 0 50px rgba(188, 140, 255, .35); border-color: #bc8cff; }
+.revealCard.legendary { box-shadow: 0 0 60px rgba(240, 198, 116, .45); border-color: #f0c674; }
+.revealCard .rarity { font-size: 12px; letter-spacing: .12em; }
+.revealCard b { display: block; font-family: var(--display); font-size: 30px; margin: 10px 0 4px; }
+.revealCard .kind { font-size: 12px; color: var(--muted); }
+.revealCard em { display: block; font-style: normal; font-size: 12px; margin-top: 14px; }
+.revealCard .new { color: #7ee787; }
+.revealCard .dup { color: var(--muted); }
+#reveal .small { margin-top: 14px; font-size: 11px; color: var(--muted); }
+@keyframes revealPop { 0% { opacity: 0; transform: scale(.86) translateY(10px); } 100% { opacity: 1; transform: none; } }
+
+#lobbyToast {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 45;
+  background: rgba(13, 17, 23, .95); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 18px; font-size: 13px;
+}
+
+/* 결과 화면 보상 */
+.resultPanel .btnRow { display: flex; gap: 10px; }
+.resultPanel .btnRow button { flex: 1; }
+button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--line); }
+#rewardBox {
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; text-align: left;
+}
+#rewardBox .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 3px 0; }
+#rewardBox .row b { color: var(--text); font-variant-numeric: tabular-nums; }
+#rewardBox .total { border-top: 1px solid rgba(255,255,255,.1); margin-top: 6px; padding-top: 8px; font-size: 14px; color: var(--text); }
+#rewardBox .total b { color: #f0c674; font-size: 17px; }
+
 </style>
 
 <canvas id="scene"></canvas>
@@ -458,28 +598,71 @@ body.playing.paused { cursor: default; }
 </div>
 <div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없습니다 — 움직인 만큼만 시점이 돌아가며, 커서가 창 밖으로 나가면 멈춥니다</div>
 
-<div id="menu" class="overlay">
-  <div class="panel">
-    <h1>라스트 서바이버 <em>3D</em></h1>
-    <p class="sub">3인칭 시점 배틀로얄 · 마지막 한 명이 될 때까지</p>
-    <ul class="rules">
-      <li>섬 곳곳의 <b>마을과 창고</b>를 뒤져 총기, 탄약, 구급상자를 챙기세요.</li>
-      <li><b>자기장</b>이 7단계로 좁아지고 밖에서는 피해를 입습니다.</li>
-      <li>우클릭 <b>정조준</b>과 <b>앉기</b>로 탄퍼짐을 줄이고, 머리를 맞히면 피해가 커집니다.</li>
-      <li>무기는 <b>두 자루</b>까지 들 수 있고 <b>1</b>·<b>2</b> 키나 휠로 바꿉니다. 주운 <b>조준경</b>은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
-    </ul>
-    <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-    <button id="startBtn">낙하 시작</button>
-    <p class="hint">시작하면 마우스가 화면에 고정됩니다. 게임 중 <kbd>O</kbd> 키로 마우스 감도를 조절할 수 있습니다.</p>
+<div id="menu" class="overlay lobbyOverlay">
+  <div id="lobby">
+    <header class="lobbyTop">
+      <div class="brand">라스트 서바이버 <em>3D</em></div>
+      <div class="wallet"><span>BP</span><b id="bp">0</b></div>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="play" class="on">플레이</button>
+      <button data-tab="crate">상자</button>
+      <button data-tab="skin">스킨</button>
+      <button data-tab="stats">기록</button>
+    </nav>
+
+    <section class="panel" id="tab-play">
+      <p class="lead">30명이 섬에 낙하합니다. 마지막 한 명이 될 때까지 살아남으세요.</p>
+      <ul class="rules">
+        <li>상공에서 <b>낙하산</b>으로 내려와 무기와 <b>조준경</b>을 챙깁니다.</li>
+        <li>무기는 <b>두 자루</b>까지, 조준경은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
+        <li>자기장이 7단계로 좁아지고, 매치가 끝나면 <b>BP</b> 를 받습니다.</li>
+      </ul>
+      <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
+      <button id="startBtn" class="primary">매치 시작</button>
+      <p class="hint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+    </section>
+
+    <section class="panel hidden" id="tab-crate">
+      <div id="crateList"></div>
+      <details class="rates" open>
+        <summary>획득 확률</summary>
+        <div id="rateTable"></div>
+      </details>
+    </section>
+
+    <section class="panel hidden" id="tab-skin">
+      <h3>캐릭터 스킨</h3>
+      <div id="skinGrid" class="grid"></div>
+      <h3>총기 도장</h3>
+      <div id="gunGrid" class="grid"></div>
+    </section>
+
+    <section class="panel hidden" id="tab-stats">
+      <div id="statList"></div>
+    </section>
   </div>
 </div>
 
+<div id="reveal" class="overlay hidden">
+  <div class="revealBox">
+    <div class="revealCard" id="revealCard"></div>
+    <p class="small">화면을 클릭하면 닫힙니다</p>
+  </div>
+</div>
+<div id="lobbyToast" class="hidden"></div>
+
 <div id="over" class="overlay hidden">
-  <div class="panel">
+  <div class="panel resultPanel">
     <h1 id="result">탈락</h1>
     <p class="sub" id="resultSub"></p>
     <div id="resultStats" class="stats"></div>
-    <button id="againBtn">다시 하기</button>
+    <div id="rewardBox"></div>
+    <div class="btnRow">
+      <button id="lobbyBtn" class="ghost">로비로</button>
+      <button id="againBtn">다시 하기</button>
+    </div>
   </div>
 </div>
 
@@ -574,12 +757,160 @@ const NAMES = [
   '족제비','비버','물총새','솔개','황조롱이','사슴','기린','치타','하이에나','바다표범'
 ];
 
-/* 캐릭터 옷 색 (봇 구분용) */
-const OUTFITS = [
-  { top:0x8c5a3c, pants:0x3f4a3a }, { top:0x4a5568, pants:0x2d3748 },
-  { top:0x6b4f3a, pants:0x4a4a3a }, { top:0x5a6b4a, pants:0x3a4230 },
-  { top:0x7a4a4a, pants:0x3d3d4a }, { top:0x46606b, pants:0x33404a }
-];
+/* ============================================================
+   스킨과 상자 (로비에서 쓰는 데이터)
+   ============================================================ */
+const RARITY = {
+  common:    { name: '일반', color: '#9fb0c0', refund: 30 },
+  rare:      { name: '고급', color: '#58a6ff', refund: 90 },
+  epic:      { name: '희귀', color: '#bc8cff', refund: 220 },
+  legendary: { name: '전설', color: '#f0c674', refund: 600 }
+};
+
+/* 캐릭터 스킨: 옷·장비 색과 머리/피부 톤 */
+const SKINS = {
+  recruit:  { name: '기본 전투복', rarity: 'common',    top: 0x3d6285, pants: 0x2f3a46, vest: 0x2c3c4c, boots: 0x24262b, helmet: 0x2f4c6b, hair: 0x2b2119, tone: 0xc39a72 },
+  ranger:   { name: '삼림 레인저', rarity: 'common',    top: 0x4d5b39, pants: 0x3a4230, vest: 0x40452f, boots: 0x2b2a24, helmet: 0x46503a, hair: 0x1f1a14, tone: 0xd0a87c },
+  militia:  { name: '민병대',      rarity: 'common',    top: 0x6b4f3a, pants: 0x453d33, vest: 0x4b4a3f, boots: 0x2a251f, helmet: 0x554b3c, hair: 0x3a2a1c, tone: 0xb98b63 },
+  desert:   { name: '사막 위장',   rarity: 'rare',      top: 0xb9a077, pants: 0x9c8a63, vest: 0x8b7a54, boots: 0x5b4c34, helmet: 0xa8926a, hair: 0x2b2119, tone: 0xc9a077 },
+  urban:    { name: '도시 위장',   rarity: 'rare',      top: 0x5b626b, pants: 0x40464d, vest: 0x2f343a, boots: 0x232629, helmet: 0x4a5058, hair: 0x171310, tone: 0x8d6547 },
+  medic:    { name: '야전 의무병', rarity: 'rare',      top: 0xdfe4e6, pants: 0x4a5158, vest: 0xc23b32, boots: 0x2a2d31, helmet: 0xe4e8ea, hair: 0x6b4a2a, tone: 0xdfb894 },
+  tracksuit:{ name: '트랙수트',    rarity: 'epic',      top: 0xd63a5a, pants: 0x1e2229, vest: 0xb02f4c, boots: 0xf0f0f0, helmet: 0, hair: 0x141414, tone: 0xc39a72 },
+  suit:     { name: '검은 정장',   rarity: 'epic',      top: 0x1c1f24, pants: 0x15171b, vest: 0x24272d, boots: 0x0f1013, helmet: 0, hair: 0x201a14, tone: 0xd6ad86 },
+  arctic:   { name: '설원 특수부대', rarity: 'epic',    top: 0xe8eef2, pants: 0xc9d4dc, vest: 0xaebac4, boots: 0x4a5158, helmet: 0xdfe8ee, hair: 0x2b2119, tone: 0xe0bb96 },
+  gold:     { name: '황금 갑주',   rarity: 'legendary', top: 0xd4a531, pants: 0x8a6c1f, vest: 0xf0c453, boots: 0x5c4712, helmet: 0xf2cf6b, hair: 0x2b2119, tone: 0xc39a72 },
+  santa:    { name: '산타 복장',   rarity: 'legendary', top: 0xc9302c, pants: 0xa32622, vest: 0xf5f5f5, boots: 0x231f1c, helmet: 0xc9302c, hair: 0xf0f0f0, tone: 0xd8ab84 }
+};
+
+/* 총기 스킨: 금속·손잡이 색을 바꿉니다 */
+const GUN_SKINS = {
+  stock:  { name: '기본',      rarity: 'common',    metal: 0x33383f, dark: 0x1f2227, wood: 0x7a5433 },
+  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa89170, dark: 0x6f6047, wood: 0x8a6a42 },
+  frost:  { name: '한파',      rarity: 'rare',      metal: 0xbecbd4, dark: 0x74838f, wood: 0x9fb0bb },
+  carbon: { name: '카본',      rarity: 'epic',      metal: 0x22262c, dark: 0x121417, wood: 0x2c3138 },
+  neon:   { name: '네온',      rarity: 'epic',      metal: 0x24304a, dark: 0x141a27, wood: 0x2b6cff },
+  golden: { name: '황금',      rarity: 'legendary', metal: 0xd9ad3d, dark: 0x8a6c1f, wood: 0xb08a2a }
+};
+
+/* 상자와 확률 (합이 1 이 되도록 맞춰 두었습니다) */
+const CRATES = {
+  supply:  { name: '보급 상자',     price: 150,  desc: '가볍게 열어 보는 기본 상자',
+             rates: { common: 0.70, rare: 0.24, epic: 0.05, legendary: 0.01 } },
+  combat:  { name: '전투 상자',     price: 500,  desc: '고급 이상이 절반 넘게 나옵니다',
+             rates: { common: 0.38, rare: 0.44, epic: 0.15, legendary: 0.03 } },
+  premium: { name: '프리미엄 상자', price: 1500, desc: '전설 확률이 가장 높은 상자',
+             rates: { common: 0.08, rare: 0.40, epic: 0.40, legendary: 0.12 } }
+};
+
+/* 매치 보상 */
+const REWARD = {
+  base: 60,
+  perKill: 25,
+  rankBonus: 6,      // (참가자 수 - 순위) × 6
+  win: 500
+};
+
+/* 봇이 입는 옷 (스킨 목록에서 골라 씁니다) */
+const BOT_SKINS = ['recruit', 'ranger', 'militia', 'desert', 'urban', 'medic'];
+const OUTFITS = BOT_SKINS.map(k => SKINS[k]);
+
+/* ============================================================
+   플레이어 계정: BP, 보유 스킨, 장착, 전적, 상자 뽑기
+   브라우저(localStorage)에 저장됩니다.
+   ============================================================ */
+const Profile = {
+  KEY: 'lastSurvivor3d.profile',
+  data: {
+    bp: 800,
+    owned: { skin: ['recruit'], gun: ['stock'] },
+    equipped: { skin: 'recruit', gun: 'stock' },
+    stats: { matches: 0, wins: 0, kills: 0, best: 99, bestKills: 0, opened: 0 }
+  },
+
+  load() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        this.data.bp = Math.max(0, +d.bp || 0);
+        if (d.owned) {
+          this.data.owned.skin = (d.owned.skin || ['recruit']).filter(k => SKINS[k]);
+          this.data.owned.gun = (d.owned.gun || ['stock']).filter(k => GUN_SKINS[k]);
+        }
+        if (d.equipped) {
+          if (SKINS[d.equipped.skin]) this.data.equipped.skin = d.equipped.skin;
+          if (GUN_SKINS[d.equipped.gun]) this.data.equipped.gun = d.equipped.gun;
+        }
+        if (d.stats) Object.assign(this.data.stats, d.stats);
+      }
+    } catch (e) { /* 저장소를 못 쓰면 기본값으로 시작합니다 */ }
+    // 기본 아이템은 항상 보유
+    if (this.data.owned.skin.indexOf('recruit') < 0) this.data.owned.skin.push('recruit');
+    if (this.data.owned.gun.indexOf('stock') < 0) this.data.owned.gun.push('stock');
+  },
+
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+
+  owns(type, key) { return this.data.owned[type].indexOf(key) >= 0; },
+  equip(type, key) {
+    if (!this.owns(type, key)) return false;
+    this.data.equipped[type] = key;
+    this.save();
+    return true;
+  },
+  addBp(n) { this.data.bp = Math.max(0, this.data.bp + n); this.save(); },
+
+  /* 상자에 들어 있는 전체 목록 */
+  pool() {
+    const out = [];
+    for (const k in SKINS) out.push({ type: 'skin', key: k, name: SKINS[k].name, rarity: SKINS[k].rarity });
+    for (const k in GUN_SKINS) out.push({ type: 'gun', key: k, name: GUN_SKINS[k].name + ' 도장', rarity: GUN_SKINS[k].rarity });
+    return out;
+  },
+
+  /* 상자 열기: 확률표대로 등급을 뽑고 그 등급 안에서 아이템을 고릅니다 */
+  openCrate(crateKey) {
+    const crate = CRATES[crateKey];
+    if (!crate) return null;
+    if (this.data.bp < crate.price) return { error: 'BP가 부족합니다' };
+
+    this.addBp(-crate.price);
+    this.data.stats.opened++;
+
+    let roll = Math.random(), rarity = 'common';
+    for (const r in crate.rates) {
+      if (roll < crate.rates[r]) { rarity = r; break; }
+      roll -= crate.rates[r];
+    }
+    const items = this.pool().filter(i => i.rarity === rarity);
+    const item = items[Math.floor(Math.random() * items.length)];
+
+    const dup = this.owns(item.type, item.key);
+    let refund = 0;
+    if (dup) { refund = RARITY[rarity].refund; this.addBp(refund); }
+    else { this.data.owned[item.type].push(item.key); }
+    this.save();
+    return { item, rarity, dup, refund, spent: crate.price };
+  },
+
+  /* 매치 결과 → 보상 계산과 전적 갱신 */
+  reward(result, total) {
+    const rankBonus = Math.max(0, (total - result.rank)) * REWARD.rankBonus;
+    const kills = result.kills * REWARD.perKill;
+    const win = result.won ? REWARD.win : 0;
+    const bp = REWARD.base + kills + rankBonus + win;
+    this.addBp(bp);
+
+    const s = this.data.stats;
+    s.matches++;
+    if (result.won) s.wins++;
+    s.kills += result.kills;
+    s.best = Math.min(s.best || 99, result.rank);
+    s.bestKills = Math.max(s.bestKills || 0, result.kills);
+    this.save();
+    return { total: bp, base: REWARD.base, kills, rankBonus, win };
+  }
+};
 
 /* ============================================================
    월드: 지형(높이맵), 건물·나무·바위, 충돌 및 레이캐스트
@@ -1345,6 +1676,9 @@ const Build = {
     return { geo: g, color, x, y, z, rx: 0, ry: 0, rz: 0 };
   },
 
+  /* 조각을 눌러 납작하게 (사람 몸통처럼 타원으로 만들 때 씁니다) */
+  sc(part, sx, sy, sz) { part.sx = sx; part.sy = sy == null ? 1 : sy; part.sz = sz == null ? sx : sz; return part; },
+
   /* 조각 배열 → 정점 색이 들어간 하나의 지오메트리 */
   merge(parts) {
     const pos = [], nor = [], col = [];
@@ -1352,7 +1686,8 @@ const Build = {
     for (const p of parts) {
       this._e.set(p.rx, p.ry, p.rz);
       this._q.setFromEuler(this._e);
-      this._m.compose(this._p.set(p.x, p.y, p.z), this._q, this._s.set(1, 1, 1));
+      this._m.compose(this._p.set(p.x, p.y, p.z), this._q,
+                      this._s.set(p.sx || 1, p.sy || 1, p.sz || 1));
       const g = p.geo.clone().applyMatrix4(this._m);
       const ng = g.index ? g.toNonIndexed() : g;
       const ap = ng.attributes.position.array, an = ng.attributes.normal.array;
@@ -1381,19 +1716,20 @@ const GunArt = {
   cache: {},
   METAL: 0x33383f, DARK: 0x1f2227, WOOD: 0x7a5433, OLIVE: 0x4a5340,
 
-  geo(key, scope) {
-    const id = key + ':' + (scope || 0);
+  geo(key, scope, skinKey) {
+    const sk = GUN_SKINS[skinKey] || GUN_SKINS.stock;
+    const id = key + ':' + (scope || 0) + ':' + (skinKey || 'stock');
     if (!this.cache[id]) {
-      const parts = this.parts(key);
-      if (scope > 1) parts.push.apply(parts, this.scopeParts(scope));
+      const parts = this.parts(key, sk);
+      if (scope > 1) parts.push.apply(parts, this.scopeParts(scope, sk));
       this.cache[id] = Build.merge(parts);
     }
     return this.cache[id];
   },
 
   /* 무기 위에 얹는 조준경 (배율이 클수록 길고 큽니다) */
-  scopeParts(level) {
-    const B = Build, D = this.DARK, M = this.METAL;
+  scopeParts(level, sk) {
+    const B = Build, D = (sk || GUN_SKINS.stock).dark, M = (sk || GUN_SKINS.stock).metal;
     const tint = SCOPES[level].color;
     if (level <= 2) return [                       // 레드도트
       B.box(0.05, 0.055, 0.05, D, 0, 0.115, -0.02),
@@ -1411,8 +1747,9 @@ const GunArt = {
     ];
   },
 
-  parts(key) {
-    const B = Build, M = this.METAL, D = this.DARK, W = this.WOOD, O = this.OLIVE;
+  parts(key, sk) {
+    sk = sk || GUN_SKINS.stock;
+    const B = Build, M = sk.metal, D = sk.dark, W = sk.wood, O = this.OLIVE;
     const A = GUNS[key].color;
     switch (key) {
       case 'pistol': return [
@@ -1612,55 +1949,81 @@ class Loot {
 const CharArt = {
   cache: {},
 
-  /* 옷차림별 지오메트리 (봇끼리 공유) */
-  get(outfit, isPlayer) {
-    const key = (isPlayer ? 'p' : '') + outfit.top + '_' + outfit.pants;
-    if (!this.cache[key]) this.cache[key] = this.build(outfit, isPlayer);
+  /* 스킨별 지오메트리 (같은 스킨을 입은 캐릭터끼리 공유) */
+  get(skin) {
+    const key = skin.name || 'default';
+    if (!this.cache[key]) this.cache[key] = this.build(skin);
     return this.cache[key];
   },
 
-  build(outfit, isPlayer) {
-    const B = Build;
-    const skin = 0xc39a72, dark = 0x2b2f36;
-    const top = isPlayer ? 0x3d6285 : outfit.top;
-    const pants = isPlayer ? 0x2f3a46 : outfit.pants;
-    const vest = isPlayer ? 0x2c3c4c : 0x4b4a3f;
-    const helmet = isPlayer ? 0x2f4c6b : 0x50503f;
-    const boot = 0x24262b;
+  /* 사람 비율에 맞춘 저폴리 인체
+     키 1.8m 기준: 골반 0.92, 어깨 1.54, 눈 1.62, 정수리 1.80 */
+  build(S) {
+    const B = Build, sc = B.sc.bind(B);
+    const top = S.top, pants = S.pants, vest = S.vest || 0x4a4a42;
+    const boots = S.boots || 0x24262b, tone = S.tone || 0xc39a72, hair = S.hair || 0x2b2119;
+    const gear = 0x2a2d33;
 
-    // 몸통: 골반 기준 (골반 그룹은 y=0.92 에 놓입니다)
-    const torso = B.merge([
-      B.box(0.44, 0.40, 0.26, top, 0, 0.20, 0),                  // 배
-      B.box(0.50, 0.30, 0.28, top, 0, 0.50, 0),                  // 가슴
-      B.box(0.53, 0.26, 0.31, vest, 0, 0.50, 0),                 // 방탄복
-      B.box(0.10, 0.30, 0.33, dark, -0.14, 0.50, 0),             // 멜빵
-      B.box(0.10, 0.30, 0.33, dark, 0.14, 0.50, 0),
-      B.box(0.34, 0.40, 0.18, 0x50503f, 0, 0.46, -0.24),         // 배낭
-      B.box(0.30, 0.10, 0.16, dark, 0, 0.28, -0.25),
-      B.box(0.15, 0.10, 0.16, skin, 0, 0.70, 0),                 // 목
-      B.box(0.26, 0.27, 0.26, skin, 0, 0.88, 0),                 // 머리
-      B.box(0.30, 0.13, 0.30, helmet, 0, 1.02, 0),               // 헬멧
-      B.sphere(0.16, helmet, 0, 1.03, 0, 1, 0.75, 1),
-      B.box(0.22, 0.07, 0.04, 0x1a1c20, 0, 0.92, 0.14)           // 고글
-    ]);
+    /* 몸통 (골반 그룹 기준) */
+    const torsoParts = [
+      sc(B.pillar(0.155, 0.145, 0.20, pants, 0, 0.09, 0), 1, 1, 0.72),      // 골반
+      B.box(0.33, 0.055, 0.24, gear, 0, 0.19, 0),                            // 허리띠
+      sc(B.pillar(0.145, 0.185, 0.30, top, 0, 0.36, 0), 1, 1, 0.70),         // 배
+      sc(B.pillar(0.185, 0.19, 0.22, top, 0, 0.60, 0), 1, 1, 0.68),          // 가슴
+      sc(B.box(0.38, 0.30, 0.27, vest, 0, 0.55, 0.005), 1, 1, 1),            // 방탄복
+      B.box(0.09, 0.26, 0.29, gear, -0.15, 0.60, 0),                         // 어깨끈
+      B.box(0.09, 0.26, 0.29, gear, 0.15, 0.60, 0),
+      B.box(0.13, 0.10, 0.09, gear, 0, 0.44, 0.14),                          // 탄창 주머니
+      sc(B.sphere(0.085, top, -0.195, 0.615, 0), 1, 1, 1),                   // 어깨
+      sc(B.sphere(0.085, top, 0.195, 0.615, 0), 1, 1, 1),
+      B.box(0.28, 0.34, 0.15, 0x4a4a3e, 0, 0.46, -0.20),                     // 배낭
+      B.box(0.30, 0.09, 0.17, gear, 0, 0.30, -0.20),
+      sc(B.pillar(0.058, 0.065, 0.10, tone, 0, 0.72, 0), 1, 1, 1),           // 목
+      sc(B.sphere(0.115, tone, 0, 0.845, 0.005), 1, 1.1, 0.97),              // 머리
+      B.box(0.155, 0.10, 0.16, tone, 0, 0.785, 0.02),                        // 턱
+      sc(B.sphere(0.03, tone, -0.113, 0.845, 0), 0.6, 1, 1),                 // 귀
+      sc(B.sphere(0.03, tone, 0.113, 0.845, 0), 0.6, 1, 1),
+      sc(B.sphere(0.121, hair, 0, 0.868, -0.01), 1, 0.85, 1),                // 머리카락
+      B.box(0.035, 0.026, 0.02, 0x1a1a20, -0.048, 0.855, 0.104),             // 눈
+      B.box(0.035, 0.026, 0.02, 0x1a1a20, 0.048, 0.855, 0.104),
+      B.box(0.046, 0.013, 0.02, hair, -0.048, 0.888, 0.103),                 // 눈썹
+      B.box(0.046, 0.013, 0.02, hair, 0.048, 0.888, 0.103),
+      B.box(0.048, 0.012, 0.02, 0x8a5148, 0, 0.792, 0.096)                   // 입
+    ];
+    if (S.helmet) {                                                          // 헬멧
+      torsoParts.push(sc(B.sphere(0.133, S.helmet, 0, 0.872, 0), 1, 0.78, 1.02));
+      torsoParts.push(B.box(0.26, 0.03, 0.10, S.helmet, 0, 0.855, 0.10));
+      torsoParts.push(B.box(0.05, 0.05, 0.06, gear, 0.12, 0.885, 0.02));
+    }
 
-    // 팔: 어깨 관절이 원점, 아래로 뻗음
-    const arm = B.merge([
-      B.box(0.15, 0.26, 0.15, top, 0, -0.13, 0),                 // 윗팔
-      B.box(0.135, 0.26, 0.135, top, 0, -0.37, 0.01),            // 아래팔
-      B.box(0.14, 0.10, 0.15, dark, 0, -0.54, 0.02)              // 장갑
-    ]);
+    /* 팔 (어깨 관절이 원점) */
+    const arm = [
+      sc(B.pillar(0.06, 0.052, 0.30, top, 0, -0.17, 0), 1, 1, 1),            // 윗팔
+      B.sphere(0.05, top, 0, -0.32, 0),                                      // 팔꿈치
+      sc(B.pillar(0.05, 0.043, 0.28, top, 0, -0.46, 0.005), 1, 1, 1),        // 아래팔
+      B.box(0.072, 0.045, 0.08, gear, 0, -0.60, 0.005),                      // 손목
+      B.box(0.078, 0.10, 0.085, gear, 0, -0.655, 0.012)                      // 장갑
+    ];
 
-    // 다리: 엉덩이 관절이 원점
-    const thigh = B.merge([
-      B.box(0.19, 0.30, 0.20, pants, 0, -0.16, 0)
-    ]);
-    const shin = B.merge([
-      B.box(0.165, 0.30, 0.175, pants, 0, -0.16, 0),
-      B.box(0.18, 0.10, 0.26, boot, 0, -0.34, 0.03)              // 군화
-    ]);
+    /* 다리 (엉덩이 관절이 원점, 무릎은 -0.44) */
+    const thigh = [
+      sc(B.pillar(0.098, 0.078, 0.42, pants, 0, -0.21, 0), 1, 1, 0.95),
+      B.sphere(0.072, pants, 0, -0.42, 0),                                   // 무릎
+      B.box(0.10, 0.09, 0.045, gear, 0, -0.41, 0.062)                        // 무릎 보호대
+    ];
+    const shin = [
+      sc(B.pillar(0.074, 0.06, 0.34, pants, 0, -0.17, 0), 1, 1, 0.95),
+      B.box(0.108, 0.16, 0.115, boots, 0, -0.40, 0),                         // 군화 목
+      B.box(0.115, 0.09, 0.24, boots, 0, -0.475, 0.03),
+      B.box(0.10, 0.06, 0.09, boots, 0, -0.49, 0.15)
+    ];
 
-    return { torso, arm, thigh, shin };
+    return {
+      torso: B.merge(torsoParts),
+      arm: B.merge(arm),
+      thigh: B.merge(thigh),
+      shin: B.merge(shin)
+    };
   }
 };
 
@@ -1677,7 +2040,7 @@ const ChuteArt = {
     const a = new THREE.Color(0xe8552f).convertSRGBToLinear();
     const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
     for (let i = 0; i < pos.count; i += 3) {
-      // 삼각형 하나씩 방위각으로 나눠 색을 번갈아 칠합니다
+      // 삼각형마다 방위각을 보고 색을 번갈아 칠합니다
       let mx = 0, mz = 0;
       for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
       const ang = Math.atan2(mz / 3, mx / 3);
@@ -1691,12 +2054,13 @@ const ChuteArt = {
     }
     dome.dispose(); if (nd !== dome) nd.dispose();
 
-    // 줄: 캐릭터 어깨에서 지붕 가장자리로
+    // 줄: 어깨에서 지붕 가장자리로
     const lineParts = [];
     for (let i = 0; i < 8; i++) {
       const ang = (i / 8) * Math.PI * 2;
       const x = Math.cos(ang) * 1.35, z = Math.sin(ang) * 1.35;
-      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z, Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
+      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z,
+                               Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
     }
     const lines = Build.merge(lineParts);
     const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
@@ -1759,6 +2123,7 @@ class Char3D {
     this.hitFlash = 0;
     this.recoil = 0;
 
+    this.gunSkin = 'stock';
     this.buildMesh(outfit || OUTFITS[0]);
 
     this.ai = isPlayer ? null : {
@@ -1770,7 +2135,7 @@ class Char3D {
   }
 
   buildMesh(outfit) {
-    const art = CharArt.get(outfit, this.isPlayer);
+    const art = CharArt.get(outfit);
     const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
     const mesh = m => { const o = new THREE.Mesh(m, mat); o.castShadow = true; return o; };
 
@@ -1783,28 +2148,28 @@ class Char3D {
     this.hips.add(this.torso);
 
     // 정면이 +Z 이므로 캐릭터의 오른쪽은 로컬 -X 입니다
-    this.armR = new THREE.Group(); this.armR.position.set(-0.31, 0.55, 0);
-    this.armL = new THREE.Group(); this.armL.position.set(0.31, 0.55, 0);
+    this.armR = new THREE.Group(); this.armR.position.set(-0.21, 0.615, 0);
+    this.armL = new THREE.Group(); this.armL.position.set(0.21, 0.615, 0);
     this.armL.add(mesh(art.arm)); this.armR.add(mesh(art.arm));
     this.hips.add(this.armL); this.hips.add(this.armR);
 
     // 총은 오른손 앞에 붙입니다
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(-0.03, -0.52, 0.26);
+    this.gunMount.position.set(-0.02, -0.60, 0.22);
     this.armR.add(this.gunMount);
     this.gunMesh = null;
 
     // 등에 메는 두 번째 무기
     this.backMount = new THREE.Group();
-    this.backMount.position.set(0.05, 0.45, -0.33);
+    this.backMount.position.set(0.05, 0.50, -0.30);
     this.backMount.rotation.set(Math.PI / 2, 0.25, 0.6);
     this.hips.add(this.backMount);
     this.backMesh = null;
 
-    this.legL = new THREE.Group(); this.legL.position.set(-0.11, 0.92, 0);
-    this.legR = new THREE.Group(); this.legR.position.set(0.11, 0.92, 0);
-    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.33;
-    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.33;
+    this.legL = new THREE.Group(); this.legL.position.set(-0.105, 0.92, 0);
+    this.legR = new THREE.Group(); this.legR.position.set(0.105, 0.92, 0);
+    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.44;
+    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.44;
     this.legL.add(mesh(art.thigh)); this.legL.add(this.kneeL); this.kneeL.add(mesh(art.shin));
     this.legR.add(mesh(art.thigh)); this.legR.add(this.kneeR); this.kneeR.add(mesh(art.shin));
 
@@ -1892,13 +2257,13 @@ class Char3D {
     if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
     if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
     if (this.gun) {
-      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot]), mat);
+      this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot], this.gunSkin), mat);
       this.gunMesh.castShadow = true;
       this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
       this.gunMount.add(this.gunMesh);
     }
     if (this.other) {                            // 남는 무기는 등에 멥니다
-      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot]), mat);
+      this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot], this.gunSkin), mat);
       this.backMesh.castShadow = true;
       this.backMount.add(this.backMesh);
     }
@@ -2513,7 +2878,9 @@ const Game = {
 
     // 플레이어
     const ps = World.freeSpot(2);
-    this.player = new Char3D(ps.x, ps.z, true, '나');
+    const mySkin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
+    this.player = new Char3D(ps.x, ps.z, true, '나', mySkin);
+    this.player.gunSkin = Profile.data.equipped.gun;
     this.scene.add(this.player.mesh);
     this.chars.push(this.player);
     this.look.yaw = Math.random() * Math.PI * 2;
@@ -3178,12 +3545,12 @@ const Game = {
   /* 1인칭에서 손에 든 총 (카메라에 붙입니다) */
   updateViewGun(dt, scoped) {
     const p = this.player;
-    const key = p.gun ? p.gun + ':' + p.zoom : '';
+    const key = p.gun ? p.gun + ':' + p.zoom + ':' + p.gunSkin : '';
     if (key !== this.viewGunKey) {           // 무기나 조준경이 바뀌면 다시 만듭니다
       this.viewGunKey = key;
       while (this.viewGun.children.length) this.viewGun.remove(this.viewGun.children[0]);
       if (p.gun) {
-        const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0),
+        const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0, p.gunSkin),
                                  Mats.vc({ roughness: 0.55, metalness: 0.25 }));
         m.rotation.y = Math.PI + 0.05;       // 총구가 카메라 앞(-Z)을 보도록 (살짝 안쪽으로)
         m.scale.setScalar(0.58);             // 화면을 가리지 않을 크기
@@ -3409,6 +3776,239 @@ const Game = {
 };
 
 /* ============================================================
+   로비: 캐릭터 미리보기(3D) + 상자·스킨·전적 화면
+   ============================================================ */
+const Lobby = {
+  scene: null, camera: null, group: null, spin: 0, ready: false,
+
+  /* ---------- 3D 미리보기 ---------- */
+  initScene() {
+    if (this.scene) return;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.1, 60);
+    // 왼쪽 패널을 피해 캐릭터가 오른쪽에 서 보이도록 카메라를 옮깁니다
+    this.camera.position.set(-1.25, 1.12, 4.5);
+    this.camera.lookAt(-1.25, 0.95, 0);
+
+    this.scene.add(new THREE.HemisphereLight(0x9cc0e4, 0x22262c, 1.05));
+    const key = new THREE.DirectionalLight(0xfff2de, 2.6);
+    key.position.set(2.0, 3.0, 3.6);
+    this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0x7fb4ff, 1.7);
+    rim.position.set(-3, 2, -2.4);
+    this.scene.add(rim);
+
+    // 받침대
+    const pod = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15, 1.3, 0.16, 40),
+      new THREE.MeshStandardMaterial({ color: srgb(0x1b2028), roughness: 0.6, metalness: 0.3 }));
+    pod.position.y = -0.08;
+    this.scene.add(pod);
+    const ring = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.18, 1.18, 0.02, 40),
+      new THREE.MeshBasicMaterial({ color: srgb(0x2f81f7) }));
+    ring.position.y = 0.01;
+    this.scene.add(ring);
+
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
+    this.ready = true;
+  },
+
+  /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 */
+  refresh() {
+    this.initScene();
+    while (this.group.children.length) this.group.remove(this.group.children[0]);
+
+    const skin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
+    const art = CharArt.get(skin);
+    const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
+    const mk = geo => new THREE.Mesh(geo, mat);
+
+    const hips = new THREE.Group();
+    hips.position.y = 0.92;
+    hips.add(mk(art.torso));
+    this.group.add(hips);
+
+    const armR = new THREE.Group(); armR.position.set(-0.21, 0.615, 0);
+    const armL = new THREE.Group(); armL.position.set(0.21, 0.615, 0);
+    armR.add(mk(art.arm)); armL.add(mk(art.arm));
+    armR.rotation.set(-0.95, 0.1, 0.16);      // 총을 든 자세
+    armL.rotation.set(-1.05, -0.3, -0.5);
+    hips.add(armR); hips.add(armL);
+
+    const gun = new THREE.Mesh(
+      GunArt.geo('rifle', 0, Profile.data.equipped.gun),
+      Mats.vc({ roughness: 0.55, metalness: 0.25 }));
+    gun.position.set(-0.02, -0.60, 0.22);
+    gun.rotation.x = 0.95;
+    armR.add(gun);
+
+    for (const s of [-1, 1]) {
+      const leg = new THREE.Group();
+      leg.position.set(0.105 * s, 0.92, 0);
+      leg.rotation.set(s > 0 ? 0.06 : -0.04, 0, 0.02 * s);
+      leg.add(mk(art.thigh));
+      const knee = new THREE.Group();
+      knee.position.y = -0.44;
+      knee.rotation.x = -0.05;
+      knee.add(mk(art.shin));
+      leg.add(knee);
+      this.group.add(leg);
+    }
+  },
+
+  update(dt) {
+    if (!this.ready) return;
+    this.spin += dt * 0.35;
+    this.group.rotation.y = Math.sin(this.spin) * 0.55 + 0.25;
+  },
+
+  render(renderer) {
+    if (!this.ready) return;
+    renderer.render(this.scene, this.camera);
+  },
+
+  resize() {
+    if (!this.camera) return;
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+  },
+
+  /* ---------- 화면 ---------- */
+  init() {
+    this.el = {
+      root: document.getElementById('lobby'),
+      bp: document.getElementById('bp'),
+      tabs: document.querySelectorAll('#lobby .tabs button'),
+      panels: document.querySelectorAll('#lobby .panel'),
+      crateList: document.getElementById('crateList'),
+      rateTable: document.getElementById('rateTable'),
+      skinGrid: document.getElementById('skinGrid'),
+      gunGrid: document.getElementById('gunGrid'),
+      statList: document.getElementById('statList'),
+      reveal: document.getElementById('reveal'),
+      revealCard: document.getElementById('revealCard')
+    };
+
+    this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
+    document.getElementById('reveal').addEventListener('click', () => {
+      this.el.reveal.classList.add('hidden');
+    });
+    this.buildCrates();
+    this.buildRates();
+    this.refreshUI();
+  },
+
+  tab(name) {
+    this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
+  },
+
+  buildCrates() {
+    this.el.crateList.innerHTML = Object.keys(CRATES).map(k => {
+      const c = CRATES[k];
+      const bars = Object.keys(c.rates).map(r =>
+        '<span class="bar" style="width:' + (c.rates[r] * 100) + '%;background:' + RARITY[r].color + '"></span>').join('');
+      return '<div class="crate" data-crate="' + k + '">' +
+        '<div class="crateIcon"></div>' +
+        '<div class="crateBody"><b>' + c.name + '</b><span>' + c.desc + '</span>' +
+        '<div class="bars">' + bars + '</div></div>' +
+        '<button class="buy">' + c.price.toLocaleString() + ' BP</button></div>';
+    }).join('');
+    this.el.crateList.querySelectorAll('.crate').forEach(el => {
+      el.querySelector('.buy').addEventListener('click', () => this.open(el.dataset.crate));
+    });
+  },
+
+  buildRates() {
+    const rows = Object.keys(CRATES).map(k => {
+      const c = CRATES[k];
+      return '<tr><td>' + c.name + '</td>' +
+        Object.keys(RARITY).map(r => '<td>' + (c.rates[r] * 100).toFixed(0) + '%</td>').join('') + '</tr>';
+    }).join('');
+    const pool = Profile.pool();
+    const byRarity = Object.keys(RARITY).map(r => {
+      const names = pool.filter(i => i.rarity === r).map(i => i.name).join(', ');
+      return '<div class="poolRow"><b style="color:' + RARITY[r].color + '">' + RARITY[r].name + '</b>' +
+        '<span>' + names + '</span><em>중복 시 ' + RARITY[r].refund + ' BP</em></div>';
+    }).join('');
+    this.el.rateTable.innerHTML =
+      '<table><thead><tr><th>상자</th>' +
+      Object.keys(RARITY).map(r => '<th style="color:' + RARITY[r].color + '">' + RARITY[r].name + '</th>').join('') +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div class="pool">' + byRarity + '</div>';
+  },
+
+  open(crateKey) {
+    const res = Profile.openCrate(crateKey);
+    if (!res) return;
+    if (res.error) { this.toast(res.error); return; }
+
+    const r = RARITY[res.rarity];
+    this.el.revealCard.className = 'revealCard ' + res.rarity;
+    this.el.revealCard.innerHTML =
+      '<span class="rarity" style="color:' + r.color + '">' + r.name + '</span>' +
+      '<b>' + res.item.name + '</b>' +
+      '<span class="kind">' + (res.item.type === 'skin' ? '캐릭터 스킨' : '총기 도장') + '</span>' +
+      (res.dup ? '<em class="dup">이미 보유 · ' + res.refund + ' BP 환급</em>' : '<em class="new">신규 획득!</em>');
+    this.el.reveal.classList.remove('hidden');
+    Sfx.pick();
+    this.refreshUI();
+  },
+
+  toast(msg) {
+    const t = document.getElementById('lobbyToast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(this._toast);
+    this._toast = setTimeout(() => t.classList.add('hidden'), 2200);
+  },
+
+  refreshUI() {
+    const d = Profile.data;
+    this.el.bp.textContent = d.bp.toLocaleString();
+
+    const card = (type, key, name, rarity) => {
+      const owned = Profile.owns(type, key);
+      const on = d.equipped[type] === key;
+      return '<button class="item' + (owned ? '' : ' locked') + (on ? ' on' : '') + '" data-type="' + type + '" data-key="' + key + '">' +
+        '<span class="itemChip" style="background:' + RARITY[rarity].color + '"></span>' +
+        '<b>' + name + '</b>' +
+        '<span class="tag" style="color:' + RARITY[rarity].color + '">' + RARITY[rarity].name + '</span>' +
+        '<span class="state">' + (owned ? (on ? '장착 중' : '장착하기') : '미보유') + '</span></button>';
+    };
+
+    this.el.skinGrid.innerHTML = Object.keys(SKINS).map(k => card('skin', k, SKINS[k].name, SKINS[k].rarity)).join('');
+    this.el.gunGrid.innerHTML = Object.keys(GUN_SKINS).map(k => card('gun', k, GUN_SKINS[k].name, GUN_SKINS[k].rarity)).join('');
+    document.querySelectorAll('#lobby .item').forEach(el => {
+      el.addEventListener('click', () => {
+        const { type, key } = el.dataset;
+        if (!Profile.owns(type, key)) { this.toast('상자에서 얻을 수 있습니다'); return; }
+        Profile.equip(type, key);
+        this.refresh();
+        this.refreshUI();
+        Sfx.swap();
+      });
+    });
+
+    const s = d.stats;
+    const rows = [
+      ['치른 매치', s.matches + '회'],
+      ['우승', s.wins + '회'],
+      ['누적 처치', s.kills + '명'],
+      ['최고 순위', (s.best && s.best < 99 ? s.best + '위' : '-')],
+      ['한 판 최다 처치', (s.bestKills || 0) + '명'],
+      ['연 상자', (s.opened || 0) + '개'],
+      ['보유 스킨', d.owned.skin.length + ' / ' + Object.keys(SKINS).length],
+      ['보유 도장', d.owned.gun.length + ' / ' + Object.keys(GUN_SKINS).length]
+    ];
+    this.el.statList.innerHTML = rows.map(r =>
+      '<div class="statRow"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>').join('');
+  }
+};
+
+/* ============================================================
    효과음, HUD, 입력, 메인 루프
    ============================================================ */
 const Sfx = {
@@ -3511,7 +4111,7 @@ const UI = {
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
-      'scope', 'alt', 'slots', 'winBanner'];
+      'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -3529,6 +4129,17 @@ const UI = {
     this.el.winBanner.classList.add('hidden');
     this.el.over.classList.remove('hidden');
     this.el.hud.classList.add('hidden');
+
+    // 보상 지급과 전적 반영
+    const rw = Profile.reward(r, r.total);
+    this.el.rewardBox.innerHTML =
+      '<div class="row"><span>참가 보상</span><b>+' + rw.base + '</b></div>' +
+      '<div class="row"><span>처치 ' + r.kills + '명</span><b>+' + rw.kills + '</b></div>' +
+      '<div class="row"><span>순위 보너스</span><b>+' + rw.rankBonus + '</b></div>' +
+      (rw.win ? '<div class="row"><span>우승 보너스</span><b>+' + rw.win + '</b></div>' : '') +
+      '<div class="row total"><span>획득 BP</span><b>+' + rw.total.toLocaleString() + '</b></div>';
+    Lobby.refresh();
+    Lobby.refreshUI();
     this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
     this.el.result.className = r.won ? 'win' : 'lose';
     this.el.resultSub.textContent = r.won ? '마지막까지 살아남았습니다' : r.rank + '위 / ' + r.total + '명';
@@ -3886,12 +4497,17 @@ const Main = {
     UI.init();
     Settings.load();
     Settings.bind();
+    Profile.load();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);
+    Lobby.init();
+    Lobby.refresh();
+    window.addEventListener('resize', () => Lobby.resize());
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
     UI.el.resumeBtn.addEventListener('click', e => { e.stopPropagation(); Input.toggleSettings(false); });
+    UI.el.lobbyBtn.addEventListener('click', () => { Game.state = 'menu'; UI.showMenu(); Lobby.tab('play'); });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
@@ -3925,6 +4541,10 @@ const Main = {
         UI.update(Game, dt);
       }
       Game.render();
+    } else if (Game.state === 'menu') {
+      UI.el.pause.classList.add('hidden');
+      Lobby.update(dt);
+      Lobby.render(Game.renderer);
     } else if (Game.scene && Game.player) {
       UI.el.pause.classList.add('hidden');
       Game.render();

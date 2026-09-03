@@ -87,9 +87,59 @@ const NAMES = [
   '족제비','비버','물총새','솔개','황조롱이','사슴','기린','치타','하이에나','바다표범'
 ];
 
-/* 캐릭터 옷 색 (봇 구분용) */
-const OUTFITS = [
-  { top:0x8c5a3c, pants:0x3f4a3a }, { top:0x4a5568, pants:0x2d3748 },
-  { top:0x6b4f3a, pants:0x4a4a3a }, { top:0x5a6b4a, pants:0x3a4230 },
-  { top:0x7a4a4a, pants:0x3d3d4a }, { top:0x46606b, pants:0x33404a }
-];
+/* ============================================================
+   스킨과 상자 (로비에서 쓰는 데이터)
+   ============================================================ */
+const RARITY = {
+  common:    { name: '일반', color: '#9fb0c0', refund: 30 },
+  rare:      { name: '고급', color: '#58a6ff', refund: 90 },
+  epic:      { name: '희귀', color: '#bc8cff', refund: 220 },
+  legendary: { name: '전설', color: '#f0c674', refund: 600 }
+};
+
+/* 캐릭터 스킨: 옷·장비 색과 머리/피부 톤 */
+const SKINS = {
+  recruit:  { name: '기본 전투복', rarity: 'common',    top: 0x3d6285, pants: 0x2f3a46, vest: 0x2c3c4c, boots: 0x24262b, helmet: 0x2f4c6b, hair: 0x2b2119, tone: 0xc39a72 },
+  ranger:   { name: '삼림 레인저', rarity: 'common',    top: 0x4d5b39, pants: 0x3a4230, vest: 0x40452f, boots: 0x2b2a24, helmet: 0x46503a, hair: 0x1f1a14, tone: 0xd0a87c },
+  militia:  { name: '민병대',      rarity: 'common',    top: 0x6b4f3a, pants: 0x453d33, vest: 0x4b4a3f, boots: 0x2a251f, helmet: 0x554b3c, hair: 0x3a2a1c, tone: 0xb98b63 },
+  desert:   { name: '사막 위장',   rarity: 'rare',      top: 0xb9a077, pants: 0x9c8a63, vest: 0x8b7a54, boots: 0x5b4c34, helmet: 0xa8926a, hair: 0x2b2119, tone: 0xc9a077 },
+  urban:    { name: '도시 위장',   rarity: 'rare',      top: 0x5b626b, pants: 0x40464d, vest: 0x2f343a, boots: 0x232629, helmet: 0x4a5058, hair: 0x171310, tone: 0x8d6547 },
+  medic:    { name: '야전 의무병', rarity: 'rare',      top: 0xdfe4e6, pants: 0x4a5158, vest: 0xc23b32, boots: 0x2a2d31, helmet: 0xe4e8ea, hair: 0x6b4a2a, tone: 0xdfb894 },
+  tracksuit:{ name: '트랙수트',    rarity: 'epic',      top: 0xd63a5a, pants: 0x1e2229, vest: 0xb02f4c, boots: 0xf0f0f0, helmet: 0, hair: 0x141414, tone: 0xc39a72 },
+  suit:     { name: '검은 정장',   rarity: 'epic',      top: 0x1c1f24, pants: 0x15171b, vest: 0x24272d, boots: 0x0f1013, helmet: 0, hair: 0x201a14, tone: 0xd6ad86 },
+  arctic:   { name: '설원 특수부대', rarity: 'epic',    top: 0xe8eef2, pants: 0xc9d4dc, vest: 0xaebac4, boots: 0x4a5158, helmet: 0xdfe8ee, hair: 0x2b2119, tone: 0xe0bb96 },
+  gold:     { name: '황금 갑주',   rarity: 'legendary', top: 0xd4a531, pants: 0x8a6c1f, vest: 0xf0c453, boots: 0x5c4712, helmet: 0xf2cf6b, hair: 0x2b2119, tone: 0xc39a72 },
+  santa:    { name: '산타 복장',   rarity: 'legendary', top: 0xc9302c, pants: 0xa32622, vest: 0xf5f5f5, boots: 0x231f1c, helmet: 0xc9302c, hair: 0xf0f0f0, tone: 0xd8ab84 }
+};
+
+/* 총기 스킨: 금속·손잡이 색을 바꿉니다 */
+const GUN_SKINS = {
+  stock:  { name: '기본',      rarity: 'common',    metal: 0x33383f, dark: 0x1f2227, wood: 0x7a5433 },
+  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa89170, dark: 0x6f6047, wood: 0x8a6a42 },
+  frost:  { name: '한파',      rarity: 'rare',      metal: 0xbecbd4, dark: 0x74838f, wood: 0x9fb0bb },
+  carbon: { name: '카본',      rarity: 'epic',      metal: 0x22262c, dark: 0x121417, wood: 0x2c3138 },
+  neon:   { name: '네온',      rarity: 'epic',      metal: 0x24304a, dark: 0x141a27, wood: 0x2b6cff },
+  golden: { name: '황금',      rarity: 'legendary', metal: 0xd9ad3d, dark: 0x8a6c1f, wood: 0xb08a2a }
+};
+
+/* 상자와 확률 (합이 1 이 되도록 맞춰 두었습니다) */
+const CRATES = {
+  supply:  { name: '보급 상자',     price: 150,  desc: '가볍게 열어 보는 기본 상자',
+             rates: { common: 0.70, rare: 0.24, epic: 0.05, legendary: 0.01 } },
+  combat:  { name: '전투 상자',     price: 500,  desc: '고급 이상이 절반 넘게 나옵니다',
+             rates: { common: 0.38, rare: 0.44, epic: 0.15, legendary: 0.03 } },
+  premium: { name: '프리미엄 상자', price: 1500, desc: '전설 확률이 가장 높은 상자',
+             rates: { common: 0.08, rare: 0.40, epic: 0.40, legendary: 0.12 } }
+};
+
+/* 매치 보상 */
+const REWARD = {
+  base: 60,
+  perKill: 25,
+  rankBonus: 6,      // (참가자 수 - 순위) × 6
+  win: 500
+};
+
+/* 봇이 입는 옷 (스킨 목록에서 골라 씁니다) */
+const BOT_SKINS = ['recruit', 'ranger', 'militia', 'desert', 'urban', 'medic'];
+const OUTFITS = BOT_SKINS.map(k => SKINS[k]);

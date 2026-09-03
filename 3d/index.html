@@ -99,38 +99,83 @@
 </div>
 <div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없습니다 — 움직인 만큼만 시점이 돌아가며, 커서가 창 밖으로 나가면 멈춥니다</div>
 
-<div id="menu" class="overlay">
-  <div class="panel">
-    <h1>라스트 서바이버 <em>3D</em></h1>
-    <p class="sub">3인칭 시점 배틀로얄 · 마지막 한 명이 될 때까지</p>
-    <ul class="rules">
-      <li>섬 곳곳의 <b>마을과 창고</b>를 뒤져 총기, 탄약, 구급상자를 챙기세요.</li>
-      <li><b>자기장</b>이 7단계로 좁아지고 밖에서는 피해를 입습니다.</li>
-      <li>우클릭 <b>정조준</b>과 <b>앉기</b>로 탄퍼짐을 줄이고, 머리를 맞히면 피해가 커집니다.</li>
-      <li>무기는 <b>두 자루</b>까지 들 수 있고 <b>1</b>·<b>2</b> 키나 휠로 바꿉니다. 주운 <b>조준경</b>은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
-    </ul>
-    <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
-    <button id="startBtn">낙하 시작</button>
-    <p class="hint">시작하면 마우스가 화면에 고정됩니다. 게임 중 <kbd>O</kbd> 키로 마우스 감도를 조절할 수 있습니다.</p>
+<div id="menu" class="overlay lobbyOverlay">
+  <div id="lobby">
+    <header class="lobbyTop">
+      <div class="brand">라스트 서바이버 <em>3D</em></div>
+      <div class="wallet"><span>BP</span><b id="bp">0</b></div>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="play" class="on">플레이</button>
+      <button data-tab="crate">상자</button>
+      <button data-tab="skin">스킨</button>
+      <button data-tab="stats">기록</button>
+    </nav>
+
+    <section class="panel" id="tab-play">
+      <p class="lead">30명이 섬에 낙하합니다. 마지막 한 명이 될 때까지 살아남으세요.</p>
+      <ul class="rules">
+        <li>상공에서 <b>낙하산</b>으로 내려와 무기와 <b>조준경</b>을 챙깁니다.</li>
+        <li>무기는 <b>두 자루</b>까지, 조준경은 <b>T</b> 키로 떼었다 붙일 수 있습니다.</li>
+        <li>자기장이 7단계로 좁아지고, 매치가 끝나면 <b>BP</b> 를 받습니다.</li>
+      </ul>
+      <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
+      <button id="startBtn" class="primary">매치 시작</button>
+      <p class="hint">WASD 이동 · 마우스 조준 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
+    </section>
+
+    <section class="panel hidden" id="tab-crate">
+      <div id="crateList"></div>
+      <details class="rates" open>
+        <summary>획득 확률</summary>
+        <div id="rateTable"></div>
+      </details>
+    </section>
+
+    <section class="panel hidden" id="tab-skin">
+      <h3>캐릭터 스킨</h3>
+      <div id="skinGrid" class="grid"></div>
+      <h3>총기 도장</h3>
+      <div id="gunGrid" class="grid"></div>
+    </section>
+
+    <section class="panel hidden" id="tab-stats">
+      <div id="statList"></div>
+    </section>
   </div>
 </div>
 
+<div id="reveal" class="overlay hidden">
+  <div class="revealBox">
+    <div class="revealCard" id="revealCard"></div>
+    <p class="small">화면을 클릭하면 닫힙니다</p>
+  </div>
+</div>
+<div id="lobbyToast" class="hidden"></div>
+
 <div id="over" class="overlay hidden">
-  <div class="panel">
+  <div class="panel resultPanel">
     <h1 id="result">탈락</h1>
     <p class="sub" id="resultSub"></p>
     <div id="resultStats" class="stats"></div>
-    <button id="againBtn">다시 하기</button>
+    <div id="rewardBox"></div>
+    <div class="btnRow">
+      <button id="lobbyBtn" class="ghost">로비로</button>
+      <button id="againBtn">다시 하기</button>
+    </div>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/profile.js"></script>
 <script src="js/world.js"></script>
 <script src="js/scenery.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/game.js"></script>
+<script src="js/lobby.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

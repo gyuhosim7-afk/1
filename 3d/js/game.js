@@ -220,7 +220,9 @@ const Game = {
 
     // 플레이어
     const ps = World.freeSpot(2);
-    this.player = new Char3D(ps.x, ps.z, true, '나');
+    const mySkin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
+    this.player = new Char3D(ps.x, ps.z, true, '나', mySkin);
+    this.player.gunSkin = Profile.data.equipped.gun;
     this.scene.add(this.player.mesh);
     this.chars.push(this.player);
     this.look.yaw = Math.random() * Math.PI * 2;
@@ -885,12 +887,12 @@ const Game = {
   /* 1인칭에서 손에 든 총 (카메라에 붙입니다) */
   updateViewGun(dt, scoped) {
     const p = this.player;
-    const key = p.gun ? p.gun + ':' + p.zoom : '';
+    const key = p.gun ? p.gun + ':' + p.zoom + ':' + p.gunSkin : '';
     if (key !== this.viewGunKey) {           // 무기나 조준경이 바뀌면 다시 만듭니다
       this.viewGunKey = key;
       while (this.viewGun.children.length) this.viewGun.remove(this.viewGun.children[0]);
       if (p.gun) {
-        const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0),
+        const m = new THREE.Mesh(GunArt.geo(p.gun, p.zoom > 1 ? p.zoom : 0, p.gunSkin),
                                  Mats.vc({ roughness: 0.55, metalness: 0.25 }));
         m.rotation.y = Math.PI + 0.05;       // 총구가 카메라 앞(-Z)을 보도록 (살짝 안쪽으로)
         m.scale.setScalar(0.58);             // 화면을 가리지 않을 크기
