@@ -1,35 +1,54 @@
 #!/usr/bin/env python3
-"""index.html 과 css/js 를 하나의 HTML 파일로 합칩니다.
+"""각 버전의 index.html 과 css/js 를 하나의 HTML 파일로 합칩니다.
 
-결과물(dist/last-survivor.html)은 외부 파일 없이 혼자 동작하므로
-공유하거나 정적 호스팅에 그대로 올릴 수 있습니다.
+결과물은 dist/ 에 들어가며, 외부 CDN 스크립트(three.js)만 태그로 남고
+프로젝트의 CSS/JS 는 모두 파일 안에 인라인됩니다.
 """
 import re
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-html = (ROOT / 'index.html').read_text(encoding='utf-8')
+TARGETS = [
+    ('index.html', 'last-survivor.html'),        # 2D 탑다운
+    ('3d/index.html', 'last-survivor-3d.html'),  # 3D 3인칭
+]
 
-title = re.search(r'<title>(.*?)</title>', html, re.S).group(1).strip()
-body = re.search(r'<body>(.*?)</body>', html, re.S).group(1)
 
-css_files = re.findall(r'<link[^>]+href="([^"]+\.css)"', html)
-js_files = re.findall(r'<script src="([^"]+)"></script>', html)
+def build(src_rel, out_name):
+    src = ROOT / src_rel
+    base = src.parent
+    html = src.read_text(encoding='utf-8')
 
-styles = '\n'.join((ROOT / p).read_text(encoding='utf-8') for p in css_files)
-scripts = '\n'.join((ROOT / p).read_text(encoding='utf-8') for p in js_files)
+    title = re.search(r'<title>(.*?)</title>', html, re.S).group(1).strip()
+    body = re.search(r'<body>(.*?)</body>', html, re.S).group(1)
 
-# 마크업에서 외부 스크립트 태그 제거
-markup = re.sub(r'\s*<script src="[^"]+"></script>', '', body).strip()
+    styles = []
+    for href in re.findall(r'<link[^>]+href="([^"]+\.css)"', html):
+        if href.startswith('http'):
+            continue
+        styles.append((base / href).read_text(encoding='utf-8'))
 
-out = (
-    f'<title>{title}</title>\n'
-    f'<style>\n{styles}\n</style>\n\n'
-    f'{markup}\n\n'
-    f'<script>\n{scripts}\n</script>\n'
-)
+    parts, external = [], []
+    for src_attr in re.findall(r'<script src="([^"]+)"></script>', html):
+        if src_attr.startswith('http'):
+            external.append(src_attr)          # CDN 스크립트는 태그로 유지
+        else:
+            parts.append((base / src_attr).read_text(encoding='utf-8'))
 
-dest = ROOT / 'dist' / 'last-survivor.html'
-dest.parent.mkdir(exist_ok=True)
-dest.write_text(out, encoding='utf-8')
-print(f'{dest.relative_to(ROOT)} ({len(out) / 1024:.1f} KB) — css {len(css_files)}개, js {len(js_files)}개 병합')
+    markup = re.sub(r'\s*<script src="[^"]+"></script>', '', body).strip()
+
+    out = ['<title>%s</title>' % title, '<style>', '\n'.join(styles), '</style>', '', markup, '']
+    for url in external:
+        out.append('<script src="%s"></script>' % url)
+    out += ['<script>', '\n'.join(parts), '</script>', '']
+
+    dest = ROOT / 'dist' / out_name
+    dest.parent.mkdir(exist_ok=True)
+    text = '\n'.join(out)
+    dest.write_text(text, encoding='utf-8')
+    print('%s (%.1f KB) — css %d개, 인라인 js %d개, 외부 js %d개'
+          % (dest.relative_to(ROOT), len(text) / 1024, len(styles), len(parts), len(external)))
+
+
+for src_rel, out_name in TARGETS:
+    build(src_rel, out_name)

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>라스트 서바이버 3D</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hurt"></div>
+
+<div id="hud" class="hidden">
+  <canvas id="compass" width="520" height="26"></canvas>
+
+  <div id="topleft">
+    <div class="chip"><span>생존자</span><b id="alive">30</b></div>
+    <div class="chip"><span>처치</span><b id="kills">0</b></div>
+    <div class="chip zone"><span id="zoneLabel">다음 자기장</span><b id="zoneText">0:40</b></div>
+  </div>
+
+  <div id="feed"></div>
+
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+  <div id="hitmark"><i></i><i></i></div>
+  <div id="dmgDir"><i></i></div>
+
+  <div id="prompt" class="hidden"></div>
+
+  <div id="healBar" class="hidden"><span>치료 중</span><div class="track"><div id="healFill"></div></div></div>
+
+  <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><span class="tabhint">TAB 전체 지도</span></div>
+
+  <div id="bottom">
+    <div id="hpWrap">
+      <div id="hpBar"><div id="hp"></div></div>
+      <span id="hpText">100</span>
+      <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
+    </div>
+  </div>
+
+  <div id="gunbox">
+    <div id="gunName">맨손</div>
+    <div id="ammo">무기를 찾으세요</div>
+  </div>
+
+  <div id="keys">
+    <span><kbd>WASD</kbd> 이동</span><span><kbd>Shift</kbd> 질주</span><span><kbd>Space</kbd> 점프</span>
+    <span><kbd>C</kbd> 앉기</span><span><kbd>우클릭</kbd> 정조준</span><span><kbd>F</kbd> 줍기</span>
+    <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span><span><kbd>Tab</kbd> 지도</span>
+  </div>
+</div>
+
+<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="620" height="620"></canvas></div>
+
+<div id="pause" class="overlay hidden"><div class="small">화면을 클릭하면 이어서 진행합니다</div></div>
+<div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없어 화면 가장자리 조준 방식으로 전환했습니다</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>라스트 서바이버 <em>3D</em></h1>
+    <p class="sub">3인칭 시점 배틀로얄 · 마지막 한 명이 될 때까지</p>
+    <ul class="rules">
+      <li>섬 곳곳의 <b>마을과 창고</b>를 뒤져 총기, 탄약, 구급상자를 챙기세요.</li>
+      <li><b>자기장</b>이 7단계로 좁아지고 밖에서는 피해를 입습니다.</li>
+      <li>우클릭 <b>정조준</b>과 <b>앉기</b>로 탄퍼짐을 줄이고, 머리를 맞히면 피해가 커집니다.</li>
+    </ul>
+    <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
+    <button id="startBtn">낙하 시작</button>
+    <p class="hint">시작하면 마우스가 화면에 고정됩니다. Esc 로 잠시 멈출 수 있습니다.</p>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <h1 id="result">탈락</h1>
+    <p class="sub" id="resultSub"></p>
+    <div id="resultStats" class="stats"></div>
+    <button id="againBtn">다시 하기</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/world.js"></script>
+<script src="js/scenery.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
