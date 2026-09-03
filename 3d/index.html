@@ -53,8 +53,30 @@
 
 <div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="620" height="620"></canvas></div>
 
-<div id="pause" class="overlay hidden"><div class="small">화면을 클릭하면 이어서 진행합니다</div></div>
-<div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없어 화면 가장자리 조준 방식으로 전환했습니다</div>
+<div id="pause" class="overlay hidden">
+  <div class="pausePanel">
+    <h2>일시 정지</h2>
+    <div class="settings">
+      <label class="row">
+        <span>마우스 감도</span>
+        <input type="range" data-set="sens" min="0.2" max="4" step="0.05">
+        <b data-val="sens">1.00</b>
+      </label>
+      <label class="row">
+        <span>정조준 감도</span>
+        <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
+        <b data-val="ads">0.65</b>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="invert">
+        <span>Y축 반전</span>
+      </label>
+    </div>
+    <button id="resumeBtn">계속하기</button>
+    <p class="small">화면을 클릭해도 이어서 진행합니다 · <kbd>O</kbd> 설정 열고 닫기</p>
+  </div>
+</div>
+<div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없습니다 — 움직인 만큼만 시점이 돌아가며, 커서가 창 밖으로 나가면 멈춥니다</div>
 
 <div id="menu" class="overlay">
   <div class="panel">
@@ -66,8 +88,24 @@
       <li>우클릭 <b>정조준</b>과 <b>앉기</b>로 탄퍼짐을 줄이고, 머리를 맞히면 피해가 커집니다.</li>
     </ul>
     <label class="field">봇 수 <input id="botCount" type="number" min="4" max="59" value="29"></label>
+    <div class="settings menuSettings">
+      <label class="row">
+        <span>마우스 감도</span>
+        <input type="range" data-set="sens" min="0.2" max="4" step="0.05">
+        <b data-val="sens">1.00</b>
+      </label>
+      <label class="row">
+        <span>정조준 감도</span>
+        <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
+        <b data-val="ads">0.65</b>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="invert">
+        <span>Y축 반전</span>
+      </label>
+    </div>
     <button id="startBtn">낙하 시작</button>
-    <p class="hint">시작하면 마우스가 화면에 고정됩니다. Esc 로 잠시 멈출 수 있습니다.</p>
+    <p class="hint">시작하면 마우스가 화면에 고정됩니다. <kbd>Esc</kbd> 로 잠시 멈추고 <kbd>O</kbd> 로 설정을 엽니다.</p>
   </div>
 </div>
 

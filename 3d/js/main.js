@@ -34,13 +34,63 @@ const Sfx = {
   reload() { this.tone(300, 0.07, 'triangle', 0.04); }
 };
 
+/* ============================================================
+   사용자 설정 (마우스 감도 등) — 브라우저에 저장됩니다
+   ============================================================ */
+const Settings = {
+  KEY: 'lastSurvivor3d.settings',
+  data: { sens: 1.0, ads: 0.65, invert: false },
+  controls: [],
+
+  load() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (raw) Object.assign(this.data, JSON.parse(raw));
+    } catch (e) { /* 저장소를 못 쓰는 환경이면 기본값을 씁니다 */ }
+    this.clamp();
+  },
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+  clamp() {
+    this.data.sens = Math.max(0.2, Math.min(4, +this.data.sens || 1));
+    this.data.ads = Math.max(0.2, Math.min(1.5, +this.data.ads || 0.65));
+    this.data.invert = !!this.data.invert;
+  },
+
+  /* data-set 이 붙은 조절기를 모두 연결하고, 값이 바뀌면 서로 맞춰 줍니다 */
+  bind() {
+    this.controls = Array.from(document.querySelectorAll('[data-set]'));
+    for (const el of this.controls) {
+      const key = el.dataset.set;
+      el.addEventListener('input', () => {
+        this.data[key] = el.type === 'checkbox' ? el.checked : parseFloat(el.value);
+        this.clamp(); this.save(); this.sync();
+      });
+      // 슬라이더를 만지는 동안 화면이 다시 잠기지 않도록
+      el.addEventListener('pointerdown', e => e.stopPropagation());
+      el.addEventListener('click', e => e.stopPropagation());
+    }
+    this.sync();
+  },
+
+  sync() {
+    for (const el of this.controls) {
+      const key = el.dataset.set;
+      if (el.type === 'checkbox') el.checked = !!this.data[key];
+      else el.value = this.data[key];
+    }
+    for (const el of document.querySelectorAll('[data-val]')) {
+      el.textContent = (+this.data[el.dataset.val]).toFixed(2);
+    }
+  }
+};
+
 const UI = {
   el: {},
   init() {
     const ids = ['menu', 'over', 'hud', 'hp', 'hpText', 'gunName', 'ammo', 'meds', 'alive',
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
-      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill'];
+      'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -238,9 +288,8 @@ const Input = {
   fwd: false, back: false, left: false, right: false,
   sprint: false, crouch: false, jump: false, fire: false, ads: false,
   ax: 0, az: 0,
-  mode: 'lock',              // lock: 마우스 잠금 / edge: 화면 가장자리로 시점 회전
-  locked: false,
-  mouseX: 0, mouseY: 0, inside: false,
+  mode: 'lock',              // lock: 마우스 잠금 / free: 잠금 없이 움직인 만큼만 회전
+  locked: false, settingsOpen: false,
 
   init(canvas) {
     this.canvas = canvas;
@@ -253,11 +302,17 @@ const Input = {
       this.locked = document.pointerLockElement === canvas;
       if (!this.locked) { this.fire = false; this.ads = false; }
     });
-    document.addEventListener('pointerlockerror', () => this.fallbackToEdge());
+    document.addEventListener('pointerlockerror', () => this.fallbackToFree());
 
+    // 잠금 여부와 상관없이 '움직인 거리'만 반영합니다.
+    // 마우스를 멈추면 시점도 곧바로 멈춥니다.
     window.addEventListener('mousemove', e => {
-      if (this.locked) { this.dx += e.movementX; this.dy += e.movementY; }
-      this.mouseX = e.clientX; this.mouseY = e.clientY; this.inside = true;
+      if (Game.state !== 'playing' || this.settingsOpen) return;
+      const mx = e.movementX, my = e.movementY;
+      if (mx === undefined) return;
+      // 창을 다시 잡을 때 튀는 큰 값은 버립니다
+      if (Math.abs(mx) > 220 || Math.abs(my) > 220) return;
+      this.dx += mx; this.dy += my;
     });
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
@@ -283,17 +338,29 @@ const Input = {
       if (k === 'q') Game.player.startHeal();
       if (k === 'tab') UI.el.bigmap.classList.toggle('hidden');
       if (k === 'm') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
+      if (k === 'o') this.toggleSettings();
     });
     window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
   },
 
-  /* 마우스 잠금을 쓸 수 없는 브라우저에서는 화면 가장자리로 시점을 돌립니다 */
-  fallbackToEdge() {
+  /* 설정 창 열고 닫기 — 열려 있는 동안 게임은 멈춥니다 */
+  toggleSettings(open) {
+    this.settingsOpen = open === undefined ? !this.settingsOpen : open;
+    if (this.settingsOpen) {
+      this.fire = false; this.ads = false;
+      if (this.locked) document.exitPointerLock();
+    } else if (this.mode === 'lock' && Game.state === 'playing' && !this.locked) {
+      this.canvas.requestPointerLock();
+    }
+  },
+
+  /* 마우스 잠금을 쓸 수 없는 브라우저에서는 잠금 없이 그대로 진행합니다 */
+  fallbackToFree() {
     if (this.mode !== 'lock') return;
-    this.mode = 'edge';
+    this.mode = 'free';
     UI.el.pause.classList.add('hidden');
     UI.el.lockHint.classList.remove('hidden');
-    setTimeout(() => UI.el.lockHint.classList.add('hidden'), 6000);
+    setTimeout(() => UI.el.lockHint.classList.add('hidden'), 7000);
   },
 
   poll() {
@@ -304,14 +371,6 @@ const Input = {
     this.right = !!(k['d'] || k['arrowright']);
     this.sprint = !!k['shift'];
     this.crouch = !!(k['c'] || k['control']);
-
-    if (this.mode === 'edge' && this.inside) {
-      const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
-      const ox = this.mouseX - cx, oy = this.mouseY - cy;
-      const dead = 60;
-      if (Math.abs(ox) > dead) this.dx += (ox - Math.sign(ox) * dead) * 0.055;
-      if (Math.abs(oy) > dead) this.dy += (oy - Math.sign(oy) * dead) * 0.04;
-    }
   }
 };
 
@@ -319,11 +378,14 @@ const Main = {
   last: 0,
   init() {
     UI.init();
+    Settings.load();
+    Settings.bind();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);
     UI.el.startBtn.addEventListener('click', () => this.startGame());
     UI.el.againBtn.addEventListener('click', () => this.startGame());
+    UI.el.resumeBtn.addEventListener('click', e => { e.stopPropagation(); Input.toggleSettings(false); });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
@@ -331,6 +393,7 @@ const Main = {
 
   startGame() {
     Sfx.init();
+    Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
     const n = Math.max(4, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
     UI.showGame();
@@ -338,7 +401,7 @@ const Main = {
     if (Input.mode === 'lock') {
       Game.renderer.domElement.requestPointerLock();
       // 잠금이 조용히 무시되는 브라우저에서는 대체 조작으로 넘어갑니다
-      setTimeout(() => { if (!Input.locked) Input.fallbackToEdge(); }, 900);
+      setTimeout(() => { if (!Input.locked) Input.fallbackToFree(); }, 900);
     }
   },
 
@@ -346,7 +409,7 @@ const Main = {
     const dt = Math.min(CFG.MAX_DT, (t - this.last) / 1000);
     this.last = t;
     if (Game.state === 'playing') {
-      const paused = Input.mode === 'lock' && !Input.locked;
+      const paused = Input.settingsOpen || (Input.mode === 'lock' && !Input.locked);
       UI.el.pause.classList.toggle('hidden', !paused);
       if (!paused) {
         Input.poll();

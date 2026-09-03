@@ -353,8 +353,10 @@ const Game = {
     const p = this.player;
 
     // 시점
-    this.look.yaw -= input.dx * 0.0022;
-    this.look.pitch -= input.dy * 0.0022;
+    // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
+    const s = 0.0022 * Settings.data.sens * (this.ads ? Settings.data.ads : 1);
+    this.look.yaw -= input.dx * s;
+    this.look.pitch -= input.dy * s * (Settings.data.invert ? -1 : 1);
     this.look.pitch = Math.max(-1.15, Math.min(0.95, this.look.pitch));
     input.dx = 0; input.dy = 0;
     p.yaw = this.look.yaw;
