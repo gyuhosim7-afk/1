@@ -26,7 +26,7 @@ const AI = {
       // 조준: 숙련도가 높을수록 빠르게 겨눔
       const turn = (2.4 + a.skill * 5.5) * dt;
       bot.yaw = this.approach(bot.yaw, toE, turn);
-      const dy = (enemy.pos.y + 1.25) - (bot.pos.y + 1.35);
+      const dy = (enemy.pos.y + 1.05) - (bot.pos.y + 1.15);
       bot.pitch = this.approach(bot.pitch, Math.atan2(dy, dist), turn);
 
       const want = this.preferredRange(bot);
@@ -94,7 +94,7 @@ const AI = {
       const d = bot.pos.distanceTo(c.pos);
       if (d > CFG.BOT_VISION || d > best) continue;
       // 시야각 밖(뒤쪽)은 조금 늦게 인지
-      if (!World.clear(bot.pos.x, bot.pos.y + 1.35, bot.pos.z, c.pos.x, c.pos.y + 1.2, c.pos.z)) continue;
+      if (!World.clear(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       best = d; enemy = c;
     }
     if (enemy && enemy !== a.target) a.reaction = (1.3 - a.skill) * (0.25 + Math.random() * 0.35);
@@ -185,8 +185,8 @@ const AI = {
     if (!bot.canShoot()) return;
     if (dist > bot.spec.range) return;
 
-    const ex = enemy.pos.x, ey = enemy.pos.y + 1.15, ez = enemy.pos.z;
-    const bx = bot.pos.x, by = bot.pos.y + 1.35, bz = bot.pos.z;
+    const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
+    const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
     if (!World.clear(bx, by, bz, ex, ey, ez)) return;
 
     // 조준선이 목표에 충분히 가까울 때만 발사

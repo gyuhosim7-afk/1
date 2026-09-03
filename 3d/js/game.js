@@ -532,7 +532,7 @@ const Game = {
     } else {
       const fwd = this._v2.set(Math.sin(p.yaw), 0, Math.cos(p.yaw));
       mx = p.pos.x + fwd.x * 0.55 - fwd.z * 0.28;
-      my = p.pos.y + (p.crouch ? 1.05 : 1.32);
+      my = p.pos.y + (p.crouch ? 0.85 : 1.05);
       mz = p.pos.z + fwd.z * 0.55 + fwd.x * 0.28;
     }
     const d = new THREE.Vector3(aim.x - mx, aim.y - my, aim.z - mz).normalize();
@@ -573,11 +573,11 @@ const Game = {
           const peerId = Object.keys(Net.players).find(k => Net.players[k] === hit.char);
           if (peerId) Net.hitPlayer(peerId, dmg, hit.head);
           this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
-          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.0, hit.char.pos.z, 0xc23b32);
         } else if (ch.isPlayer && this.online && hit.char.ai && !Net.isHost) {
           Net.hitBot(hit.char.netId, dmg, hit.head);
           this.hitMarker = hit.head ? 0.3 : 0.18; Sfx.hit(hit.head);
-          this.puff(hit.char.pos.x, hit.char.pos.y + 1.2, hit.char.pos.z, 0xc23b32);
+          this.puff(hit.char.pos.x, hit.char.pos.y + 1.0, hit.char.pos.z, 0xc23b32);
         } else {
           this.damage(hit.char, dmg, ch, hit.head, false);
         }
@@ -599,7 +599,7 @@ const Game = {
     let best = null;
     for (const c of this.chars) {
       if (c.dead || c === exclude) continue;
-      const r = 0.42;
+      const r = 0.36;
       const px = ox - c.pos.x, pz = oz - c.pos.z;
       const a = dx * dx + dz * dz;
       if (a < 1e-9) continue;
@@ -611,9 +611,9 @@ const Game = {
       if (t < 0.1) t = (-b + Math.sqrt(disc)) / (2 * a);
       if (t < 0.1 || t > maxT || (best && t > best.t)) continue;
       const hy = oy + dy * t;
-      const top = c.pos.y + (c.crouch ? 1.45 : 1.95);
+      const top = c.pos.y + (c.crouch ? 1.22 : 1.58);
       if (hy < c.pos.y || hy > top) continue;
-      const headY = c.pos.y + (c.crouch ? 1.36 : 1.86);
+      const headY = c.pos.y + (c.crouch ? 1.06 : 1.28);
       best = { t, char: c, head: hy > headY - 0.14 };
     }
     return best;
@@ -635,7 +635,7 @@ const Game = {
         this.hitMarker = head ? 0.3 : 0.18;
         Sfx.hit(head);
       }
-      this.puff(target.pos.x, target.pos.y + 1.2, target.pos.z, 0xc23b32);
+      this.puff(target.pos.x, target.pos.y + 1.0, target.pos.z, 0xc23b32);
       if (target === this.player && src) {
         this.damageDir = { yaw: Math.atan2(src.pos.x - target.pos.x, src.pos.z - target.pos.z), life: 1.4 };
         Sfx.hurt();

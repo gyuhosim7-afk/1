@@ -10,8 +10,8 @@ const Lobby = {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(srgb(0x2b3446), 14, 62);
     this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
-    this.camera.position.set(0, 1.05, 6.0);
-    this.camera.lookAt(0, 0.98, 0);
+    this.camera.position.set(0, 0.95, 4.5);
+    this.camera.lookAt(0, 0.80, 0);
 
     // 하늘: 해질녘 그라데이션
     const skyGeo = new THREE.SphereGeometry(150, 24, 16);
@@ -79,25 +79,25 @@ const Lobby = {
     const mk = geo => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; };
 
     const hips = new THREE.Group();
-    hips.position.y = 0.92;
+    hips.position.y = 0.52;
     hips.add(mk(art.torso));
     this.group.add(hips);
 
-    const armR = new THREE.Group(); armR.position.set(-0.21, 0.615, 0);
-    const armL = new THREE.Group(); armL.position.set(0.21, 0.615, 0);
+    const armR = new THREE.Group(); armR.position.set(-0.325, 0.60, 0);
+    const armL = new THREE.Group(); armL.position.set(0.325, 0.60, 0);
     armR.add(mk(art.arm)); armL.add(mk(art.arm));
-    armR.rotation.set(-0.06, 0, -0.10);          // 팔을 자연스럽게 내린 자세
-    armL.rotation.set(-0.02, 0, 0.12);
+    armR.rotation.set(-0.05, 0, -0.22);          // 팔을 자연스럽게 내린 자세
+    armL.rotation.set(-0.02, 0, 0.24);
     hips.add(armR); hips.add(armL);
     this.armR = armR; this.armL = armL; this.hipsRef = hips;
 
     for (const s of [-1, 1]) {
       const leg = new THREE.Group();
-      leg.position.set(0.105 * s, 0.92, 0);
+      leg.position.set(0.145 * s, 0.52, 0);
       leg.rotation.set(s > 0 ? 0.05 : -0.03, 0, 0.03 * s);
       leg.add(mk(art.thigh));
       const knee = new THREE.Group();
-      knee.position.y = -0.44;
+      knee.position.y = -0.26;
       knee.rotation.x = -0.04;
       knee.add(mk(art.shin));
       leg.add(knee);
@@ -111,14 +111,14 @@ const Lobby = {
     this.spin += dt;
     // 숨쉬는 듯한 미세한 움직임과 아주 느린 시선 이동
     if (this.hipsRef) {
-      this.hipsRef.position.y = 0.92 + Math.sin(this.spin * 1.4) * 0.008;
+      this.hipsRef.position.y = 0.52 + Math.sin(this.spin * 1.4) * 0.012;
       this.hipsRef.rotation.y = Math.sin(this.spin * 0.5) * 0.05;
-      if (this.armR) this.armR.rotation.x = -0.06 + Math.sin(this.spin * 1.4) * 0.02;
-      if (this.armL) this.armL.rotation.x = -0.02 + Math.sin(this.spin * 1.4 + 0.6) * 0.02;
+      if (this.armR) this.armR.rotation.x = -0.05 + Math.sin(this.spin * 1.4) * 0.05;
+      if (this.armL) this.armL.rotation.x = -0.02 + Math.sin(this.spin * 1.4 + 0.6) * 0.05;
     }
     this.group.rotation.y = 0.12 + Math.sin(this.spin * 0.22) * 0.16;
     this.camera.position.x = Math.sin(this.spin * 0.16) * 0.12;
-    this.camera.lookAt(0, 0.98, 0);
+    this.camera.lookAt(0, 0.80, 0);
   },
 
   render(renderer) {

@@ -17,12 +17,12 @@ const CFG = {
   WALK: 4.4,
   SPRINT: 7.8,
   CROUCH: 2.2,
-  EYE: 1.62,            // 눈높이
-  BODY_R: 0.46,         // 몸통 반지름 (충돌)
-  BODY_H: 1.8,
+  EYE: 1.28,            // 눈높이 (폴가이즈 체형)
+  BODY_R: 0.40,         // 몸통 반지름 (충돌)
+  BODY_H: 1.55,
 
   CAM_DIST: 4.6,        // 3인칭 카메라 거리
-  CAM_HEIGHT: 1.72,
+  CAM_HEIGHT: 1.30,
   CAM_SIDE: 0.72,       // 어깨 너머 오프셋
   ADS_DIST: 2.4,
   ADS_SIDE: 0.95,

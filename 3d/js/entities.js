@@ -338,74 +338,64 @@ const CharArt = {
     return this.cache[key];
   },
 
-  /* 사람 비율에 맞춘 저폴리 인체
-     키 1.8m 기준: 골반 0.92, 어깨 1.54, 눈 1.62, 정수리 1.80 */
+  /* 폴가이즈풍 콩 몸매
+     머리와 몸통이 이어진 달걀 하나 + 짧고 통통한 팔다리.
+     좌표는 골반 그룹(월드 y = 0.52) 기준이고 정수리는 약 1.5m 입니다. */
   build(S) {
     const B = Build, sc = B.sc.bind(B);
-    const top = S.top, pants = S.pants, vest = S.vest || 0x4a4a42;
-    const boots = S.boots || 0x24262b, tone = S.tone || 0xc39a72, hair = S.hair || 0x2b2119;
-    const gear = 0x2a2d33;
+    const body = S.top, pants = S.pants, boots = S.boots || 0x24262b;
+    const trim = S.vest || 0x4a4a42;
+    const face = S.face || 0xdcb894, dark = 0x24272d;
+    const cap = S.helmet || S.hair || 0x2b2119;
 
-    /* 몸통 (골반 그룹 기준) */
+    /* 몸통: 머리까지 하나로 이어진 큰 달걀 */
     const torsoParts = [
-      sc(B.pillar(0.155, 0.145, 0.20, pants, 0, 0.09, 0), 1, 1, 0.72),      // 골반
-      B.box(0.33, 0.055, 0.24, gear, 0, 0.19, 0),                            // 허리띠
-      sc(B.pillar(0.138, 0.178, 0.30, top, 0, 0.36, 0), 1, 1, 0.70),         // 배(허리는 좁게)
-      sc(B.pillar(0.183, 0.192, 0.24, top, 0, 0.61, 0), 1, 1, 0.70),         // 가슴
-      sc(B.pillar(0.196, 0.20, 0.30, vest, 0, 0.55, 0.004), 1, 1, 0.76),     // 방탄조끼
-      sc(B.pillar(0.20, 0.19, 0.06, gear, 0, 0.40, 0.004), 1, 1, 0.78),      // 조끼 아래단
-      B.box(0.085, 0.24, 0.30, gear, -0.145, 0.615, 0),                      // 어깨끈
-      B.box(0.085, 0.24, 0.30, gear, 0.145, 0.615, 0),
-      B.box(0.13, 0.10, 0.07, gear, 0, 0.45, 0.15),                          // 탄창 주머니
-      B.box(0.10, 0.08, 0.06, gear, -0.13, 0.44, 0.14),
-      sc(B.sphere(0.098, top, -0.202, 0.60, 0), 1, 0.95, 1),                 // 어깨
-      sc(B.sphere(0.098, top, 0.202, 0.60, 0), 1, 0.95, 1),
-      B.box(0.28, 0.34, 0.15, 0x4a4a3e, 0, 0.46, -0.20),                     // 배낭
-      B.box(0.30, 0.09, 0.17, gear, 0, 0.30, -0.20),
-      sc(B.pillar(0.056, 0.064, 0.11, tone, 0, 0.715, 0), 1, 1, 1),          // 목
-      sc(B.sphere(0.112, tone, 0, 0.856, 0.004, 1, 1, 1, 16), 1, 1.06, 0.99),// 머리
-      sc(B.sphere(0.084, tone, 0, 0.812, 0.014, 1, 1, 1, 14), 0.97, 0.86, 1.0), // 턱·볼
-      sc(B.sphere(0.026, tone, -0.109, 0.852, -0.004, 1, 1, 1, 8), 0.55, 1, 1),  // 귀
-      sc(B.sphere(0.026, tone, 0.109, 0.852, -0.004, 1, 1, 1, 8), 0.55, 1, 1),
-      sc(B.sphere(0.117, hair, 0, 0.872, -0.014, 1, 1, 1, 16), 1.02, 0.86, 1.0), // 머리카락
-      sc(B.sphere(0.095, hair, 0, 0.826, -0.055, 1, 1, 1, 12), 1, 0.8, 0.85),    // 뒷머리
-      B.box(0.021, 0.032, 0.034, tone, 0, 0.836, 0.110),                     // 코
-      B.box(0.030, 0.018, 0.016, 0xd8d2c9, -0.045, 0.862, 0.106),            // 눈 (흰자)
-      B.box(0.030, 0.018, 0.016, 0xd8d2c9, 0.045, 0.862, 0.106),
-      B.box(0.013, 0.015, 0.012, 0x2b2118, -0.045, 0.861, 0.111),            // 눈동자
-      B.box(0.013, 0.015, 0.012, 0x2b2118, 0.045, 0.861, 0.111),
-      B.box(0.042, 0.010, 0.018, hair, -0.045, 0.878, 0.104),                // 눈썹
-      B.box(0.042, 0.010, 0.018, hair, 0.045, 0.878, 0.104),
-      B.box(0.036, 0.008, 0.014, 0x8a5248, 0, 0.792, 0.106)                  // 입
+      B.sphere(0.35, body, 0, 0.45, 0, 1.0, 1.5, 0.94, 22),        // 콩 본체
+      B.sphere(0.356, trim, 0, 0.29, 0, 1.0, 0.30, 0.96, 22),             // 옷 허리 띠
+
+      /* 얼굴: 앞쪽으로 살짝 튀어나온 타원판 */
+      B.sphere(0.205, face, 0, 0.765, 0.225, 0.82, 0.88, 0.42, 18),
+
+      /* 큰 눈 */
+      B.sphere(0.085, 0xffffff, -0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 14),
+      B.sphere(0.085, 0xffffff, 0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 14),
+      B.sphere(0.045, 0x191c22, -0.094, 0.784, 0.332, 1, 1.05, 0.55, 12),
+      B.sphere(0.045, 0x191c22, 0.094, 0.784, 0.332, 1, 1.05, 0.55, 12),
+      B.sphere(0.021, 0xffffff, -0.114, 0.820, 0.358, 1, 1, 0.5, 8),   // 눈 반짝임
+      B.sphere(0.021, 0xffffff, 0.114, 0.820, 0.358, 1, 1, 0.5, 8),
+      B.box(0.082, 0.019, 0.024, cap, -0.094, 0.880, 0.310, 0.24),     // 눈썹
+      B.box(0.082, 0.019, 0.024, cap, 0.094, 0.880, 0.310, 0.24),
+
+      /* 작은 입 */
+      B.sphere(0.040, 0x7d3f3c, 0, 0.702, 0.312, 1, 0.55, 0.45, 10),
+
+      /* 등에 멘 작은 가방 */
+      B.sphere(0.16, trim, 0, 0.40, -0.235, 1, 1.15, 0.6, 12),
+      B.box(0.20, 0.05, 0.06, dark, 0, 0.50, -0.235)
     ];
-    if (S.helmet) {                                                          // 헬멧
-      // 헬멧은 눈썹 위에서 정수리까지만 덮습니다
-      torsoParts.push(sc(B.sphere(0.126, S.helmet, 0, 0.926, -0.006, 1, 1, 1, 16), 1.02, 0.46, 1.04));
-      torsoParts.push(B.box(0.20, 0.02, 0.07, S.helmet, 0, 0.898, 0.10));      // 앞 챙
-      torsoParts.push(B.box(0.042, 0.04, 0.05, gear, 0.112, 0.915, 0.01));     // 측면 장비
+
+    if (S.helmet) {                                    // 챙 달린 모자
+      torsoParts.push(B.sphere(0.245, S.helmet, 0, 0.885, 0.0, 1.02, 0.62, 1.0, 18));
+      torsoParts.push(B.box(0.26, 0.035, 0.15, S.helmet, 0, 0.868, 0.175));
+    } else {                                           // 모자가 없으면 머리카락
+      torsoParts.push(B.sphere(0.235, S.hair || 0x2b2119, 0, 0.885, -0.01, 1.02, 0.60, 1.0, 16));
     }
 
-    /* 팔 (어깨 관절이 원점) */
+    /* 팔: 어깨 관절이 원점, 짧고 통통하게 */
     const arm = [
-      sc(B.sphere(0.072, top, 0, -0.02, 0), 1, 1, 1),                        // 어깨 이음새
-      sc(B.pillar(0.066, 0.052, 0.30, top, 0, -0.17, 0), 1, 1, 1),           // 윗팔
-      B.sphere(0.05, top, 0, -0.32, 0),                                      // 팔꿈치
-      sc(B.pillar(0.05, 0.043, 0.28, top, 0, -0.46, 0.005), 1, 1, 1),        // 아래팔
-      B.box(0.072, 0.045, 0.08, gear, 0, -0.60, 0.005),                      // 손목
-      sc(B.sphere(0.052, gear, 0, -0.655, 0.012, 1, 1, 1, 10), 0.8, 1.05, 0.95) // 장갑
+      B.sphere(0.098, body, 0, -0.02, 0, 1, 1, 1, 12),
+      B.pillar(0.090, 0.082, 0.22, body, 0, -0.13, 0),
+      B.sphere(0.100, trim, 0, -0.27, 0.01, 1, 0.95, 1, 12)      // 장갑 낀 손
     ];
 
-    /* 다리 (엉덩이 관절이 원점, 무릎은 -0.44) */
+    /* 다리: 짧은 허벅지와 종아리, 둥근 신발 */
     const thigh = [
-      sc(B.pillar(0.098, 0.078, 0.42, pants, 0, -0.21, 0), 1, 1, 0.95),
-      B.sphere(0.072, pants, 0, -0.42, 0),                                   // 무릎
-      B.box(0.10, 0.09, 0.045, gear, 0, -0.41, 0.062)                        // 무릎 보호대
+      B.pillar(0.118, 0.106, 0.26, pants, 0, -0.13, 0),
+      B.sphere(0.108, pants, 0, -0.26, 0, 1, 1, 1, 12)
     ];
     const shin = [
-      sc(B.pillar(0.074, 0.06, 0.34, pants, 0, -0.17, 0), 1, 1, 0.95),
-      B.box(0.108, 0.16, 0.115, boots, 0, -0.40, 0),                         // 군화 목
-      B.box(0.115, 0.09, 0.24, boots, 0, -0.475, 0.03),
-      B.box(0.10, 0.06, 0.09, boots, 0, -0.49, 0.15)
+      B.pillar(0.104, 0.098, 0.17, pants, 0, -0.085, 0),
+      B.sphere(0.128, boots, 0, -0.185, 0.030, 1, 0.72, 1.28, 12)  // 신발
     ];
 
     return {
@@ -532,34 +522,34 @@ class Char3D {
     this.mesh = new THREE.Group();
     this.body = new THREE.Group();          // 사망 연출용 회전축
     this.hips = new THREE.Group();
-    this.hips.position.y = 0.92;
+    this.hips.position.y = 0.52;              // 다리가 짧아진 만큼 골반도 낮게
 
     this.torso = mesh(art.torso);
     this.hips.add(this.torso);
 
     // 정면이 +Z 이므로 캐릭터의 오른쪽은 로컬 -X 입니다
-    this.armR = new THREE.Group(); this.armR.position.set(-0.21, 0.615, 0);
-    this.armL = new THREE.Group(); this.armL.position.set(0.21, 0.615, 0);
+    this.armR = new THREE.Group(); this.armR.position.set(-0.325, 0.60, 0);
+    this.armL = new THREE.Group(); this.armL.position.set(0.325, 0.60, 0);
     this.armL.add(mesh(art.arm)); this.armR.add(mesh(art.arm));
     this.hips.add(this.armL); this.hips.add(this.armR);
 
     // 총은 오른손 앞에 붙입니다
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(-0.02, -0.60, 0.22);
+    this.gunMount.position.set(-0.02, -0.32, 0.17);
     this.armR.add(this.gunMount);
     this.gunMesh = null;
 
     // 등에 메는 두 번째 무기
     this.backMount = new THREE.Group();
-    this.backMount.position.set(0.05, 0.50, -0.30);
-    this.backMount.rotation.set(Math.PI / 2, 0.25, 0.6);
+    this.backMount.position.set(0.06, 0.60, -0.32);
+    this.backMount.rotation.set(Math.PI / 2, 0.22, 0.55);
     this.hips.add(this.backMount);
     this.backMesh = null;
 
-    this.legL = new THREE.Group(); this.legL.position.set(-0.105, 0.92, 0);
-    this.legR = new THREE.Group(); this.legR.position.set(0.105, 0.92, 0);
-    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.44;
-    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.44;
+    this.legL = new THREE.Group(); this.legL.position.set(-0.145, 0.52, 0);
+    this.legR = new THREE.Group(); this.legR.position.set(0.145, 0.52, 0);
+    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.26;
+    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.26;
     this.legL.add(mesh(art.thigh)); this.legL.add(this.kneeL); this.kneeL.add(mesh(art.shin));
     this.legR.add(mesh(art.thigh)); this.legR.add(this.kneeR); this.kneeR.add(mesh(art.shin));
 
@@ -569,7 +559,7 @@ class Char3D {
     // 낙하산 (필요할 때만 보이게)
     this.chute = new THREE.Mesh(ChuteArt.build(), Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
     this.chute.castShadow = true;
-    this.chute.position.y = 1.7;
+    this.chute.position.y = 1.45;
     this.chute.visible = false;
     this.mesh.add(this.chute);
 
@@ -591,7 +581,7 @@ class Char3D {
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
   get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
-  get eyeY() { return this.pos.y + (this.crouch ? 1.18 : CFG.EYE); }
+  get eyeY() { return this.pos.y + (this.crouch ? 0.98 : CFG.EYE); }
 
   forward(out) {
     return (out || new THREE.Vector3()).set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
@@ -649,12 +639,15 @@ class Char3D {
     if (this.gun) {
       this.gunMesh = new THREE.Mesh(GunArt.geo(this.gun, this.scopeOff[this.slot] ? 0 : this.scopes[this.slot], this.gunSkin), mat);
       this.gunMesh.castShadow = true;
+      this.gunMesh.scale.setScalar(0.82);       // 몸집에 맞춘 크기
       this.gunMesh.position.set(0, 0, 0.06);    // 총구는 앞(+Z)
       this.gunMount.add(this.gunMesh);
     }
     if (this.other) {                            // 남는 무기는 등에 멥니다
       this.backMesh = new THREE.Mesh(GunArt.geo(this.other, this.scopeOff[1 - this.slot] ? 0 : this.scopes[1 - this.slot], this.gunSkin), mat);
       this.backMesh.castShadow = true;
+      this.backMesh.scale.setScalar(0.74);
+      this.backMesh.position.set(0, 0, -0.32);   // 등 뒤에서 몸통 길이에 맞게
       this.backMount.add(this.backMesh);
     }
   }
@@ -795,7 +788,7 @@ class Char3D {
         t.hipsX = lean * 0.5;
         t.hipsZ = 0;
         t.bodyX = 0; t.bodyZ = 0;
-        t.bodyY = (this.crouch ? -0.34 : 0) + bob;
+        t.bodyY = (this.crouch ? -0.20 : 0) + bob;
         t.gunX = 0;
         rate = 16;
       }
