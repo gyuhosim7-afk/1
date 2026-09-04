@@ -663,3 +663,12 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 /* 시트 안 내용은 왼쪽 정렬이 읽기 편합니다 */
 .sheet { text-align: left; }
 .sheet h2, .sheet .sheetSub, .sheet h3 { text-align: left; }
+
+/* 진단 표시 (P 키) */
+#debug {
+  position: absolute; left: 14px; top: 132px; z-index: 11;
+  margin: 0; padding: 8px 11px; white-space: pre;
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #9fe6b0; background: rgba(6, 10, 14, .82);
+  border: 1px solid var(--line); border-radius: 8px;
+}

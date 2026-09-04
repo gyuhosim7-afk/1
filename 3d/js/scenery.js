@@ -170,7 +170,7 @@ const Scenery = {
   },
 
   buildWater(scene) {
-    const geo = new THREE.PlaneGeometry(World.size * 1.4, World.size * 1.4, 56, 56);
+    const geo = new THREE.PlaneGeometry(World.size * 1.25, World.size * 1.25, 32, 32);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
       color: srgb(0x2b5b76), transparent: true, opacity: 0.86,
@@ -246,17 +246,15 @@ const Scenery = {
 
   /* 좌우·뒷벽에 창문을 냅니다 (yOff 는 바닥에서 창 중심까지 높이) */
   windows(cx, cz, yaw, w, d, h, base, count, yOff) {
-    const frame = 0x6f7378, glass = 0x38505e;
+    const glass = 0x38505e;
     for (let i = 0; i < count; i++) {
       const t = (i + 1) / (count + 1) - 0.5;
       for (const side of [-1, 1]) {
-        const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.02), t * d * 0.8);
-        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 0.95, sz: 1.25, yaw, color: glass, solid: false });
-        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.08, sy: 1.1, sz: 1.4, yaw, color: frame, solid: false });
+        const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.03), t * d * 0.8);
+        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 1.0, sz: 1.3, yaw, color: glass, solid: false });
       }
-      const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.02);
-      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.25, sy: 0.95, sz: 0.12, yaw, color: glass, solid: false });
-      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.4, sy: 1.1, sz: 0.08, yaw, color: frame, solid: false });
+      const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.03);
+      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.3, sy: 1.0, sz: 0.12, yaw, color: glass, solid: false });
     }
   },
 
@@ -490,9 +488,17 @@ const Scenery = {
       const c = f === 3 ? 0x8a8578 : floorC;
       this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW + 0.4, d + 0.4, y, c, 0.34);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + frontD / 2, holeW + 0.4, frontD, y, c, 0.34);
+      // 계단 B 라인 쪽으로 발판을 조금 더 내밀어 마지막 단과 사이가 벌어지지 않게 합니다
+      this.slab(cx, cz, yaw, -w / 2 + holeW * 0.75, -d / 2 + frontD + 0.4, holeW * 0.5, 0.9, y, c, 0.34);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd + (d - stairEnd) / 2,
                 holeW + 0.4, d - stairEnd + 0.2, y, c, 0.34);
       this.rail(cx, cz, yaw, -w / 2 + holeW + 0.15, -d / 2 + stairEnd / 2, 0.16, stairEnd - 0.6, y, steel);
+      if (f === 3) {
+        /* 옥상은 위로 이어지는 계단이 없으므로 계단실 구멍을 난간으로 막습니다.
+           올라온 쪽(계단 B 라인)만 열어 두어 다시 내려갈 수 있습니다. */
+        this.rail(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd - 0.15, holeW, 0.16, y, steel);
+        this.rail(cx, cz, yaw, -w / 2 + holeW * 0.25, -d / 2 + frontD + 0.15, holeW * 0.5, 0.16, y, steel);
+      }
     }
 
     // 옥상 난간과 처마
@@ -568,7 +574,7 @@ const Scenery = {
       World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
     }
 
-    for (let i = 0; i < Math.round(7000 * density); i++) {
+    for (let i = 0; i < Math.round(3400 * density); i++) {
       const lim = World.half * 0.95;
       const x = (rnd() * 2 - 1) * lim, z = (rnd() * 2 - 1) * lim;
       const y = World.height(x, z);
@@ -625,10 +631,9 @@ const Scenery = {
 
     // 활엽수 잎: 덩어리 여러 개
     const leafGeo = B.merge([
-      B.ico(1.05, 0x47692f, 0, 0, 0),
-      B.ico(0.78, 0x51763a, 0.85, 0.30, 0.18),
-      B.ico(0.70, 0x3f5e2b, -0.72, 0.16, -0.34),
-      B.ico(0.62, 0x577d3e, 0.10, 0.78, 0.48)
+      B.ico(1.08, 0x47692f, 0, 0, 0),
+      B.ico(0.80, 0x51763a, 0.82, 0.30, 0.18),
+      B.ico(0.72, 0x3f5e2b, -0.70, 0.20, -0.32)
     ]);
     const leafMesh = new THREE.InstancedMesh(leafGeo, foliageMat, Math.max(1, leafs.length));
     leafMesh.castShadow = true;
@@ -660,7 +665,7 @@ const Scenery = {
     const rockGeo = new THREE.IcosahedronGeometry(1, 0);
     const rockMat = new THREE.MeshStandardMaterial({ color: srgb(0x7d7a72), roughness: 1, flatShading: true });
     const rockMesh = new THREE.InstancedMesh(rockGeo, rockMat, Math.max(1, this.rocks.length));
-    rockMesh.castShadow = true; rockMesh.receiveShadow = true;
+    rockMesh.castShadow = false; rockMesh.receiveShadow = true;
     this.rocks.forEach((r, i) => {
       e.set(rnd() * 0.6, r.rot, rnd() * 0.6); q.setFromEuler(e);
       m.compose(v.set(r.x, r.y + 0.6 * r.s, r.z), q, sv.set(1.5 * r.s, 1.2 * r.s, 1.4 * r.s));
@@ -671,13 +676,12 @@ const Scenery = {
 
     // 수풀
     const bushGeo = Build.merge([
-      Build.ico(0.95, 0x3f5b2e, 0, 0, 0),
-      Build.ico(0.66, 0x496a35, 0.62, 0.12, 0.2),
-      Build.ico(0.58, 0x37502a, -0.55, 0.05, -0.25)
+      Build.ico(0.98, 0x3f5b2e, 0, 0, 0),
+      Build.ico(0.68, 0x496a35, 0.60, 0.10, 0.18)
     ]);
     const bushMat = Mats.vc({ roughness: 1, metalness: 0, flatShading: true });
     const bushMesh = new THREE.InstancedMesh(bushGeo, bushMat, Math.max(1, this.bushes.length));
-    bushMesh.castShadow = true;
+    bushMesh.castShadow = false;
     this.bushes.forEach((b, i) => {
       e.set(0, b.rot, 0); q.setFromEuler(e);
       const h = b.tall ? 0.8 : 0.55;

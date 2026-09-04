@@ -102,7 +102,7 @@ const UI = {
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'bagTag', 'speedo'];
+      'gear', 'vestTag', 'bagTag', 'speedo', 'debug'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -486,6 +486,10 @@ const Input = {
       if (c === 'Tab') UI.el.bigmap.classList.toggle('hidden');
       if (c === 'KeyM') { Sfx.enabled = !Sfx.enabled; Game.pushFeed('소리 ' + (Sfx.enabled ? '켜짐' : '꺼짐')); }
       if (c === 'KeyO') this.toggleSettings();
+      if (c === 'KeyP') {
+        UI.el.debug.classList.toggle('hidden');
+        Game.pushFeed('진단 표시 ' + (UI.el.debug.classList.contains('hidden') ? '끔' : '켬'));
+      }
       if (c === 'Digit1' || c === 'Numpad1') { if (Game.player.selectSlot(0)) Sfx.swap(); }
       if (c === 'Digit2' || c === 'Numpad2') { if (Game.player.selectSlot(1)) Sfx.swap(); }
       if (c === 'KeyX') { if (Game.player.swapSlot()) Sfx.swap(); }
@@ -610,12 +614,30 @@ const Main = {
     }
   },
 
+  /* 한 프레임. 어디서 오류가 나더라도 다음 프레임은 반드시 예약합니다.
+     예전에는 오류 한 번에 루프가 끊겨 화면만 남고 조작이 완전히 멎었습니다. */
   loop(t) {
     const dt = Math.min(CFG.MAX_DT, (t - this.last) / 1000);
     this.last = t;
+    try {
+      this.frame(dt);
+    } catch (e) {
+      this.onError(e);
+    }
+    requestAnimationFrame(nt => this.loop(nt));
+  },
+
+  frame(dt) {
     Net.tick();
     Net.update(dt);
     if (Game.state === 'playing') {
+      // 마우스 잠금이 풀렸다고 게임을 영영 멈추지 않습니다.
+      // 잠깐 기다렸다가 잠금 없이 그대로 이어서 진행합니다.
+      if (Input.mode === 'lock' && !Input.locked) {
+        if (!this.unlockAt) this.unlockAt = performance.now();
+        else if (performance.now() - this.unlockAt > 1200) Input.fallbackToFree();
+      } else this.unlockAt = 0;
+
       const paused = Input.settingsOpen || (Input.mode === 'lock' && !Input.locked);
       UI.el.pause.classList.toggle('hidden', !paused);
       document.body.classList.toggle('paused', paused);
@@ -633,7 +655,35 @@ const Main = {
       UI.el.pause.classList.add('hidden');
       Game.render();
     }
-    requestAnimationFrame(nt => this.loop(nt));
+    this.stats(dt);
+  },
+
+  onError(e) {
+    this.errCount = (this.errCount || 0) + 1;
+    this.lastErr = (e && e.message ? e.message : String(e));
+    if (this.errCount <= 3 && Game.pushFeed) Game.pushFeed('오류가 발생했지만 계속 진행합니다');
+    if (this.errCount <= 3) console.error(e);
+  },
+
+  /* P 키로 켜는 진단 표시 (프레임·입력·좌표) */
+  stats(dt) {
+    this.fpsN = (this.fpsN || 0) + 1;
+    this.fpsT = (this.fpsT || 0) + dt;
+    if (this.fpsT >= 0.5) { this.fps = Math.round(this.fpsN / this.fpsT); this.fpsN = 0; this.fpsT = 0; }
+    const el = UI.el.debug;
+    if (!el || el.classList.contains('hidden')) return;
+    const p = Game.player;
+    el.textContent =
+      'FPS ' + (this.fps || 0) + ' · dt ' + dt.toFixed(3) +
+      ' · ' + (Input.mode === 'lock' ? (Input.locked ? '마우스잠금' : '잠금대기') : '잠금없음') +
+      (Input.settingsOpen ? ' · 설정열림' : '') +
+      '\n입력 ' + [Input.fwd ? 'W' : '', Input.back ? 'S' : '', Input.left ? 'A' : '', Input.right ? 'D' : ''].join('') +
+      ' · 속도 ' + (p ? p.speedNow.toFixed(1) : '-') +
+      ' · ' + (p && p.grounded ? '지면' : '공중') + (p && p.flying ? ' · 낙하중' : '') +
+      (p && p.vehicle ? ' · 탑승중' : '') +
+      '\n좌표 ' + (p ? [p.pos.x, p.pos.y, p.pos.z].map(v => v.toFixed(1)).join(', ') : '-') +
+      ' · 그리기 ' + Game.renderer.info.render.calls +
+      '\n오류 ' + (this.errCount || 0) + (this.lastErr ? ' · ' + this.lastErr.slice(0, 70) : '');
   }
 };
 

@@ -231,6 +231,19 @@ const World = {
     return g;
   },
 
+  /* 머리 위에서 가장 낮은 천장 높이 (없으면 Infinity).
+     위로 뛸 때 위층 바닥을 뚫고 올라가지 않도록 씁니다. */
+  ceilingY(x, z, headY) {
+    let c = Infinity;
+    for (const o of this.near(x, z, x, z, 2)) {
+      if (o.r !== undefined) continue;
+      if (o.bottom < headY - 0.02) continue;   // 이미 머리 아래면 천장이 아님
+      if (o.bottom >= c) continue;
+      if (this.insideBox(o, x, z, 0)) c = o.bottom;
+    }
+    return c;
+  },
+
   /* 이 자리에 몸(반지름 r, feetY~headY)이 들어갈 수 있는지.
      들어갈 수 없으면 true. 관통과 끼임을 막는 마지막 확인용입니다. */
   blocked(x, z, r, feetY, headY, stepUp) {

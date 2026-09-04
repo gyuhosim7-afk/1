@@ -26,7 +26,7 @@ const Game = {
     // 기본은 높은 품질로 시작하고, 프레임이 나쁘면 한 번만 낮춥니다
     this.low = false;
     this.perfSum = 0; this.perfN = 0; this.downgraded = false;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -60,9 +60,9 @@ const Game = {
     this.sun = new THREE.DirectionalLight(0xfff0d6, 2.35);
     this.sun.position.set(70, 90, 40);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(1536, 1536);
     const sc = this.sun.shadow.camera;
-    sc.near = 1; sc.far = 320; sc.left = -70; sc.right = 70; sc.top = 70; sc.bottom = -70;
+    sc.near = 1; sc.far = 260; sc.left = -46; sc.right = 46; sc.top = 46; sc.bottom = -46;
     this.sun.shadow.bias = -0.0008;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun);
@@ -445,6 +445,23 @@ const Game = {
       if (l.dead) continue;
       const d = Math.hypot(l.pos.x - cam.x, l.pos.y - cam.y, l.pos.z - cam.z);
       l.update(this.time, d, l === this.highlight);
+    }
+
+    // 캐릭터: 아주 멀면 통째로 끄고, 조금 멀면 손에 든 것들만 숨깁니다
+    for (const c of this.chars) {
+      if (c === this.player) continue;
+      const d = Math.hypot(c.pos.x - cam.x, c.pos.z - cam.z);
+      const on = d < 260;
+      if (c.mesh.visible !== on) c.mesh.visible = on;
+      if (!on) continue;
+      const detail = d < 70;
+      if (c._detail !== detail) {
+        c._detail = detail;
+        if (c.gunMesh) c.gunMesh.visible = detail;
+        if (c.backMesh) c.backMesh.visible = detail;
+        if (c.vestMesh) c.vestMesh.visible = detail;
+        if (c.bagMesh) c.bagMesh.visible = detail;
+      }
     }
 
     if (this.online) Net.interpolate(dt);
@@ -966,14 +983,29 @@ const Game = {
       }
     }
 
-    ch.vy -= CFG.GRAVITY * dt;
-    ch.pos.y += ch.vy * dt;
-    const g = World.groundY(ch.pos.x, ch.pos.z, ch.pos.y);
-    if (ch.pos.y <= g) {
-      if (ch === this.player && ch.vy < -6) this.landDip = Math.min(0.34, -ch.vy * 0.022);
-      ch.pos.y = g; ch.vy = 0; ch.grounded = true;
+    /* ---- 수직 이동 ----
+       작은 턱은 떨어뜨리지 않고 그대로 딛고 내려가게 해야
+       계단을 '걸어서' 내려올 수 있습니다. 매 칸 낙하하면 공중 상태가 되어
+       걷기가 끊기고 점프도 되지 않습니다. */
+    const prevY = ch.pos.y;
+    const support = World.groundY(ch.pos.x, ch.pos.z, prevY);
+    if (ch.grounded && ch.vy <= 0 && support <= prevY && prevY - support <= CFG.STEP_UP + 0.05) {
+      ch.pos.y = support; ch.vy = 0; ch.grounded = true;
+    } else {
+      ch.vy -= CFG.GRAVITY * dt;
+      ch.pos.y += ch.vy * dt;
+      // 위로 뛰는 중이면 천장에 막힙니다 (위층 바닥을 뚫고 올라가지 않도록)
+      if (ch.vy > 0) {
+        const ceil = World.ceilingY(ch.pos.x, ch.pos.z, prevY + bodyH);
+        if (ch.pos.y + bodyH > ceil) { ch.pos.y = ceil - bodyH; ch.vy = 0; }
+      }
+      // 한 프레임에 바닥을 지나쳐 떨어지지 않도록 '떨어지기 전 높이' 로 지지면을 찾습니다
+      const g = World.groundY(ch.pos.x, ch.pos.z, Math.max(prevY, ch.pos.y));
+      if (ch.pos.y <= g) {
+        if (ch === this.player && ch.vy < -6) this.landDip = Math.min(0.34, -ch.vy * 0.022);
+        ch.pos.y = g; ch.vy = 0; ch.grounded = true;
+      } else if (ch.vy < -0.2) ch.grounded = false;
     }
-    else if (ch.vy < -0.2) ch.grounded = false;
 
     ch.speedNow = Math.hypot(ch.pos.x - before.x, ch.pos.z - before.z) / Math.max(dt, 1e-4);
   },
@@ -1276,7 +1308,7 @@ const Game = {
     const w = Scenery.water;
     if (!w) return;
     this.waterTick = (this.waterTick || 0) + 1;
-    if (this.waterTick % 3) return;
+    if (this.waterTick % 6) return;
     const pos = w.geometry.attributes.position;
     const t = this.time;
     for (let i = 0; i < pos.count; i++) {
@@ -1417,15 +1449,18 @@ const Game = {
   checkPerf(dt) {
     if (this.downgraded || this.state !== 'playing') return;
     this.perfSum += dt; this.perfN++;
-    if (this.perfN < 120) return;
+    if (this.perfN < 45) return;
     const avg = this.perfSum / this.perfN;
     this.perfSum = 0; this.perfN = 0;
-    if (avg > 0.027) {                     // 37fps 미만이면
+    if (avg > 0.024) {                     // 42fps 미만이면
       this.downgraded = true; this.low = true;
       this.renderer.setPixelRatio(1);
       this.sun.shadow.mapSize.set(1024, 1024);
+      const sc = this.sun.shadow.camera;
+      sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34;
+      sc.updateProjectionMatrix();
       if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
-      this.scene.fog.far = 280;
+      this.scene.fog.far = 240;
       this.pushFeed('그래픽 품질을 낮췄습니다 (프레임 확보)');
     }
   },

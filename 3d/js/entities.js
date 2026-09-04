@@ -295,7 +295,7 @@ const LootArt = {
   },
 
   beam() {
-    if (!this.beamGeo) this.beamGeo = new THREE.CylinderGeometry(0.3, 0.42, 3.4, 10, 1, true);
+    if (!this.beamGeo) this.beamGeo = new THREE.CylinderGeometry(0.26, 0.36, 2.8, 8, 1, true);
     return this.beamGeo;
   }
 };
@@ -328,7 +328,7 @@ class Loot {
     this.beam = new THREE.Mesh(LootArt.beam(), new THREE.MeshBasicMaterial({
       color: srgb(color), transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide
     }));
-    this.beam.position.y = 1.7;
+    this.beam.position.y = 1.45;
 
     this.mesh.add(this.model);
     this.mesh.add(this.beam);
@@ -346,10 +346,13 @@ class Loot {
 
   /* dist: 카메라와의 거리 — 멀면 모델을 숨겨 그리기 비용을 아낍니다 */
   update(t, dist, highlighted) {
-    const near = dist < 55;
+    // 멀면 그룹째 끕니다 (하위 메시까지 통째로 건너뛰어 훨씬 가볍습니다)
+    const on = dist < 115;
+    if (this.mesh.visible !== on) this.mesh.visible = on;
+    if (!on) return;
+    const near = dist < 48;
     if (this.model.visible !== near) this.model.visible = near;
-    const beamOn = dist < 140;
-    if (this.beam.visible !== beamOn) this.beam.visible = beamOn;
+    if (this.beam.visible !== on) this.beam.visible = on;
     if (!near) return;
 
     this.spin += 0.012;
@@ -388,52 +391,52 @@ const CharArt = {
 
     /* 몸통: 머리까지 하나로 이어진 큰 달걀 */
     const torsoParts = [
-      B.sphere(0.35, body, 0, 0.45, 0, 1.0, 1.5, 0.94, 22),        // 콩 본체
-      B.sphere(0.356, trim, 0, 0.29, 0, 1.0, 0.30, 0.96, 22),             // 옷 허리 띠
+      B.sphere(0.35, body, 0, 0.45, 0, 1.0, 1.5, 0.94, 16),        // 콩 본체
+      B.sphere(0.356, trim, 0, 0.29, 0, 1.0, 0.30, 0.96, 16),             // 옷 허리 띠
 
       /* 얼굴: 앞쪽으로 살짝 튀어나온 타원판 */
-      B.sphere(0.205, face, 0, 0.765, 0.225, 0.82, 0.88, 0.42, 18),
+      B.sphere(0.205, face, 0, 0.765, 0.225, 0.82, 0.88, 0.42, 14),
 
       /* 큰 눈 */
-      B.sphere(0.085, 0xffffff, -0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 14),
-      B.sphere(0.085, 0xffffff, 0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 14),
-      B.sphere(0.045, 0x191c22, -0.094, 0.784, 0.332, 1, 1.05, 0.55, 12),
-      B.sphere(0.045, 0x191c22, 0.094, 0.784, 0.332, 1, 1.05, 0.55, 12),
-      B.sphere(0.021, 0xffffff, -0.114, 0.820, 0.358, 1, 1, 0.5, 8),   // 눈 반짝임
-      B.sphere(0.021, 0xffffff, 0.114, 0.820, 0.358, 1, 1, 0.5, 8),
+      B.sphere(0.085, 0xffffff, -0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 10),
+      B.sphere(0.085, 0xffffff, 0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 10),
+      B.sphere(0.045, 0x191c22, -0.094, 0.784, 0.332, 1, 1.05, 0.55, 8),
+      B.sphere(0.045, 0x191c22, 0.094, 0.784, 0.332, 1, 1.05, 0.55, 8),
+      B.sphere(0.021, 0xffffff, -0.114, 0.820, 0.358, 1, 1, 0.5, 6),   // 눈 반짝임
+      B.sphere(0.021, 0xffffff, 0.114, 0.820, 0.358, 1, 1, 0.5, 6),
       B.box(0.082, 0.019, 0.024, cap, -0.094, 0.880, 0.310, 0.24),     // 눈썹
       B.box(0.082, 0.019, 0.024, cap, 0.094, 0.880, 0.310, 0.24),
 
       /* 작은 입 */
-      B.sphere(0.040, 0x7d3f3c, 0, 0.702, 0.312, 1, 0.55, 0.45, 10),
+      B.sphere(0.040, 0x7d3f3c, 0, 0.702, 0.312, 1, 0.55, 0.45, 8),
 
       /* 등에 멘 작은 가방 */
-      B.sphere(0.16, trim, 0, 0.40, -0.235, 1, 1.15, 0.6, 12),
+      B.sphere(0.16, trim, 0, 0.40, -0.235, 1, 1.15, 0.6, 8),
       B.box(0.20, 0.05, 0.06, dark, 0, 0.50, -0.235)
     ];
 
     if (S.helmet) {                                    // 챙 달린 모자
-      torsoParts.push(B.sphere(0.245, S.helmet, 0, 0.885, 0.0, 1.02, 0.62, 1.0, 18));
+      torsoParts.push(B.sphere(0.245, S.helmet, 0, 0.885, 0.0, 1.02, 0.62, 1.0, 14));
       torsoParts.push(B.box(0.26, 0.035, 0.15, S.helmet, 0, 0.868, 0.175));
     } else {                                           // 모자가 없으면 머리카락
-      torsoParts.push(B.sphere(0.235, S.hair || 0x2b2119, 0, 0.885, -0.01, 1.02, 0.60, 1.0, 16));
+      torsoParts.push(B.sphere(0.235, S.hair || 0x2b2119, 0, 0.885, -0.01, 1.02, 0.60, 1.0, 12));
     }
 
     /* 팔: 어깨 관절이 원점, 짧고 통통하게 */
     const arm = [
-      B.sphere(0.098, body, 0, -0.02, 0, 1, 1, 1, 12),
+      B.sphere(0.098, body, 0, -0.02, 0, 1, 1, 1, 8),
       B.pillar(0.090, 0.082, 0.22, body, 0, -0.13, 0),
-      B.sphere(0.100, trim, 0, -0.27, 0.01, 1, 0.95, 1, 12)      // 장갑 낀 손
+      B.sphere(0.100, trim, 0, -0.27, 0.01, 1, 0.95, 1, 8)      // 장갑 낀 손
     ];
 
     /* 다리: 짧은 허벅지와 종아리, 둥근 신발 */
     const thigh = [
       B.pillar(0.118, 0.106, 0.26, pants, 0, -0.13, 0),
-      B.sphere(0.108, pants, 0, -0.26, 0, 1, 1, 1, 12)
+      B.sphere(0.108, pants, 0, -0.26, 0, 1, 1, 1, 8)
     ];
     const shin = [
       B.pillar(0.104, 0.098, 0.17, pants, 0, -0.085, 0),
-      B.sphere(0.128, boots, 0, -0.185, 0.030, 1, 0.72, 1.28, 12)  // 신발
+      B.sphere(0.128, boots, 0, -0.185, 0.030, 1, 0.72, 1.28, 8)  // 신발
     ];
 
     return {
@@ -597,12 +600,8 @@ class Char3D {
     this.body.add(this.hips); this.body.add(this.legL); this.body.add(this.legR);
     this.mesh.add(this.body);
 
-    // 낙하산 (필요할 때만 보이게)
-    this.chute = new THREE.Mesh(ChuteArt.build(), Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
-    this.chute.castShadow = true;
-    this.chute.position.y = 1.45;
-    this.chute.visible = false;
-    this.mesh.add(this.chute);
+    // 낙하산은 실제로 펼 때 만듭니다 (평소에는 메시를 두지 않습니다)
+    this.chute = { visible: false, rotation: { x: 0, y: 0, z: 0 } };
 
     this.mesh.position.copy(this.pos);
   }
@@ -656,8 +655,8 @@ class Char3D {
     if (this.vest) {
       const c = VESTS[this.vest].color;
       const parts = [
-        B.sphere(0.362, c, 0, 0.48, 0, 1.0, 0.62, 0.98, 20),          // 몸판
-        B.sphere(0.345, 0x2a2d33, 0, 0.30, 0, 1.02, 0.16, 1.0, 18),   // 아래 띠
+        B.sphere(0.362, c, 0, 0.48, 0, 1.0, 0.62, 0.98, 14),          // 몸판
+        B.sphere(0.345, 0x2a2d33, 0, 0.30, 0, 1.02, 0.16, 1.0, 12),   // 아래 띠
         B.box(0.10, 0.30, 0.05, 0x2a2d33, -0.13, 0.55, 0.29),         // 어깨 끈
         B.box(0.10, 0.30, 0.05, 0x2a2d33, 0.13, 0.55, 0.29),
         B.box(0.15, 0.11, 0.06, 0x2a2d33, 0, 0.42, 0.31)              // 탄창 주머니
@@ -808,6 +807,14 @@ class Char3D {
       rate = 9;
       this.chute.visible = false;
     } else if (this.flying) {                         // 낙하
+      if (this.flying === 'chute' && !this.chuteMesh) {
+        this.chuteMesh = new THREE.Mesh(ChuteArt.build(),
+          Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+        this.chuteMesh.castShadow = true;
+        this.chuteMesh.position.y = 1.45;
+        this.mesh.add(this.chuteMesh);
+        this.chute = this.chuteMesh;
+      }
       this.chute.visible = this.flying === 'chute';
       const free = this.flying === 'freefall';
       t.bodyX = free ? -1.15 : 0.14 + (this.chutePitch || 0) * 0.18;
@@ -824,6 +831,11 @@ class Char3D {
       this.stepPhase += dt;
       if (!free) { this.chute.rotation.z = this.chuteTilt; this.chute.rotation.x = Math.sin(this.stepPhase * 0.6) * 0.04; }
     } else {
+      if (this.chuteMesh) {
+        this.mesh.remove(this.chuteMesh);
+        this.chuteMesh = null;
+        this.chute = { visible: false, rotation: { x: 0, y: 0, z: 0 } };
+      }
       this.chute.visible = false;
       const a = this.aimBlend;
 
