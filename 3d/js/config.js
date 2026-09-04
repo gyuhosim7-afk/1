@@ -4,11 +4,11 @@
    ============================================================ */
 
 const CFG = {
-  MAP: 1100,            // 맵 한 변 (m)
-  SEG: 176,             // 지형 격자 해상도
+  MAP: 1500,            // 맵 한 변 (m)
+  SEG: 208,             // 지형 격자 해상도 (칸 7.2m — 넓어진 맵에서 삼각형을 아낍니다)
   BOTS: 39,
   FOG_NEAR: 70,
-  FOG_FAR: 360,
+  FOG_FAR: 390,
   FOV: 72,
   ADS_FOV: 42,
 
@@ -17,25 +17,35 @@ const CFG = {
   WALK: 4.4,
   SPRINT: 7.8,
   CROUCH: 2.2,
-  EYE: 1.28,            // 눈높이 (폴가이즈 체형)
+  EYE: 1.12,            // 눈높이 (커비 체형)
   BODY_R: 0.40,         // 몸통 반지름 (충돌)
-  BODY_H: 1.55,
+  BODY_H: 1.42,
   STEP_UP: 0.60,        // 걸어서 올라설 수 있는 턱 높이 (계단 한 칸 = 0.36)
   VAULT_MAX: 2.0,       // 매달려 기어오를 수 있는 최대 높이
   VAULT_TIME: 0.55,     // 기어오르는 데 걸리는 시간
 
   CAM_DIST: 4.6,        // 3인칭 카메라 거리
-  CAM_HEIGHT: 1.30,
+  CAM_HEIGHT: 1.14,
   CAM_SIDE: 0.72,       // 어깨 너머 오프셋
   ADS_DIST: 2.4,
   ADS_SIDE: 0.95,
 
-  DROP_HEIGHT: 210,       // 낙하 시작 고도 (m)
-  CHUTE_OPEN: 75,         // 이 고도에서 낙하산이 자동으로 펴집니다
+  DROP_HEIGHT: 300,       // 수송기 고도 (m)
+  CHUTE_OPEN: 95,         // 이 고도에서 낙하산이 자동으로 펴집니다
   FREEFALL_SPEED: 52,     // 자유낙하 최고 속도
-  CHUTE_SPEED: 7.5,       // 낙하산 하강 속도
+  CHUTE_SPEED: 4.6,       // 낙하산 하강 속도 (천천히 내려와 멀리까지 갑니다)
   FREEFALL_MOVE: 34,      // 자유낙하 중 수평 이동
-  CHUTE_MOVE: 17,         // 낙하산 수평 이동
+  CHUTE_MOVE: 14,         // 낙하산 수평 이동
+
+  /* ---------- 수송기 ---------- */
+  PLANE_SPEED: 62,        // 수송기 속도 (m/s)
+  PLANE_LEAD: 3.0,        // 문이 열리기 전 대기 (초)
+  PLANE_TAIL: 2.5,        // 항로 끝에서 자동으로 뛰어내리기까지 (초)
+
+  /* ---------- 지점 표시(핑) ---------- */
+  PING_LIFE: 34,          // 표시가 남아 있는 시간 (초)
+  PING_MAX: 5,            // 동시에 남길 수 있는 표시 수
+  PING_RANGE: 900,        // 표시를 찍을 수 있는 최대 거리
   SLOTS: 2,               // 무기 칸 수
   SWAP_TIME: 0.45,        // 무기 교체 시간
 
@@ -54,8 +64,8 @@ const CFG = {
   VEH_CAM_HEIGHT: 3.5,
 
   /* ---------- 공중 보급 ---------- */
-  DROP_FIRST: 90,         // 첫 보급까지 (초)
-  DROP_EVERY: 130,        // 이후 보급 간격 (초)
+  DROP_FIRST: 170,        // 첫 보급까지 (초)
+  DROP_EVERY: 220,        // 이후 보급 간격 (초)
   DROP_ALT: 190,          // 보급 상자가 나타나는 고도
   DROP_FALL: 9.5,         // 보급 상자 낙하 속도 (m/s)
   DROP_OPEN: 4.0          // 보급 상자를 열 수 있는 거리
@@ -161,13 +171,15 @@ const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
    차량: 넓은 맵을 빠르게 이동하는 수단
    accel 가속(m/s^2), max 최고 속도(m/s), turn 조향(rad/s)
    ============================================================ */
+/* win 은 '차에 탄 사람이 총에 맞는 높이' 입니다 (발밑 기준 m).
+   지붕이 있는 트럭은 창문 높이만 노출되고, 뚜껑 없는 버기와 오토바이는 거의 다 드러납니다. */
 const VEHICLES = {
   truck: { name: '픽업트럭', accel: 11, max: 25, rev: 8,  turn: 1.35, brake: 20,
-           hp: 900, r: 1.55, seatH: 1.15, mass: 1, color: 0x8a6a3c },
+           hp: 900, r: 1.55, seatH: 1.15, mass: 1, color: 0x8a6a3c, win: [0.92, 1.48] },
   buggy: { name: '버기',     accel: 14, max: 28, rev: 9,  turn: 1.75, brake: 24,
-           hp: 620, r: 1.30, seatH: 0.95, mass: 0.8, color: 0xb9773c },
+           hp: 620, r: 1.30, seatH: 0.95, mass: 0.8, color: 0xb9773c, win: [0.50, 1.55] },
   bike:  { name: '오토바이', accel: 17, max: 31, rev: 6,  turn: 2.35, brake: 26,
-           hp: 340, r: 0.85, seatH: 0.95, mass: 0.5, color: 0x3f6b8a }
+           hp: 340, r: 0.85, seatH: 0.95, mass: 0.5, color: 0x3f6b8a, win: [0.00, 1.58] }
 };
 const VEHICLE_KEYS = Object.keys(VEHICLES);
 
@@ -181,8 +193,8 @@ const DROP_TABLE = {
 /* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.
    축소 시간이 길어야 자기장 벽이 밀려오는 속도가 걸어서 따라갈 만합니다. */
 const PHASES = [
-  { wait:78, shrink:72, f:0.62, dps:1  },
-  { wait:64, shrink:64, f:0.44, dps:2  },
+  { wait:92, shrink:84, f:0.62, dps:1  },
+  { wait:74, shrink:72, f:0.44, dps:2  },
   { wait:56, shrink:56, f:0.31, dps:3  },
   { wait:48, shrink:48, f:0.20, dps:5  },
   { wait:40, shrink:40, f:0.12, dps:8  },

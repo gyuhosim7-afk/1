@@ -138,11 +138,21 @@ const UI = {
         ? '#' + GUNS[key].color.toString(16).padStart(6, '0') : '';
     }
 
-    // 낙하 중 고도
-    if (p.flying) {
+    // 수송기 · 낙하 안내
+    if (p.flying === 'plane') {
+      const pl = g.plane;
+      const wait = pl ? Math.max(0, g.planeDoor - pl.t) : 0;
+      const left = Math.max(0, Math.round(g.planeLeft || 0));
+      this.el.alt.classList.remove('hidden');
+      this.el.alt.querySelector('b').textContent = left;
+      this.el.alt.querySelector('span').textContent = '초';
+      this.el.alt.querySelector('em').textContent =
+        wait > 0.05 ? '문 여는 중…' : 'SPACE 낙하 · 남은 시간';
+    } else if (p.flying) {
       const altV = Math.max(0, Math.round(p.pos.y - World.height(p.pos.x, p.pos.z)));
       this.el.alt.classList.remove('hidden');
       this.el.alt.querySelector('b').textContent = altV;
+      this.el.alt.querySelector('span').textContent = 'm';
       this.el.alt.querySelector('em').textContent = p.flying === 'chute' ? '낙하산' : '자유낙하';
     } else this.el.alt.classList.add('hidden');
 
@@ -298,6 +308,24 @@ const UI = {
       c.fillRect(q[0] - 2.2, q[1] - 2.2, 4.4, 4.4);
     }
 
+    // 수송기 항로와 현재 위치
+    if (g.plane) {
+      const a = toPx(g.plane.a.x, g.plane.a.z), b2 = toPx(g.plane.b.x, g.plane.b.z);
+      c.save();
+      c.setLineDash([6, 5]); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b2[0], b2[1]); c.stroke();
+      c.restore();
+      const q = toPx(g.plane.pos.x, g.plane.pos.z);
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(q[0], q[1], 3.4, 0, Math.PI * 2); c.fill();
+    }
+
+    // 지점 표시(핑)
+    for (const pg of (g.pings || [])) {
+      const q = toPx(pg.pos.x, pg.pos.z);
+      this.pingMark(c, q[0], q[1], 6);
+    }
+
     // 보급 상자
     for (const a of g.drops) {
       if (a.dead || a.opened) continue;
@@ -320,6 +348,16 @@ const UI = {
     c.rotate(Math.PI - Game.look.yaw);   // 지도 위쪽이 북이므로 시선 방향으로 돌립니다
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -6); c.lineTo(4.5, 5); c.lineTo(-4.5, 5); c.closePath(); c.fill();
+    c.restore();
+  },
+
+  /* 지점 표시(핑) 표식: 노란 마름모 */
+  pingMark(c, x, y, r) {
+    c.save();
+    c.fillStyle = '#ffd166'; c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(x, y - r); c.lineTo(x + r * 0.72, y); c.lineTo(x, y + r); c.lineTo(x - r * 0.72, y);
+    c.closePath(); c.fill(); c.stroke();
     c.restore();
   },
 
@@ -360,6 +398,21 @@ const UI = {
       const q = toPx(v.pos.x, v.pos.z);
       c.fillStyle = v.occupied ? '#ffd166' : '#9fd3ff';
       c.fillRect(q[0] - 2, q[1] - 2, 4, 4);
+    }
+    // 수송기 항로
+    if (g.plane) {
+      const a = toPx(g.plane.a.x, g.plane.a.z), b2 = toPx(g.plane.b.x, g.plane.b.z);
+      c.save();
+      c.setLineDash([9, 7]); c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b2[0], b2[1]); c.stroke();
+      c.restore();
+      const q = toPx(g.plane.pos.x, g.plane.pos.z);
+      c.fillStyle = '#fff';
+      c.beginPath(); c.arc(q[0], q[1], 5, 0, Math.PI * 2); c.fill();
+    }
+    for (const pg of (g.pings || [])) {
+      const q = toPx(pg.pos.x, pg.pos.z);
+      this.pingMark(c, q[0], q[1], 9);
     }
     for (const a of g.drops) {
       if (a.dead || a.opened) continue;
@@ -425,6 +478,7 @@ const Input = {
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
       if (e.button === 0) this.fire = true;
+      if (e.button === 1) { e.preventDefault(); Game.placePing(); }
       if (e.button === 2) this.ads = true;
     });
     window.addEventListener('mouseup', e => {
@@ -450,7 +504,12 @@ const Input = {
       if (this.keys[c]) return;                    // 키 반복 무시
       this.keys[c] = true;
       if (Game.state !== 'playing') { if (c === 'Enter' || c === 'NumpadEnter') Main.startGame(); return; }
-      if (c === 'Space') this.jump = true;
+      if (c === 'Space') {
+        // 수송기 안이면 스페이스로 뛰어내립니다
+        if (Game.player && Game.player.flying === 'plane') Game.jumpFromPlane(Game.player);
+        else this.jump = true;
+      }
+      if (c === 'KeyZ') Game.placePing();
       if (c === 'KeyR') Game.player.startReload();
       if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
       if (c === 'KeyQ') Game.player.startHeal();

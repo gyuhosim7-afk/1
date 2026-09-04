@@ -208,10 +208,12 @@ const Game = {
 
     for (const v of (this.vehicles || [])) this.scene.remove(v.mesh);
     for (const a of (this.drops || [])) this.scene.remove(a.mesh);
+    for (const g of (this.pings || [])) this.scene.remove(g.mesh);
+    if (this.plane) { this.scene.remove(this.plane.mesh); this.plane = null; }
 
     RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
     this.chars = []; this.loots = []; this.feed = []; this.botById = {};
-    this.vehicles = []; this.drops = [];
+    this.vehicles = []; this.drops = []; this.pings = [];
     this.dropTimer = CFG.DROP_FIRST;
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
@@ -268,18 +270,56 @@ const Game = {
       this.chars.push(b);
     }
 
-    // 모두 상공에서 낙하 시작
+    /* 수송기 항로: 섬 한가운데 근처를 지나 반대편으로 빠져나갑니다.
+       모두 이 안에서 시작해 원하는 자리에서 뛰어내립니다. */
     const towns = World.towns;
+    const ang = rnd() * Math.PI * 2;
+    const off = (rnd() - 0.5) * World.half * 0.5;          // 항로가 정중앙을 지나지는 않게
+    const ux = Math.cos(ang), uz = Math.sin(ang);
+    const reach = World.half * 1.2;
+    const cxp = -uz * off, czp = ux * off;
+    this.plane = new Plane(cxp - ux * reach, czp - uz * reach,
+                           cxp + ux * reach, czp + uz * reach,
+                           World.waterY + CFG.DROP_HEIGHT);
+    this.scene.add(this.plane.mesh);
+
+    /* 문은 '섬 위를 지나는 동안' 만 열립니다.
+       바다 위에서 뛰어내리면 첫 자기장 밖이라 그대로 죽기 때문입니다. */
+    const R = World.half * 0.86;
+    const chord = Math.sqrt(Math.max(0, R * R - off * off));
+    this.planeDoor = Math.max(CFG.PLANE_LEAD, (reach - chord) / CFG.PLANE_SPEED);
+    this.planeEnd = Math.min(this.plane.total - CFG.PLANE_TAIL,
+                             (reach + chord) / CFG.PLANE_SPEED);
+    if (this.planeEnd < this.planeDoor + 2) this.planeEnd = this.planeDoor + 2;
+
+    // 항로에서 활강으로 닿을 만한 마을만 목적지 후보로 씁니다
+    const GLIDE = 340;
+    const nearPath = towns.filter(t => {
+      const dx = t.x - this.plane.a.x, dz = t.z - this.plane.a.z;
+      const s2 = dx * this.plane.dir.x + dz * this.plane.dir.z;
+      const px = this.plane.a.x + this.plane.dir.x * s2, pz = this.plane.a.z + this.plane.dir.z * s2;
+      return Math.hypot(t.x - px, t.z - pz) < GLIDE;
+    });
+
     for (const c of this.chars) {
-      c.pos.y = World.height(c.pos.x, c.pos.z) + CFG.DROP_HEIGHT + Math.random() * 40;
-      c.flying = 'freefall';
-      c.vy = -8;
+      c.flying = 'plane';
+      c.vy = 0;
       c.grounded = false;
-      if (c.ai) {   // 봇은 마을이나 근처 지점을 목표로 내려갑니다
-        const t = towns.length && Math.random() < 0.75
-          ? towns[Math.floor(Math.random() * towns.length)]
-          : { x: c.pos.x + (Math.random() - 0.5) * 120, z: c.pos.z + (Math.random() - 0.5) * 120 };
-        c.ai.drop = { x: t.x + (Math.random() - 0.5) * 60, z: t.z + (Math.random() - 0.5) * 60 };
+      if (c.ai) {
+        // 봇은 목표 마을에 가장 가까이 지나가는 순간에 뛰어내립니다
+        let t;
+        if (nearPath.length && Math.random() < 0.85) {
+          t = nearPath[Math.floor(Math.random() * nearPath.length)];
+        } else {
+          // 마을이 아니면 항로 위 아무 지점 옆으로 내려갑니다
+          const s2 = (this.planeDoor + Math.random() * (this.planeEnd - this.planeDoor)) * CFG.PLANE_SPEED;
+          t = { x: this.plane.a.x + this.plane.dir.x * s2 + (Math.random() - 0.5) * 200,
+                z: this.plane.a.z + this.plane.dir.z * s2 + (Math.random() - 0.5) * 200 };
+        }
+        c.ai.drop = { x: t.x + (Math.random() - 0.5) * 70, z: t.z + (Math.random() - 0.5) * 70 };
+        const want = this.plane.bestTime(c.ai.drop.x, c.ai.drop.z);
+        c.jumpAt = Math.max(this.planeDoor,
+                    Math.min(this.planeEnd, want + (Math.random() - 0.5) * 3));
       }
     }
 
@@ -396,6 +436,8 @@ const Game = {
     if (this.state !== 'playing') return;
     this.time += dt;
     this.updateZone(dt);
+    this.updatePlane(dt);
+    this.updatePings(dt);
 
     if (!this.player.dead) this.updatePlayer(dt, input);
 
@@ -895,9 +937,15 @@ const Game = {
       if (t < 0.1) t = (-b + Math.sqrt(disc)) / (2 * a);
       if (t < 0.1 || t > maxT || (best && t > best.t)) continue;
       const hy = oy + dy * t;
-      const top = c.pos.y + (c.crouch ? 1.22 : 1.58);
-      if (hy < c.pos.y || hy > top) continue;
-      const headY = c.pos.y + (c.crouch ? 1.06 : 1.28);
+      /* 차에 타고 있으면 차체가 몸을 가려 줍니다.
+         트럭은 창문 높이만, 뚜껑 없는 버기와 오토바이는 거의 다 드러납니다. */
+      let lo = c.pos.y, hi = c.pos.y + (c.crouch ? 1.10 : 1.42);
+      if (c.vehicle && c.vehicle.spec.win) {
+        lo = c.pos.y + c.vehicle.spec.win[0];
+        hi = c.pos.y + c.vehicle.spec.win[1];
+      }
+      if (hy < lo || hy > hi) continue;
+      const headY = c.pos.y + (c.crouch ? 0.92 : 1.10);   // 몸이 곧 머리라 위쪽 절반이 헤드샷
       best = { t, char: c, head: hy > headY - 0.14 };
     }
     return best;
@@ -1118,8 +1166,92 @@ const Game = {
     return false;
   },
 
+  /* ---------- 수송기 ---------- */
+  updatePlane(dt) {
+    const pl = this.plane;
+    if (!pl) return;
+    if (pl.t > pl.total + 6) {                 // 항로를 다 지나면 치웁니다
+      this.scene.remove(pl.mesh);
+      this.plane = null;
+      return;
+    }
+    pl.update(dt);
+    // 아직 안에 있는 사람은 수송기를 따라갑니다
+    let inside = 0;
+    for (const c of this.chars) {
+      if (c.dead || c.flying !== 'plane') continue;
+      inside++;
+      // 열린 뒷문 자리에 섭니다 (동체 안이 아니라 램프 위라서 화면이 가려지지 않습니다)
+      c.pos.set(pl.pos.x - pl.dir.x * 16.5, pl.pos.y - 2.5, pl.pos.z - pl.dir.z * 16.5);
+      c.yaw = pl.yaw;
+      if (c.ai && pl.t >= c.jumpAt) this.jumpFromPlane(c);
+      else if (pl.t >= this.planeEnd) this.jumpFromPlane(c);
+    }
+    if (this.player.flying === 'plane') {
+      const left = Math.max(0, this.planeEnd - pl.t);
+      this.planeLeft = left;
+      if (!this._doorOpened && pl.t >= this.planeDoor) {
+        this._doorOpened = true;
+        this.pushFeed('문이 열렸습니다 — 스페이스로 낙하');
+      }
+    }
+    if (!inside && this.player.flying !== 'plane') this.planeLeft = 0;
+  },
+
+  /* 수송기에서 뛰어내립니다 */
+  jumpFromPlane(c) {
+    if (c.flying !== 'plane') return false;
+    if (this.plane && this.plane.t < this.planeDoor) return false;
+    c.flying = 'freefall';
+    c.vy = -4;
+    c.grounded = false;
+    if (c === this.player) { Sfx.wind(1); this.pushFeed('낙하!'); }
+    return true;
+  },
+
+  /* ---------- 지점 표시(핑) ---------- */
+  updatePings(dt) {
+    if (!this.pings) this.pings = [];
+    for (let i = this.pings.length - 1; i >= 0; i--) {
+      const g = this.pings[i];
+      g.life -= dt;
+      if (g.life <= 0) { this.scene.remove(g.mesh); this.pings.splice(i, 1); continue; }
+      g.spin += dt * 1.8;
+      g.mesh.rotation.y = g.spin;
+      g.mesh.position.y = g.pos.y + 1.1 + Math.sin(g.spin * 1.6) * 0.16;
+      const fade = Math.min(1, g.life / 3);
+      g.mesh.children.forEach(m => { if (m.material.transparent) m.material.opacity = 0.34 * fade; });
+    }
+  },
+
+  /* 조준한 곳에 표시를 남깁니다 */
+  placePing() {
+    const p = this.player;
+    if (p.dead) return false;
+    const o = this.camera.position, d = this.aimDir;
+    const t = Math.min(CFG.PING_RANGE, this.rayAll(o.x, o.y, o.z, d.x, d.y, d.z, CFG.PING_RANGE, p));
+    const x = o.x + d.x * t, z = o.z + d.z * t;
+    let y = o.y + d.y * t;
+    const g = World.groundY(x, z, y + 2);
+    if (y < g) y = g;
+    if (this.pings.length >= CFG.PING_MAX) {
+      this.scene.remove(this.pings[0].mesh);
+      this.pings.shift();
+    }
+    const mesh = PingArt.make();
+    mesh.position.set(x, y + 1.1, z);
+    this.scene.add(mesh);
+    this.pings.push({ pos: new THREE.Vector3(x, y, z), mesh, life: CFG.PING_LIFE, spin: 0 });
+    Sfx.click();
+    this.pushFeed('지점 표시 (' + Math.round(Math.hypot(x - p.pos.x, z - p.pos.z)) + 'm)');
+    return true;
+  },
+
   /* 낙하: 자유낙하 → 낙하산 → 착지 */
   updateFlight(c, dt, mx, mz) {
+    // 수송기 안에서는 조종할 것이 없습니다 (위치는 updatePlane 이 정합니다)
+    if (c.flying === 'plane') { if (c === this.player) Sfx.wind(0.25); return; }
+
     const ground = World.groundY(c.pos.x, c.pos.z, c.pos.y);
     const alt = c.pos.y - ground;
     if (c === this.player) Sfx.wind(c.flying === 'freefall' ? 1 : 0.42);

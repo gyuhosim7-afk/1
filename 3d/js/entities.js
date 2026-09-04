@@ -220,6 +220,101 @@ const GunArt = {
   }
 };
 
+
+/* ============================================================
+   수송기
+   경기 시작에 섬을 가로질러 날아갑니다.
+   모두 이 안에서 시작해 원하는 자리에서 뛰어내립니다.
+   ============================================================ */
+/* 지점 표시(핑) 표식: 공중에 뜬 마름모 + 바닥 기둥 */
+const PingArt = {
+  make() {
+    if (!this._geo) {
+      this._geo = new THREE.OctahedronGeometry(0.42, 0);
+      this._beam = new THREE.CylinderGeometry(0.30, 0.30, 9, 10, 1, true);
+      this._beam.translate(0, 4.5, 0);
+      this._ring = new THREE.RingGeometry(0.9, 1.15, 22);
+      this._ring.rotateX(-Math.PI / 2);
+    }
+    const g = new THREE.Group();
+    const c = srgb(0xffd166);
+    const mark = new THREE.Mesh(this._geo, new THREE.MeshBasicMaterial({ color: c }));
+    const beam = new THREE.Mesh(this._beam, new THREE.MeshBasicMaterial({
+      color: c, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = -1.1;
+    const ring = new THREE.Mesh(this._ring, new THREE.MeshBasicMaterial({
+      color: c, transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide }));
+    ring.position.y = -1.05;
+    g.add(mark); g.add(beam); g.add(ring);
+    return g;
+  }
+};
+
+class Plane {
+  constructor(ax, az, bx, bz, y) {
+    this.a = new THREE.Vector3(ax, y, az);
+    this.b = new THREE.Vector3(bx, y, bz);
+    const dx = bx - ax, dz = bz - az;
+    this.len = Math.hypot(dx, dz);
+    this.dir = { x: dx / this.len, z: dz / this.len };
+    this.yaw = Math.atan2(this.dir.x, this.dir.z);
+    this.total = this.len / CFG.PLANE_SPEED;
+    this.t = 0;
+    this.pos = this.a.clone();
+    this.mesh = new THREE.Mesh(Plane.geo(), Mats.vc({ roughness: 0.72, metalness: 0.18 }));
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+  }
+
+  /* 항로 위 t초 지점의 위치 */
+  at(t, out) {
+    const d = Math.min(this.len, CFG.PLANE_SPEED * t);
+    return (out || new THREE.Vector3()).set(
+      this.a.x + this.dir.x * d, this.a.y, this.a.z + this.dir.z * d);
+  }
+
+  /* 어떤 지점에 가장 가까이 지나가는 시각 (초) */
+  bestTime(x, z) {
+    const d = (x - this.a.x) * this.dir.x + (z - this.a.z) * this.dir.z;
+    return Math.max(0, Math.min(this.total, d / CFG.PLANE_SPEED));
+  }
+
+  update(dt) {
+    this.t += dt;
+    this.at(this.t, this.pos);
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.yaw;
+  }
+
+  static geo() {
+    if (this._geo) return this._geo;
+    const B = Build;
+    const body = 0xb9c2cc, dark = 0x394452, wing = 0x8f9aa6, glass = 0x2f4a5e;
+    const parts = [
+      // 동체
+      B.sphere(2.6, body, 0, 0, 0, 1.0, 0.95, 5.4, 16),
+      B.sphere(2.4, body, 0, 0, 12.6, 1.0, 0.92, 1.6, 14),        // 기수
+      B.box(2.6, 1.6, 1.2, glass, 0, 0.9, 12.0),                  // 조종석 창
+      // 주익
+      B.box(21.0, 0.55, 4.2, wing, 0, 1.5, 1.0),
+      B.box(3.0, 1.1, 2.0, dark, -6.2, 0.6, 1.6),                 // 엔진
+      B.box(3.0, 1.1, 2.0, dark, 6.2, 0.6, 1.6),
+      B.box(2.2, 0.9, 1.6, dark, -9.6, 0.7, 1.2),
+      B.box(2.2, 0.9, 1.6, dark, 9.6, 0.7, 1.2),
+      // 꼬리
+      B.box(0.7, 5.4, 3.6, wing, 0, 3.0, -12.0),
+      B.box(9.0, 0.45, 2.6, wing, 0, 4.6, -13.0),
+      // 뒷문 (열려 있습니다)
+      B.box(3.2, 0.3, 3.4, dark, 0, -1.5, -14.6, -0.5),
+      // 동체 줄무늬
+      B.box(0.4, 0.5, 22.0, 0xf0c453, -2.3, 0.4, 0),
+      B.box(0.4, 0.5, 22.0, 0xf0c453, 2.3, 0.4, 0)
+    ];
+    this._geo = Build.merge(parts);
+    return this._geo;
+  }
+}
+
 /* ============================================================
    아이템 (총기 / 탄약 상자 / 구급상자)
    ============================================================ */
@@ -424,64 +519,75 @@ const CharArt = {
     return this.cache[key];
   },
 
-  /* 폴가이즈풍 콩 몸매
-     머리와 몸통이 이어진 달걀 하나 + 짧고 통통한 팔다리.
-     좌표는 골반 그룹(월드 y = 0.52) 기준이고 정수리는 약 1.5m 입니다. */
+  /* 색을 어둡게 / 밝게 (발과 볼처럼 같은 계열의 다른 톤을 만들 때 씁니다) */
+  shade(hex, k) {
+    const r = Math.min(255, Math.round(((hex >> 16) & 255) * k));
+    const g = Math.min(255, Math.round(((hex >> 8) & 255) * k));
+    const b = Math.min(255, Math.round((hex & 255) * k));
+    return (r << 16) | (g << 8) | b;
+  },
+
+  /* 커비풍 둥근 몸매
+     머리와 몸통이 하나인 큰 달걀에, 큼직한 눈과 볼, 짧은 팔과 넓적한 발.
+     좌표는 골반 그룹(월드 y = 0.52) 기준이고 정수리는 약 1.37m 입니다. */
   build(S) {
-    const B = Build, sc = B.sc.bind(B);
-    const body = S.top, pants = S.pants, boots = S.boots || 0x24262b;
+    const B = Build;
+    const body = S.top;
+    const foot = this.shade(S.boots && S.boots !== 0x24262b ? S.boots : body, 0.62);
     const trim = S.vest || 0x4a4a42;
-    const face = S.face || 0xdcb894, dark = 0x24272d;
-    const cap = S.helmet || S.hair || 0x2b2119;
+    const dark = 0x24272d;
+    const cheek = this.shade(body, 0.78);
 
-    /* 몸통: 머리까지 하나로 이어진 큰 달걀 */
+    /* 몸통: 매끄럽고 동그란 공 하나.
+       얼굴 부품은 공 표면 바로 위에 오도록 z 를 계산해 얹습니다.
+       (반지름 x 0.415 · y 0.457 · z 0.402, 중심 y 0.36) */
     const torsoParts = [
-      B.sphere(0.35, body, 0, 0.45, 0, 1.0, 1.5, 0.94, 16),        // 콩 본체
-      B.sphere(0.356, trim, 0, 0.29, 0, 1.0, 0.30, 0.96, 16),             // 옷 허리 띠
+      B.sphere(0.415, body, 0, 0.36, 0, 1.0, 1.10, 0.97, 24),
 
-      /* 얼굴: 앞쪽으로 살짝 튀어나온 타원판 */
-      B.sphere(0.205, face, 0, 0.765, 0.225, 0.82, 0.88, 0.42, 14),
+      /* 눈: 위쪽이 하얗고 아래가 짙은 남색인 큼직한 세로 타원.
+         공 표면(z ≈ 0.355) 바로 위에 얹어야 안으로 파묻히지 않습니다 */
+      B.sphere(0.098, 0x080e20, -0.145, 0.505, 0.342, 0.66, 1.45, 0.34, 14),
+      B.sphere(0.098, 0x080e20,  0.145, 0.505, 0.342, 0.66, 1.45, 0.34, 14),
+      B.sphere(0.090, 0x162c63, -0.145, 0.495, 0.352, 0.62, 1.34, 0.32, 14),
+      B.sphere(0.090, 0x162c63,  0.145, 0.495, 0.352, 0.62, 1.34, 0.32, 14),
+      B.sphere(0.086, 0x2f6ad0, -0.145, 0.442, 0.354, 0.60, 0.62, 0.30, 12),   // 아래쪽 푸른빛
+      B.sphere(0.086, 0x2f6ad0,  0.145, 0.442, 0.354, 0.60, 0.62, 0.30, 12),
+      B.sphere(0.070, 0xffffff, -0.145, 0.552, 0.360, 0.64, 0.74, 0.28, 12),   // 흰 하이라이트
+      B.sphere(0.070, 0xffffff,  0.145, 0.552, 0.360, 0.64, 0.74, 0.28, 12),
 
-      /* 큰 눈 */
-      B.sphere(0.085, 0xffffff, -0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 10),
-      B.sphere(0.085, 0xffffff, 0.094, 0.792, 0.295, 0.95, 1.15, 0.60, 10),
-      B.sphere(0.045, 0x191c22, -0.094, 0.784, 0.332, 1, 1.05, 0.55, 8),
-      B.sphere(0.045, 0x191c22, 0.094, 0.784, 0.332, 1, 1.05, 0.55, 8),
-      B.sphere(0.021, 0xffffff, -0.114, 0.820, 0.358, 1, 1, 0.5, 6),   // 눈 반짝임
-      B.sphere(0.021, 0xffffff, 0.114, 0.820, 0.358, 1, 1, 0.5, 6),
-      B.box(0.082, 0.019, 0.024, cap, -0.094, 0.880, 0.310, 0.24),     // 눈썹
-      B.box(0.082, 0.019, 0.024, cap, 0.094, 0.880, 0.310, 0.24),
+      /* 발그레한 볼 */
+      B.sphere(0.082, cheek, -0.265, 0.358, 0.300, 1.25, 0.62, 0.26, 12),
+      B.sphere(0.082, cheek,  0.265, 0.358, 0.300, 1.25, 0.62, 0.26, 12),
 
-      /* 작은 입 */
-      B.sphere(0.040, 0x7d3f3c, 0, 0.702, 0.312, 1, 0.55, 0.45, 8),
+      /* 작게 벌린 입 */
+      B.sphere(0.064, 0x8f2f26, 0, 0.318, 0.392, 1.0, 1.05, 0.28, 12),
+      B.sphere(0.045, 0x5a1712, 0, 0.310, 0.404, 0.9, 0.90, 0.20, 10),
 
       /* 등에 멘 작은 가방 */
-      B.sphere(0.16, trim, 0, 0.40, -0.235, 1, 1.15, 0.6, 8),
-      B.box(0.20, 0.05, 0.06, dark, 0, 0.50, -0.235)
+      B.sphere(0.17, trim, 0, 0.30, -0.275, 1.0, 1.05, 0.55, 12),
+      B.box(0.21, 0.05, 0.06, dark, 0, 0.40, -0.275)
     ];
 
     if (S.helmet) {                                    // 챙 달린 모자
-      torsoParts.push(B.sphere(0.245, S.helmet, 0, 0.885, 0.0, 1.02, 0.62, 1.0, 14));
-      torsoParts.push(B.box(0.26, 0.035, 0.15, S.helmet, 0, 0.868, 0.175));
+      torsoParts.push(B.sphere(0.268, S.helmet, 0, 0.790, -0.01, 1.0, 0.52, 1.0, 16));
+      torsoParts.push(B.box(0.27, 0.035, 0.17, S.helmet, 0, 0.762, 0.215));
     } else {                                           // 모자가 없으면 머리카락
-      torsoParts.push(B.sphere(0.235, S.hair || 0x2b2119, 0, 0.885, -0.01, 1.02, 0.60, 1.0, 12));
+      torsoParts.push(B.sphere(0.268, S.hair || 0x2b2119, 0, 0.795, -0.02, 1.0, 0.50, 1.0, 16));
     }
 
-    /* 팔: 어깨 관절이 원점, 짧고 통통하게 */
+    /* 팔: 마디 없이 매끈하게 이어지는 짧은 팔 */
     const arm = [
-      B.sphere(0.098, body, 0, -0.02, 0, 1, 1, 1, 8),
-      B.pillar(0.090, 0.082, 0.22, body, 0, -0.13, 0),
-      B.sphere(0.100, trim, 0, -0.27, 0.01, 1, 0.95, 1, 8)      // 장갑 낀 손
+      B.sphere(0.112, body, 0, -0.03, 0, 1.0, 1.0, 1.0, 10),
+      B.sphere(0.104, body, 0, -0.12, 0, 0.98, 1.35, 0.98, 10),
+      B.sphere(0.098, body, 0, -0.235, 0.01, 1.02, 1.0, 1.02, 10)   // 동그란 손
     ];
 
-    /* 다리: 짧은 허벅지와 종아리, 둥근 신발 */
+    /* 다리는 보이지 않습니다. 몸 바로 아래에 넓적한 발만 붙습니다 */
     const thigh = [
-      B.pillar(0.118, 0.106, 0.26, pants, 0, -0.13, 0),
-      B.sphere(0.108, pants, 0, -0.26, 0, 1, 1, 1, 8)
+      B.sphere(0.03, foot, 0, -0.02, 0, 1, 1, 1, 5)      // 몸 속에 숨는 이음매
     ];
     const shin = [
-      B.pillar(0.104, 0.098, 0.17, pants, 0, -0.085, 0),
-      B.sphere(0.128, boots, 0, -0.185, 0.030, 1, 0.72, 1.28, 8)  // 신발
+      B.sphere(0.195, foot, 0, 0.075, 0.045, 0.94, 0.60, 1.30, 16)
     ];
 
     return {
@@ -619,14 +725,14 @@ class Char3D {
     this.hips.add(this.torso);
 
     // 정면이 +Z 이므로 캐릭터의 오른쪽은 로컬 -X 입니다
-    this.armR = new THREE.Group(); this.armR.position.set(-0.325, 0.60, 0);
-    this.armL = new THREE.Group(); this.armL.position.set(0.325, 0.60, 0);
+    this.armR = new THREE.Group(); this.armR.position.set(-0.395, 0.44, 0);
+    this.armL = new THREE.Group(); this.armL.position.set(0.395, 0.44, 0);
     this.armL.add(mesh(art.arm)); this.armR.add(mesh(art.arm));
     this.hips.add(this.armL); this.hips.add(this.armR);
 
     // 총은 오른손 앞에 붙입니다
     this.gunMount = new THREE.Group();
-    this.gunMount.position.set(-0.02, -0.32, 0.17);
+    this.gunMount.position.set(0.03, -0.25, 0.15);
     this.armR.add(this.gunMount);
     this.gunMesh = null;
 
@@ -715,15 +821,15 @@ class Char3D {
     if (this.helmet) {
       const c = HELMETS[this.helmet].color, strap = 0x2a2d33;
       const parts = [
-        B.sphere(0.262, c, 0, 0.895, 0.0, 1.03, 0.72, 1.04, 14),        // 헬멧 껍데기
-        B.box(0.30, 0.045, 0.17, c, 0, 0.858, 0.185),                   // 챙
-        B.box(0.05, 0.10, 0.04, strap, -0.20, 0.775, 0.04),             // 턱끈
-        B.box(0.05, 0.10, 0.04, strap, 0.20, 0.775, 0.04)
+        B.sphere(0.318, c, 0, 0.760, 0.0, 1.02, 0.60, 1.03, 18),        // 헬멧 껍데기 (몸이 곧 머리)
+        B.box(0.34, 0.045, 0.19, c, 0, 0.722, 0.225),                   // 챙
+        B.box(0.06, 0.13, 0.05, strap, -0.285, 0.645, 0.14),            // 턱끈
+        B.box(0.06, 0.13, 0.05, strap, 0.285, 0.645, 0.14)
       ];
-      if (this.helmet >= 2) parts.push(B.box(0.09, 0.05, 0.10, strap, 0.20, 0.925, 0.02));  // 옆 부착물
+      if (this.helmet >= 2) parts.push(B.box(0.10, 0.06, 0.12, strap, 0.275, 0.790, 0.02)); // 옆 부착물
       if (this.helmet >= 3) {
-        parts.push(B.box(0.30, 0.05, 0.05, strap, 0, 0.985, 0.0));       // 윗면 레일
-        parts.push(B.box(0.07, 0.09, 0.07, 0x1f2227, 0, 0.955, 0.16));   // 앞쪽 야시경 거치대
+        parts.push(B.box(0.34, 0.05, 0.06, strap, 0, 0.868, 0.0));       // 윗면 레일
+        parts.push(B.box(0.08, 0.10, 0.08, 0x1f2227, 0, 0.828, 0.20));   // 앞쪽 야시경 거치대
       }
       this.helmetMesh = new THREE.Mesh(B.merge(parts), mat);
       this.helmetMesh.castShadow = true;
@@ -732,14 +838,14 @@ class Char3D {
     if (this.vest) {
       const c = VESTS[this.vest].color;
       const parts = [
-        B.sphere(0.362, c, 0, 0.48, 0, 1.0, 0.62, 0.98, 14),          // 몸판
-        B.sphere(0.345, 0x2a2d33, 0, 0.30, 0, 1.02, 0.16, 1.0, 12),   // 아래 띠
-        B.box(0.10, 0.30, 0.05, 0x2a2d33, -0.13, 0.55, 0.29),         // 어깨 끈
-        B.box(0.10, 0.30, 0.05, 0x2a2d33, 0.13, 0.55, 0.29),
-        B.box(0.15, 0.11, 0.06, 0x2a2d33, 0, 0.42, 0.31)              // 탄창 주머니
+        B.sphere(0.408, c, 0, 0.215, 0, 1.0, 0.72, 0.98, 16),         // 몸판 (배 둘레)
+        B.sphere(0.400, 0x2a2d33, 0, 0.075, 0, 1.02, 0.16, 1.0, 14),  // 아래 띠
+        B.box(0.10, 0.26, 0.05, 0x2a2d33, -0.15, 0.315, 0.33),        // 어깨 끈
+        B.box(0.10, 0.26, 0.05, 0x2a2d33, 0.15, 0.315, 0.33),
+        B.box(0.16, 0.11, 0.06, 0x2a2d33, 0, 0.185, 0.355)            // 탄창 주머니
       ];
       for (let i = 0; i < this.vest; i++) {
-        parts.push(B.box(0.045, 0.045, 0.02, 0xf0c453, -0.05 + i * 0.05, 0.62, 0.33));
+        parts.push(B.box(0.045, 0.045, 0.02, 0xf0c453, -0.05 + i * 0.05, 0.290, 0.375));
       }
       this.vestMesh = new THREE.Mesh(B.merge(parts), mat);
       this.vestMesh.castShadow = true;
@@ -749,9 +855,9 @@ class Char3D {
       const c = BAGS[this.bag].color;
       const w = 0.34 + this.bag * 0.05, h = 0.34 + this.bag * 0.07, dz = 0.16 + this.bag * 0.035;
       const parts = [
-        B.box(w, h, dz, c, 0, 0.44, -0.30 - dz / 2),
-        B.box(w * 0.86, h * 0.32, dz * 0.6, c, 0, 0.44 + h * 0.24, -0.30 - dz * 0.9),
-        B.box(w * 0.7, 0.05, 0.03, 0x2a2d33, 0, 0.40, -0.30 - dz - 0.01)
+        B.box(w, h, dz, c, 0, 0.30, -0.33 - dz / 2),
+        B.box(w * 0.86, h * 0.32, dz * 0.6, c, 0, 0.30 + h * 0.24, -0.33 - dz * 0.9),
+        B.box(w * 0.7, 0.05, 0.03, 0x2a2d33, 0, 0.26, -0.33 - dz - 0.01)
       ];
       this.bagMesh = new THREE.Mesh(B.merge(parts), mat);
       this.bagMesh.castShadow = true;
