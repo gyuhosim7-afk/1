@@ -87,6 +87,7 @@ const GUNS = {
   /* ---------- 기관단총 ---------- */
   smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
   vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
+  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0x8fd3f4, model:'smg' },
 
   /* ---------- 산탄총 ---------- */
   shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
@@ -100,6 +101,10 @@ const GUNS = {
   /* ---------- 지정사수총 ---------- */
   dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
   mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
+  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0xff9a5b, model:'dmr' },
+  /* VSS 는 소음기와 조준경이 총에 붙어 있습니다. 조준경을 따로 달 수 없는 대신
+     처음부터 4배율로 보이고 총성이 훨씬 작게 들립니다. */
+  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0x9aa8b5, model:'vss' },
 
   /* ---------- 저격총 ---------- */
   kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
@@ -113,8 +118,8 @@ const GUNS = {
 
 const GUN_KEYS = Object.keys(GUNS);
 /* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
-const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','shotgun','s12k',
-                   'rifle','rifle','scar','ak','ak','dmr','mini14','kar98'];
+const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','mp5k','shotgun','s12k',
+                   'rifle','rifle','scar','ak','ak','dmr','mini14','slr','vss','kar98'];
 /* 보급 상자 전용 무기 */
 const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
 /* 바닥에 떨어지는 탄약 구경 */
@@ -137,6 +142,12 @@ const VESTS = {
   1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
   2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
   3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+};
+/* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
+const HELMETS = {
+  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
+  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x3f6b8a },
+  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
 };
 const BAGS = {
   1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
@@ -164,7 +175,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 const DROP_TABLE = {
   guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
-  vest: 3, bag: 3, meds: 2
+  vest: 3, bag: 3, helmet: 3, meds: 2
 };
 
 /* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.

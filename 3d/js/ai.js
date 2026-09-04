@@ -167,7 +167,7 @@ const AI = {
     }
 
     // 아이템 찾기 (무기·탄약뿐 아니라 조끼와 가방도 챕니다)
-    const wantGear = bot.vest < 3 || bot.bag < 3;
+    const wantGear = bot.vest < 3 || bot.bag < 3 || bot.helmet < 3;
     if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70) || wantGear) {
       let target = null, bd = 80 * 80;
       for (const l of game.loots) {
@@ -176,6 +176,7 @@ const AI = {
             (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
+        if (l.kind === 'helmet' && bot.helmet >= l.level) continue;
         if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;

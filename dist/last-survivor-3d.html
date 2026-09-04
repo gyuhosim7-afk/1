@@ -597,6 +597,14 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 }
 .gi.vest::before { left: 2px; }
 .gi.vest::after { right: 2px; }
+.gi.helmet {
+  background: #d9e2ec; border-radius: 7px 7px 3px 3px; height: 11px; margin-top: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+}
+.gi.helmet::before {
+  content: ''; position: absolute; left: -1.5px; right: -1.5px; bottom: -1px; height: 3px;
+  background: #d9e2ec; border-radius: 1px;
+}
 .gi.bag {
   background: #c7a86b; border-radius: 3px 3px 2px 2px; height: 13px; margin-top: 1px;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);
@@ -716,6 +724,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
       <span id="hpText">100</span>
       <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
       <div id="gear">
+        <span id="helmetTag" class="gearTag off"><i class="gi helmet"></i><b>-</b></span>
         <span id="vestTag" class="gearTag off"><i class="gi vest"></i><b>-</b></span>
         <span id="bagTag" class="gearTag off"><i class="gi bag"></i><b>-</b></span>
       </div>
@@ -1021,6 +1030,7 @@ const GUNS = {
   /* ---------- 기관단총 ---------- */
   smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
   vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
+  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0x8fd3f4, model:'smg' },
 
   /* ---------- 산탄총 ---------- */
   shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
@@ -1034,6 +1044,10 @@ const GUNS = {
   /* ---------- 지정사수총 ---------- */
   dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
   mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
+  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0xff9a5b, model:'dmr' },
+  /* VSS 는 소음기와 조준경이 총에 붙어 있습니다. 조준경을 따로 달 수 없는 대신
+     처음부터 4배율로 보이고 총성이 훨씬 작게 들립니다. */
+  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0x9aa8b5, model:'vss' },
 
   /* ---------- 저격총 ---------- */
   kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
@@ -1047,8 +1061,8 @@ const GUNS = {
 
 const GUN_KEYS = Object.keys(GUNS);
 /* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
-const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','shotgun','s12k',
-                   'rifle','rifle','scar','ak','ak','dmr','mini14','kar98'];
+const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','mp5k','shotgun','s12k',
+                   'rifle','rifle','scar','ak','ak','dmr','mini14','slr','vss','kar98'];
 /* 보급 상자 전용 무기 */
 const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
 /* 바닥에 떨어지는 탄약 구경 */
@@ -1071,6 +1085,12 @@ const VESTS = {
   1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
   2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
   3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+};
+/* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
+const HELMETS = {
+  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
+  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x3f6b8a },
+  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
 };
 const BAGS = {
   1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
@@ -1098,7 +1118,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 const DROP_TABLE = {
   guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
-  vest: 3, bag: 3, meds: 2
+  vest: 3, bag: 3, helmet: 3, meds: 2
 };
 
 /* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.
@@ -3342,6 +3362,20 @@ const GunArt = {
         B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
         B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
       ];
+      case 'vss': return [
+        B.box(0.068, 0.115, 0.30, D, 0, 0.02, 0.0),
+        B.tube(0.036, 0.40, D, 0, 0.03, 0.36),              // 총열을 감싼 소음기
+        B.tube(0.042, 0.05, M, 0, 0.03, 0.58),
+        B.box(0.05, 0.14, 0.09, D, 0, -0.10, -0.02, 0.10),
+        B.box(0.062, 0.115, 0.26, W, 0, -0.01, -0.26),      // 나무 개머리판
+        B.box(0.05, 0.022, 0.24, A, 0, 0.085, 0.02),
+        // 붙박이 조준경
+        B.tube(0.034, 0.22, D, 0, 0.165, 0.05),
+        B.tube(0.042, 0.03, M, 0, 0.165, 0.16),
+        B.box(0.03, 0.06, 0.03, D, 0, 0.115, -0.02),
+        B.box(0.03, 0.06, 0.03, D, 0, 0.115, 0.13),
+        B.box(0.02, 0.016, 0.02, 0x7ee787, 0, 0.20, 0.05)
+      ];
       case 'lmg': return [
         B.box(0.085, 0.135, 0.46, M, 0, 0.02, 0.0),
         B.tube(0.020, 0.40, M, 0, 0.03, 0.44),
@@ -3372,6 +3406,7 @@ const LootArt = {
       else if (kind === 'ammo') this.cache[key] = Build.merge(this.ammoParts(gun));
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
       else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
+      else if (kind === 'helmet') this.cache[key] = Build.merge(this.helmetParts(level));
       else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
@@ -3413,6 +3448,20 @@ const LootArt = {
       B.pillar(0.001, 0.017, 0.03, brass, -0.04, 0.375, -0.03),
       B.pillar(0.001, 0.017, 0.03, brass, 0.02, 0.375, 0.04)
     ];
+  },
+
+  /* 바닥에 떨어진 헬멧 */
+  helmetParts(level) {
+    const B = Build, c = HELMETS[level].color, strap = 0x2a2d33;
+    const parts = [
+      B.sphere(0.19, c, 0, 0.20, 0, 1.0, 0.78, 1.05, 14),
+      B.box(0.22, 0.035, 0.13, c, 0, 0.155, 0.14),
+      B.box(0.30, 0.04, 0.30, strap, 0, 0.055, 0)
+    ];
+    for (let i = 0; i < level; i++) {
+      parts.push(B.box(0.035, 0.035, 0.018, 0xf0c453, -0.04 + i * 0.04, 0.245, 0.145));
+    }
+    return parts;
   },
 
   /* 바닥에 떨어진 방탄조끼 */
@@ -3470,7 +3519,7 @@ class Loot {
   constructor(x, z, kind, gun, amount, level, fixedY) {
     const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
-    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
+    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'helmet' | 'bag'
     // 'ammo' 일 때는 gun 자리에 총 이름이 아니라 '구경' 이 들어옵니다 ('556' 등)
     this.gun = gun || null;
     this.amount = amount || 0;
@@ -3482,7 +3531,8 @@ class Loot {
       : (kind === 'ammo' ? (CALIBERS[gun] || CALIBERS['9mm']).color
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
-      : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
+      : (kind === 'bag' ? 0xc7a86b
+      : (kind === 'helmet' ? 0xd9e2ec : 0xff6b6b)))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -3507,6 +3557,7 @@ class Loot {
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
+    if (this.kind === 'helmet') return HELMETS[this.level].name + ' (머리 피해 -' + Math.round(HELMETS[this.level].reduce * 100) + '%)';
     return '구급상자';
   }
 
@@ -3705,6 +3756,7 @@ class Char3D {
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
+    this.helmet = 0;               // 헬멧 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
     this.vehicle = null;           // 타고 있는 차량
     this.climb = null;             // 기어오르는 중 { t, from, to }
@@ -3780,7 +3832,11 @@ class Char3D {
   set mag(v) { this.mags[this.slot] = v; }
   get other() { return this.guns[1 - this.slot]; }
   get zoom() {
-    if (!this.gun || this.scopeOff[this.slot]) return 1;
+    if (!this.gun) return 1;
+    // 총에 붙어 있는 조준경은 뗄 수 없습니다 (VSS)
+    const built = GUNS[this.gun].builtScope || 0;
+    if (built) return built;
+    if (this.scopeOff[this.slot]) return 1;
     return this.scopes[this.slot] || 1;
   }
   get scopeStowed() { return !!(this.scopes[this.slot] && this.scopeOff[this.slot]); }
@@ -3795,8 +3851,10 @@ class Char3D {
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
   get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
   get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
-  /* 조끼가 막아 주는 피해 비율 */
+  /* 조끼가 막아 주는 피해 비율 (몸통) */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
+  /* 헬멧이 막아 주는 피해 비율 (머리) */
+  get headArmor() { return this.helmet ? HELMETS[this.helmet].reduce : 0; }
 
   /* 탄약을 구경별 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
   addAmmo(cal, n) {
@@ -3813,18 +3871,36 @@ class Char3D {
 
   /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
   wear(kind, level) {
-    const cur = kind === 'vest' ? this.vest : this.bag;
+    const cur = this[kind] || 0;
     if (cur >= level) return -1;
-    if (kind === 'vest') this.vest = level; else this.bag = level;
+    this[kind] = level;
     this.refreshGear();
     return cur;
   }
 
-  /* 조끼와 가방을 몸에 붙입니다 */
+  /* 조끼·가방·헬멧을 몸에 붙입니다 */
   refreshGear() {
     const B = Build, mat = Mats.vc({ roughness: 0.7, metalness: 0.05 });
     if (this.vestMesh) { this.hips.remove(this.vestMesh); this.vestMesh = null; }
     if (this.bagMesh) { this.hips.remove(this.bagMesh); this.bagMesh = null; }
+    if (this.helmetMesh) { this.hips.remove(this.helmetMesh); this.helmetMesh = null; }
+    if (this.helmet) {
+      const c = HELMETS[this.helmet].color, strap = 0x2a2d33;
+      const parts = [
+        B.sphere(0.262, c, 0, 0.895, 0.0, 1.03, 0.72, 1.04, 14),        // 헬멧 껍데기
+        B.box(0.30, 0.045, 0.17, c, 0, 0.858, 0.185),                   // 챙
+        B.box(0.05, 0.10, 0.04, strap, -0.20, 0.775, 0.04),             // 턱끈
+        B.box(0.05, 0.10, 0.04, strap, 0.20, 0.775, 0.04)
+      ];
+      if (this.helmet >= 2) parts.push(B.box(0.09, 0.05, 0.10, strap, 0.20, 0.925, 0.02));  // 옆 부착물
+      if (this.helmet >= 3) {
+        parts.push(B.box(0.30, 0.05, 0.05, strap, 0, 0.985, 0.0));       // 윗면 레일
+        parts.push(B.box(0.07, 0.09, 0.07, 0x1f2227, 0, 0.955, 0.16));   // 앞쪽 야시경 거치대
+      }
+      this.helmetMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.helmetMesh.castShadow = true;
+      this.hips.add(this.helmetMesh);
+    }
     if (this.vest) {
       const c = VESTS[this.vest].color;
       const parts = [
@@ -4457,6 +4533,7 @@ class Airdrop {
       { kind: 'gun', gun, amount: CALIBERS[GUNS[gun].ammo].box * 2 },
       { kind: 'scope', level: scope },
       { kind: 'vest', level: t.vest },
+      { kind: 'helmet', level: t.helmet },
       { kind: 'bag', level: t.bag },
       { kind: 'med', amount: t.meds }
     ];
@@ -4632,7 +4709,7 @@ const AI = {
     }
 
     // 아이템 찾기 (무기·탄약뿐 아니라 조끼와 가방도 챕니다)
-    const wantGear = bot.vest < 3 || bot.bag < 3;
+    const wantGear = bot.vest < 3 || bot.bag < 3 || bot.helmet < 3;
     if (noAmmo || (bot.reserveAmmo < 20 && bot.mag < 8) || (bot.meds < 1 && bot.hp < 70) || wantGear) {
       let target = null, bd = 80 * 80;
       for (const l of game.loots) {
@@ -4641,6 +4718,7 @@ const AI = {
             (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
+        if (l.kind === 'helmet' && bot.helmet >= l.level) continue;
         if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;
@@ -4991,6 +5069,7 @@ const Game = {
       for (const c of LOOT_CALIBERS) b.reserve[c] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
+      if (Math.random() < 0.28) b.wear('helmet', 1);
       if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
@@ -5058,9 +5137,11 @@ const Game = {
       } else if (roll < 0.72) {
         const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
         l = new Loot(x, z, 'scope', null, 0, lv, y);
-      } else if (roll < 0.83) {
+      } else if (roll < 0.80) {
         l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
-      } else if (roll < 0.92) {
+      } else if (roll < 0.87) {
+        l = new Loot(x, z, 'helmet', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.94) {
         l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else {
         l = new Loot(x, z, 'med', null, 1, 0, y);
@@ -5430,7 +5511,9 @@ const Game = {
       }
     }
 
-    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos);
+    // 소음기가 달린 총(VSS)은 훨씬 멀리서만 들립니다
+    const quiet = spec.quiet || 1;
+    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos) / quiet;
     Sfx.shot(shotD, ch.gun, this.indoors(ch));
     if (ch !== this.player) {
       // 총알이 내 옆을 스치면 총성보다 먼저 '탁' 하는 파열음이 지나갑니다
@@ -5636,8 +5719,12 @@ const Game = {
 
   damage(target, amount, src, head, isZone) {
     if (target.dead) return;
-    // 방탄조끼는 몸에 맞은 피해만 줄여 줍니다 (머리와 자기장은 그대로)
-    if (!isZone && !head && target.armor > 0) amount *= (1 - target.armor);
+    /* 방어구: 몸통은 조끼가, 머리는 헬멧이 막아 줍니다.
+       자기장 피해는 어느 쪽도 막지 못합니다. */
+    if (!isZone) {
+      if (head) { if (target.headArmor > 0) amount *= (1 - target.headArmor); }
+      else if (target.armor > 0) amount *= (1 - target.armor);
+    }
     target.hp -= amount;
     if (!isZone) {
       target.hitFlash = 0.12;
@@ -5693,6 +5780,10 @@ const Game = {
     }
     if (c.vest) {
       const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.helmet) {
+      const l = new Loot(c.pos.x + 1.1, c.pos.z - 1.4, 'helmet', null, 0, c.helmet, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
     if (c.bag) {
@@ -5759,7 +5850,7 @@ const Game = {
         return false;
       }
       if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
-    } else if (l.kind === 'vest' || l.kind === 'bag') {
+    } else if (l.kind === 'vest' || l.kind === 'bag' || l.kind === 'helmet') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
         if (ch === this.player) this.pushFeed('이미 더 좋은 것을 착용 중입니다');
@@ -5771,7 +5862,8 @@ const Game = {
         this.scene.add(d.mesh); this.loots.push(d);
       }
       if (ch === this.player) {
-        this.pushFeed((l.kind === 'vest' ? VESTS : BAGS)[l.level].name + ' 착용');
+        const table = l.kind === 'vest' ? VESTS : (l.kind === 'helmet' ? HELMETS : BAGS);
+        this.pushFeed(table[l.level].name + ' 착용');
       }
     } else {
       const cap = ch.medCap;
@@ -7182,7 +7274,7 @@ const UI = {
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'bagTag', 'speedo', 'debug'];
+      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -7277,6 +7369,7 @@ const UI = {
       el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
       el.title = lv ? table[lv].name : '없음';
     };
+    tag(this.el.helmetTag, p.helmet, HELMETS);
     tag(this.el.vestTag, p.vest, VESTS);
     tag(this.el.bagTag, p.bag, BAGS);
 

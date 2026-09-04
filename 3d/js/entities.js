@@ -190,6 +190,20 @@ const GunArt = {
         B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
         B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
       ];
+      case 'vss': return [
+        B.box(0.068, 0.115, 0.30, D, 0, 0.02, 0.0),
+        B.tube(0.036, 0.40, D, 0, 0.03, 0.36),              // 총열을 감싼 소음기
+        B.tube(0.042, 0.05, M, 0, 0.03, 0.58),
+        B.box(0.05, 0.14, 0.09, D, 0, -0.10, -0.02, 0.10),
+        B.box(0.062, 0.115, 0.26, W, 0, -0.01, -0.26),      // 나무 개머리판
+        B.box(0.05, 0.022, 0.24, A, 0, 0.085, 0.02),
+        // 붙박이 조준경
+        B.tube(0.034, 0.22, D, 0, 0.165, 0.05),
+        B.tube(0.042, 0.03, M, 0, 0.165, 0.16),
+        B.box(0.03, 0.06, 0.03, D, 0, 0.115, -0.02),
+        B.box(0.03, 0.06, 0.03, D, 0, 0.115, 0.13),
+        B.box(0.02, 0.016, 0.02, 0x7ee787, 0, 0.20, 0.05)
+      ];
       case 'lmg': return [
         B.box(0.085, 0.135, 0.46, M, 0, 0.02, 0.0),
         B.tube(0.020, 0.40, M, 0, 0.03, 0.44),
@@ -220,6 +234,7 @@ const LootArt = {
       else if (kind === 'ammo') this.cache[key] = Build.merge(this.ammoParts(gun));
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
       else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
+      else if (kind === 'helmet') this.cache[key] = Build.merge(this.helmetParts(level));
       else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
@@ -261,6 +276,20 @@ const LootArt = {
       B.pillar(0.001, 0.017, 0.03, brass, -0.04, 0.375, -0.03),
       B.pillar(0.001, 0.017, 0.03, brass, 0.02, 0.375, 0.04)
     ];
+  },
+
+  /* 바닥에 떨어진 헬멧 */
+  helmetParts(level) {
+    const B = Build, c = HELMETS[level].color, strap = 0x2a2d33;
+    const parts = [
+      B.sphere(0.19, c, 0, 0.20, 0, 1.0, 0.78, 1.05, 14),
+      B.box(0.22, 0.035, 0.13, c, 0, 0.155, 0.14),
+      B.box(0.30, 0.04, 0.30, strap, 0, 0.055, 0)
+    ];
+    for (let i = 0; i < level; i++) {
+      parts.push(B.box(0.035, 0.035, 0.018, 0xf0c453, -0.04 + i * 0.04, 0.245, 0.145));
+    }
+    return parts;
   },
 
   /* 바닥에 떨어진 방탄조끼 */
@@ -318,7 +347,7 @@ class Loot {
   constructor(x, z, kind, gun, amount, level, fixedY) {
     const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
-    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
+    this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'helmet' | 'bag'
     // 'ammo' 일 때는 gun 자리에 총 이름이 아니라 '구경' 이 들어옵니다 ('556' 등)
     this.gun = gun || null;
     this.amount = amount || 0;
@@ -330,7 +359,8 @@ class Loot {
       : (kind === 'ammo' ? (CALIBERS[gun] || CALIBERS['9mm']).color
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
-      : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
+      : (kind === 'bag' ? 0xc7a86b
+      : (kind === 'helmet' ? 0xd9e2ec : 0xff6b6b)))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -355,6 +385,7 @@ class Loot {
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
+    if (this.kind === 'helmet') return HELMETS[this.level].name + ' (머리 피해 -' + Math.round(HELMETS[this.level].reduce * 100) + '%)';
     return '구급상자';
   }
 
@@ -553,6 +584,7 @@ class Char3D {
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
+    this.helmet = 0;               // 헬멧 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
     this.vehicle = null;           // 타고 있는 차량
     this.climb = null;             // 기어오르는 중 { t, from, to }
@@ -628,7 +660,11 @@ class Char3D {
   set mag(v) { this.mags[this.slot] = v; }
   get other() { return this.guns[1 - this.slot]; }
   get zoom() {
-    if (!this.gun || this.scopeOff[this.slot]) return 1;
+    if (!this.gun) return 1;
+    // 총에 붙어 있는 조준경은 뗄 수 없습니다 (VSS)
+    const built = GUNS[this.gun].builtScope || 0;
+    if (built) return built;
+    if (this.scopeOff[this.slot]) return 1;
     return this.scopes[this.slot] || 1;
   }
   get scopeStowed() { return !!(this.scopes[this.slot] && this.scopeOff[this.slot]); }
@@ -643,8 +679,10 @@ class Char3D {
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
   get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
   get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
-  /* 조끼가 막아 주는 피해 비율 */
+  /* 조끼가 막아 주는 피해 비율 (몸통) */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
+  /* 헬멧이 막아 주는 피해 비율 (머리) */
+  get headArmor() { return this.helmet ? HELMETS[this.helmet].reduce : 0; }
 
   /* 탄약을 구경별 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
   addAmmo(cal, n) {
@@ -661,18 +699,36 @@ class Char3D {
 
   /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
   wear(kind, level) {
-    const cur = kind === 'vest' ? this.vest : this.bag;
+    const cur = this[kind] || 0;
     if (cur >= level) return -1;
-    if (kind === 'vest') this.vest = level; else this.bag = level;
+    this[kind] = level;
     this.refreshGear();
     return cur;
   }
 
-  /* 조끼와 가방을 몸에 붙입니다 */
+  /* 조끼·가방·헬멧을 몸에 붙입니다 */
   refreshGear() {
     const B = Build, mat = Mats.vc({ roughness: 0.7, metalness: 0.05 });
     if (this.vestMesh) { this.hips.remove(this.vestMesh); this.vestMesh = null; }
     if (this.bagMesh) { this.hips.remove(this.bagMesh); this.bagMesh = null; }
+    if (this.helmetMesh) { this.hips.remove(this.helmetMesh); this.helmetMesh = null; }
+    if (this.helmet) {
+      const c = HELMETS[this.helmet].color, strap = 0x2a2d33;
+      const parts = [
+        B.sphere(0.262, c, 0, 0.895, 0.0, 1.03, 0.72, 1.04, 14),        // 헬멧 껍데기
+        B.box(0.30, 0.045, 0.17, c, 0, 0.858, 0.185),                   // 챙
+        B.box(0.05, 0.10, 0.04, strap, -0.20, 0.775, 0.04),             // 턱끈
+        B.box(0.05, 0.10, 0.04, strap, 0.20, 0.775, 0.04)
+      ];
+      if (this.helmet >= 2) parts.push(B.box(0.09, 0.05, 0.10, strap, 0.20, 0.925, 0.02));  // 옆 부착물
+      if (this.helmet >= 3) {
+        parts.push(B.box(0.30, 0.05, 0.05, strap, 0, 0.985, 0.0));       // 윗면 레일
+        parts.push(B.box(0.07, 0.09, 0.07, 0x1f2227, 0, 0.955, 0.16));   // 앞쪽 야시경 거치대
+      }
+      this.helmetMesh = new THREE.Mesh(B.merge(parts), mat);
+      this.helmetMesh.castShadow = true;
+      this.hips.add(this.helmetMesh);
+    }
     if (this.vest) {
       const c = VESTS[this.vest].color;
       const parts = [
@@ -1305,6 +1361,7 @@ class Airdrop {
       { kind: 'gun', gun, amount: CALIBERS[GUNS[gun].ammo].box * 2 },
       { kind: 'scope', level: scope },
       { kind: 'vest', level: t.vest },
+      { kind: 'helmet', level: t.helmet },
       { kind: 'bag', level: t.bag },
       { kind: 'med', amount: t.meds }
     ];

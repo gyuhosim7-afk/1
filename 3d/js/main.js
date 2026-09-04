@@ -64,7 +64,7 @@ const UI = {
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'bagTag', 'speedo', 'debug'];
+      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -159,6 +159,7 @@ const UI = {
       el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
       el.title = lv ? table[lv].name : '없음';
     };
+    tag(this.el.helmetTag, p.helmet, HELMETS);
     tag(this.el.vestTag, p.vest, VESTS);
     tag(this.el.bagTag, p.bag, BAGS);
 

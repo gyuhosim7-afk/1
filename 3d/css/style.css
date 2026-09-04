@@ -595,6 +595,14 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 }
 .gi.vest::before { left: 2px; }
 .gi.vest::after { right: 2px; }
+.gi.helmet {
+  background: #d9e2ec; border-radius: 7px 7px 3px 3px; height: 11px; margin-top: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+}
+.gi.helmet::before {
+  content: ''; position: absolute; left: -1.5px; right: -1.5px; bottom: -1px; height: 3px;
+  background: #d9e2ec; border-radius: 1px;
+}
 .gi.bag {
   background: #c7a86b; border-radius: 3px 3px 2px 2px; height: 13px; margin-top: 1px;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.3);

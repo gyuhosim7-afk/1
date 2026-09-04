@@ -262,6 +262,7 @@ const Game = {
       for (const c of LOOT_CALIBERS) b.reserve[c] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
+      if (Math.random() < 0.28) b.wear('helmet', 1);
       if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
@@ -329,9 +330,11 @@ const Game = {
       } else if (roll < 0.72) {
         const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
         l = new Loot(x, z, 'scope', null, 0, lv, y);
-      } else if (roll < 0.83) {
+      } else if (roll < 0.80) {
         l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
-      } else if (roll < 0.92) {
+      } else if (roll < 0.87) {
+        l = new Loot(x, z, 'helmet', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.94) {
         l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else {
         l = new Loot(x, z, 'med', null, 1, 0, y);
@@ -701,7 +704,9 @@ const Game = {
       }
     }
 
-    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos);
+    // 소음기가 달린 총(VSS)은 훨씬 멀리서만 들립니다
+    const quiet = spec.quiet || 1;
+    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos) / quiet;
     Sfx.shot(shotD, ch.gun, this.indoors(ch));
     if (ch !== this.player) {
       // 총알이 내 옆을 스치면 총성보다 먼저 '탁' 하는 파열음이 지나갑니다
@@ -907,8 +912,12 @@ const Game = {
 
   damage(target, amount, src, head, isZone) {
     if (target.dead) return;
-    // 방탄조끼는 몸에 맞은 피해만 줄여 줍니다 (머리와 자기장은 그대로)
-    if (!isZone && !head && target.armor > 0) amount *= (1 - target.armor);
+    /* 방어구: 몸통은 조끼가, 머리는 헬멧이 막아 줍니다.
+       자기장 피해는 어느 쪽도 막지 못합니다. */
+    if (!isZone) {
+      if (head) { if (target.headArmor > 0) amount *= (1 - target.headArmor); }
+      else if (target.armor > 0) amount *= (1 - target.armor);
+    }
     target.hp -= amount;
     if (!isZone) {
       target.hitFlash = 0.12;
@@ -964,6 +973,10 @@ const Game = {
     }
     if (c.vest) {
       const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
+    if (c.helmet) {
+      const l = new Loot(c.pos.x + 1.1, c.pos.z - 1.4, 'helmet', null, 0, c.helmet, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
     if (c.bag) {
@@ -1030,7 +1043,7 @@ const Game = {
         return false;
       }
       if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
-    } else if (l.kind === 'vest' || l.kind === 'bag') {
+    } else if (l.kind === 'vest' || l.kind === 'bag' || l.kind === 'helmet') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
         if (ch === this.player) this.pushFeed('이미 더 좋은 것을 착용 중입니다');
@@ -1042,7 +1055,8 @@ const Game = {
         this.scene.add(d.mesh); this.loots.push(d);
       }
       if (ch === this.player) {
-        this.pushFeed((l.kind === 'vest' ? VESTS : BAGS)[l.level].name + ' 착용');
+        const table = l.kind === 'vest' ? VESTS : (l.kind === 'helmet' ? HELMETS : BAGS);
+        this.pushFeed(table[l.level].name + ' 착용');
       }
     } else {
       const cap = ch.medCap;
