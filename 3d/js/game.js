@@ -513,7 +513,7 @@ const Game = {
     // 시점
     // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
     const zoomAdj = this.ads ? Settings.data.ads * Math.sqrt(this.camera.fov / CFG.FOV) : 1;
-    const s = 0.0022 * Settings.data.sens * zoomAdj;
+    const s = 0.0018 * Settings.data.sens * zoomAdj;   // 기본 감도를 조금 낮췄습니다
     this.look.yaw -= input.dx * s;
     this.look.pitch -= input.dy * s * (Settings.data.invert ? -1 : 1);
     this.look.pitch = Math.max(-1.15, Math.min(0.95, this.look.pitch));
@@ -928,12 +928,32 @@ const Game = {
     const len = Math.hypot(mx, mz);
     if (len > 0.0001) { mx /= len; mz /= len; } else { mx = 0; mz = 0; }
     const before = { x: ch.pos.x, z: ch.pos.z };
+    const bodyH = ch.crouch ? 1.35 : CFG.BODY_H;
 
-    const nx = ch.pos.x + mx * speed * dt;
-    const nz = ch.pos.z + mz * speed * dt;
-    const headY = ch.pos.y + (ch.crouch ? 1.35 : CFG.BODY_H);
-    const res = World.resolve(nx, nz, CFG.BODY_R, ch.pos.y, headY);
-    ch.pos.x = res.x; ch.pos.z = res.z;
+    /* 한 프레임에 벽을 뚫지 않도록 이동을 짧은 칸으로 나눠 처리합니다.
+       칸마다 '그 자리에서 발이 놓일 높이'를 먼저 구하고, 그 높이를 기준으로
+       벽을 밀어냅니다. 계단은 한 칸이 걸음 높이보다 낮으므로 자연히 올라갑니다. */
+    const dist = speed * dt;
+    const steps = Math.max(1, Math.ceil(dist / 0.14));
+    for (let i = 0; i < steps; i++) {
+      const nx = ch.pos.x + mx * dist / steps;
+      const nz = ch.pos.z + mz * dist / steps;
+
+      const gy = ch.grounded ? World.groundY(nx, nz, ch.pos.y) : -Infinity;
+      const feetY = Math.max(ch.pos.y, gy);
+      const res = World.resolve(nx, nz, CFG.BODY_R, feetY, feetY + bodyH);
+
+      // 부딪힌 적이 없으면 확인을 건너뜁니다 (대부분의 프레임은 여기서 끝납니다)
+      if (Math.abs(res.x - nx) > 1e-6 || Math.abs(res.z - nz) > 1e-6) {
+        // 밀어내도 여전히 장애물 속이면 이번 칸은 멈춥니다 (관통 방지).
+        // 원래 자리도 장애물 속이었다면(이미 끼인 상태) 빠져나가도록 그대로 옮깁니다.
+        const gy2 = ch.grounded ? World.groundY(res.x, res.z, ch.pos.y) : -Infinity;
+        const fy2 = Math.max(ch.pos.y, gy2);
+        if (World.blocked(res.x, res.z, CFG.BODY_R, fy2, fy2 + bodyH) &&
+            !World.blocked(ch.pos.x, ch.pos.z, CFG.BODY_R, ch.pos.y, ch.pos.y + bodyH)) break;
+      }
+      ch.pos.x = res.x; ch.pos.z = res.z;
+    }
     // 세워 둔 차량은 밀고 지나갈 수 없습니다
     for (const v of this.vehicles) {
       if (v.driver === ch) continue;

@@ -224,11 +224,39 @@ const World = {
     const list = this.near(x, z, x, z, 2);
     for (const o of list) {
       if (o.r !== undefined) continue;             // 원기둥은 올라설 수 없음
-      if (o.top > feetY + 0.55) continue;          // 너무 높으면 지지대가 아님
+      if (o.top > feetY + CFG.STEP_UP) continue;   // 너무 높으면 지지대가 아님
       if (o.top < g) continue;
       if (this.insideBox(o, x, z, 0)) g = o.top;
     }
     return g;
+  },
+
+  /* 이 자리에 몸(반지름 r, feetY~headY)이 들어갈 수 있는지.
+     들어갈 수 없으면 true. 관통과 끼임을 막는 마지막 확인용입니다. */
+  blocked(x, z, r, feetY, headY, stepUp) {
+    const up = stepUp == null ? CFG.STEP_UP : stepUp;
+    for (const o of this.near(x, z, x, z, r + 1)) {
+      if (o.r !== undefined) {
+        if (o.top < feetY + 0.35) continue;
+        if (Math.hypot(x - o.x, z - o.z) < r + o.r - 0.03) return true;
+        continue;
+      }
+      if (o.top <= feetY + up || o.bottom >= headY) continue;
+      if (this.boxDist(o, x, z) < r - 0.03) return true;
+    }
+    return false;
+  },
+
+  /* 상자(회전 포함) 표면과 점 사이의 거리. 안에 있으면 0 입니다.
+     모서리에서 원을 정확히 판정하려면 이 거리로 비교해야 합니다. */
+  boxDist(o, x, z) {
+    const dx = x - o.x, dz = z - o.z;
+    const lx = dx * o.cos + dz * o.sin;
+    const lz = -dx * o.sin + dz * o.cos;
+    const ex = Math.abs(lx) - o.hx, ez = Math.abs(lz) - o.hz;
+    if (ex <= 0 && ez <= 0) return 0;
+    const qx = Math.max(0, ex), qz = Math.max(0, ez);
+    return Math.hypot(qx, qz);
   },
 
   insideBox(b, x, z, pad) {
@@ -239,31 +267,48 @@ const World = {
   },
 
   /* 원기둥(캐릭터)을 장애물 밖으로 밀어냄 */
-  resolve(x, z, r, feetY, headY) {
+  /* 원기둥(캐릭터·차량)을 장애물 밖으로 밀어냅니다.
+     feetY 는 '이 자리에서 발이 놓일 높이', stepUp 은 그 위로 넘어갈 수 있는 여유입니다.
+     캐릭터는 이미 계단 한 칸을 올려 잡은 feetY 를 넘겨주므로 stepUp 을 아주 작게 씁니다. */
+  resolve(x, z, r, feetY, headY, stepUp) {
+    const up = stepUp == null ? CFG.STEP_UP : stepUp;
     const list = this.near(x, z, x, z, r + 3);
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < 4; pass++) {
+      let pushed = false;
       for (const o of list) {
         if (o.r !== undefined) {
           if (o.top < feetY + 0.35) continue;
           const dx = x - o.x, dz = z - o.z;
           const d = Math.hypot(dx, dz), min = r + o.r;
-          if (d < min && d > 1e-4) { x = o.x + dx / d * min; z = o.z + dz / d * min; }
+          if (d < min && d > 1e-4) { x = o.x + dx / d * min; z = o.z + dz / d * min; pushed = true; }
+          else if (d <= 1e-4) { x = o.x + min; pushed = true; }
           continue;
         }
-        if (o.ramp) continue;                                      // 계단은 밀어내지 않습니다
-        if (o.top <= feetY + 0.55 || o.bottom >= headY) continue;  // 넘어가거나 밑을 지남
-        // 상자 로컬 좌표에서 밀어내기
+        if (o.top <= feetY + up || o.bottom >= headY) continue;  // 넘어서거나 밑을 지남
         const dx = x - o.x, dz = z - o.z;
         let lx = dx * o.cos + dz * o.sin;
         let lz = -dx * o.sin + dz * o.cos;
-        const ox = o.hx + r - Math.abs(lx);
-        const oz = o.hz + r - Math.abs(lz);
-        if (ox <= 0 || oz <= 0) continue;
-        if (ox < oz) lx += Math.sign(lx || 1) * ox;
-        else lz += Math.sign(lz || 1) * oz;
+        const ex = Math.abs(lx) - o.hx, ez = Math.abs(lz) - o.hz;
+        if (ex > 0 && ez > 0) {
+          // 모서리 바깥: 모서리에서 반지름만큼 밀어냅니다 (둥글게 돌아 나갑니다)
+          const d = Math.hypot(ex, ez);
+          if (d >= r) continue;
+          const k = r / Math.max(d, 1e-5);
+          lx = (lx >= 0 ? 1 : -1) * (o.hx + ex * k);
+          lz = (lz >= 0 ? 1 : -1) * (o.hz + ez * k);
+        } else {
+          // 면 쪽: 덜 파고든 축으로 빼냅니다
+          const ox = o.hx + r - Math.abs(lx);
+          const oz = o.hz + r - Math.abs(lz);
+          if (ox <= 0 || oz <= 0) continue;
+          if (ox < oz) lx += (lx >= 0 ? 1 : -1) * ox;
+          else lz += (lz >= 0 ? 1 : -1) * oz;
+        }
         x = o.x + lx * o.cos - lz * o.sin;
         z = o.z + lx * o.sin + lz * o.cos;
+        pushed = true;
       }
+      if (!pushed) break;
     }
     const lim = this.half - 4;
     return { x: Math.max(-lim, Math.min(lim, x)), z: Math.max(-lim, Math.min(lim, z)) };
