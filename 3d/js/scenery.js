@@ -301,7 +301,9 @@ const Scenery = {
 
   /* 계단. 로컬 (lx,lz) 에서 시작해 dir(+1: +z, -1: -z) 방향으로 올라갑니다.
      한 칸 높이를 0.42m 로 잡아 캐릭터가 걸어서 오를 수 있게 합니다. */
-  stairs(cx, cz, yaw, lx, lz, fromY, toY, width, dir, color) {
+  /* fillFrom 을 주면 계단 밑을 그 높이까지 막습니다.
+     계단 아래에 사람 키보다 조금 낮은 빈 공간이 생기면 그 안에 끼기 때문입니다. */
+  stairs(cx, cz, yaw, lx, lz, fromY, toY, width, dir, color, fillFrom) {
     const rise = 0.36, run = 0.60;
     const n = Math.max(1, Math.round((toY - fromY) / rise));
     const step = (toY - fromY) / n;
@@ -315,6 +317,10 @@ const Scenery = {
       const [x, z] = this.local(cx, cz, yaw, lx, lzz);
       // 각 단은 바닥까지 채워 옆에서 봐도 계단처럼 보입니다
       this.box(x, (fromY + top) / 2, z, width, top - fromY, run, yaw, color, true, true);
+    }
+    if (fillFrom != null && fillFrom < fromY - 0.05) {
+      const [fx, fz] = this.local(cx, cz, yaw, lx, lz + dir * (run * n) / 2);
+      this.box(fx, (fillFrom + fromY) / 2, fz, width, fromY - fillFrom, run * n, yaw, color);
     }
     return { len: run * n };
   },
@@ -476,7 +482,7 @@ const Scenery = {
   apartment(cx, cz, yaw, opt) {
     opt = opt || {};
     const floors = opt.floors || 3;
-    const w = opt.w || 19, d = opt.d || 14, fh = 3.0;
+    const w = opt.w || 19, d = opt.d || 14, fh = 3.3;   // 층높이 (계단 참 위 머리 공간 확보)
     const base = this.padY(cx, cz, w, d, yaw);
     const wall = opt.wall || 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
     const holeW = 3.6;
@@ -486,37 +492,51 @@ const Scenery = {
     for (let f = 0; f < floors; f++) this.windows(cx, cz, yaw, w, d, fh, base, opt.win || 4, fh * f + 1.9);
     this.trim(cx, cz, yaw, 0, base + 1.2, -d / 2 - 0.03, 2.6, 2.4, 0.1, 0x5c5f63);
 
-    /* 계단실: 반 층씩 올라가 뒤쪽 참에서 꺾어 앞쪽으로 다시 올라옵니다.
-       올라온 자리(앞쪽)에는 층마다 발판을 두고, 그 사이는 위아래로 통해 있습니다. */
-    const runLen = 0.62 * 4;                           // 반 층 = 4단
-    const laneA = -w / 2 + holeW * 0.27, laneB = -w / 2 + holeW * 0.73;
-    const zA = -d / 2 + 0.7;
-    const zB = zA + runLen + 1.6;                      // 뒤쪽 참을 지난 자리
-    const stairEnd = zB + 0.5 + d / 2;                 // 앞벽에서 계단실 끝까지의 깊이
-    const frontD = 1.9;                                // 층마다 앞쪽 발판 깊이
+    /* 계단실: 한 층에 곧은 계단 한 줄씩.
+       층마다 좌우 두 줄(레인)을 번갈아 쓰고 방향도 뒤집습니다.
+       그래서 계단을 다 오른 자리에서 옆으로 한 걸음만 옮기면
+       바로 다음 층 계단의 첫 단입니다 (꺾어 오르는 실제 계단실과 같습니다).
+
+       각 층 바닥은 '그 층으로 올라온 계단이 지나는 줄' 만 뚫어 둡니다.
+       계단 단은 아래가 꽉 찬 덩어리라서 계단 밑에 끼는 빈 공간이 생기지 않고,
+       머리 위로는 두 층 위 바닥까지 2.9m 가 비어 있어 어디서도 끼지 않습니다. */
+    const rise = 0.33, run = 0.60;
+    const nStep = Math.max(6, Math.round(fh / rise));
+    const runLen = run * nStep;                        // 한 층 계단 길이
+    const laneW = 1.5;                                 // 계단 폭
+    const lane = [-w / 2 + 0.95, -w / 2 + 2.65];       // 0 = 바깥벽쪽, 1 = 안쪽
+    const midX = -w / 2 + holeW / 2;                   // 두 줄을 가르는 선
+    // 계단을 건물 깊이 한가운데에 두어 앞뒤 참을 넉넉하게 잡습니다
+    const zF = -d / 2 + Math.max(1.2, (d - runLen) / 2);   // 계단 앞쪽 끝
+    const zK = zF + runLen;                                // 계단 뒤쪽 끝
     for (let f = 0; f < floors; f++) {
-      const y = base + fh * f, mid = y + fh / 2, top = y + fh;
-      this.stairs(cx, cz, yaw, laneA, zA, y, mid, holeW * 0.42, 1, 0xa79f92);
-      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, zA + runLen + 0.8, holeW, 1.7, mid, floorC, 0.30);
-      this.stairs(cx, cz, yaw, laneB, zB, mid, top, holeW * 0.42, -1, 0xa79f92);
+      const y = base + fh * f;
+      const dir = f % 2 === 0 ? 1 : -1;                // 짝수 층은 뒤로, 홀수 층은 앞으로
+      this.stairs(cx, cz, yaw, lane[f % 2], dir > 0 ? zF : zK, y, y + fh, laneW, dir, 0xa79f92);
     }
-    /* 층 바닥: 오른쪽 큰 판 + 계단실 앞 발판 + 계단실 뒤 바닥.
-       f = 3 은 옥상 바닥이 됩니다 (계단실은 뚫려 있어 계단으로 올라옵니다). */
+    /* 층 바닥. f = floors 는 옥상 바닥이 됩니다.
+       계단이 지나는 구간은 폭 전체를 뚫어 하나의 통짜 계단실로 만듭니다.
+       (한쪽 줄만 뚫으면 주 바닥 바로 옆에 좁고 긴 구멍이 생겨 빠지기 쉽습니다.)
+       앞뒤 참은 폭 전체가 단단한 바닥이라 여기서 줄을 갈아탑니다. */
+    const shaft0 = zF + 0.6, shaft1 = zK - 0.6;   // 마지막 단까지 참을 붙입니다
     for (let f = 1; f <= floors; f++) {
       const y = base + fh * f;
       const c = f === floors ? 0x8a8578 : floorC;
+      // 계단실 바깥의 큰 바닥
       this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW + 0.4, d + 0.4, y, c, 0.34);
-      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + frontD / 2, holeW + 0.4, frontD, y, c, 0.34);
-      // 계단 B 라인 쪽으로 발판을 조금 더 내밀어 마지막 단과 사이가 벌어지지 않게 합니다
-      this.slab(cx, cz, yaw, -w / 2 + holeW * 0.75, -d / 2 + frontD + 0.4, holeW * 0.5, 0.9, y, c, 0.34);
-      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd + (d - stairEnd) / 2,
-                holeW + 0.4, d - stairEnd + 0.2, y, c, 0.34);
-      this.rail(cx, cz, yaw, -w / 2 + holeW + 0.15, -d / 2 + stairEnd / 2, 0.16, stairEnd - 0.6, y, steel);
+      // 앞 참 / 뒤 참
+      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, (-d / 2 - 0.2 + shaft0) / 2,
+                holeW + 0.4, shaft0 + d / 2 + 0.2, y, c, 0.34);
+      this.slab(cx, cz, yaw, -w / 2 + holeW / 2, (shaft1 + d / 2 + 0.2) / 2,
+                holeW + 0.4, d / 2 + 0.2 - shaft1, y, c, 0.34);
+      // 주 바닥 쪽 난간: 계단실 구멍 길이만큼. 참(앞뒤 끝)은 트여 있어 드나듭니다.
+      this.rail(cx, cz, yaw, -w / 2 + holeW, (shaft0 + shaft1) / 2, 0.16, shaft1 - shaft0, y, steel);
+      // 계단이 드나들지 않는 쪽 참 가장자리에도 난간을 둡니다
+      this.rail(cx, cz, yaw, -w / 2 + holeW / 2, f % 2 === 0 ? shaft1 : shaft0, holeW, 0.16, y, steel);
       if (f === floors) {
-        /* 옥상은 위로 이어지는 계단이 없으므로 계단실 구멍을 난간으로 막습니다.
-           올라온 쪽(계단 B 라인)만 열어 두어 다시 내려갈 수 있습니다. */
-        this.rail(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd - 0.15, holeW, 0.16, y, steel);
-        this.rail(cx, cz, yaw, -w / 2 + holeW * 0.25, -d / 2 + frontD + 0.15, holeW * 0.5, 0.16, y, steel);
+        // 옥상: 올라온 계단이 쓰지 않는 반쪽도 막아 둡니다
+        const capX = (f - 1) % 2 === 0 ? -w / 2 + holeW * 0.75 : -w / 2 + holeW * 0.25;
+        this.rail(cx, cz, yaw, capX, f % 2 === 0 ? shaft0 : shaft1, holeW / 2, 0.16, y, steel);
       }
     }
 

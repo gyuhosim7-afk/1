@@ -707,6 +707,66 @@ const Game = {
     if (ch.mag <= 0) ch.startReload();
   },
 
+  /* ---------- 갇힘 탈출 ----------
+     지형이 절차적으로 만들어지다 보니 아무리 다듬어도 몸이 끼는 틈이 남습니다.
+     그래서 '어떤 경우에도 빠져나오는' 안전장치를 둡니다.
+     1) 밀어내기 → 2) 위로 올라서기 → 3) 가장 가까운 설 수 있는 자리로 */
+  unstick(ch) {
+    const bodyH = ch.crouch ? 1.35 : CFG.BODY_H;
+    if (!World.blocked(ch.pos.x, ch.pos.z, CFG.BODY_R, ch.pos.y, ch.pos.y + bodyH)) return false;
+
+    // 1) 평범한 밀어내기로 나올 수 있으면 그걸로
+    const res = World.resolve(ch.pos.x, ch.pos.z, CFG.BODY_R, ch.pos.y, ch.pos.y + bodyH);
+    if (!World.blocked(res.x, res.z, CFG.BODY_R, ch.pos.y, ch.pos.y + bodyH)) {
+      ch.pos.x = res.x; ch.pos.z = res.z;
+      return true;
+    }
+
+    // 2) 바로 위에 설 자리가 있으면 올라섭니다 (계단·바닥 사이에 낀 경우)
+    const up = World.groundY(ch.pos.x, ch.pos.z, ch.pos.y + 2.6);
+    if (up > ch.pos.y + 0.05 && up - ch.pos.y < 3.0 &&
+        !World.blocked(ch.pos.x, ch.pos.z, CFG.BODY_R, up, up + bodyH)) {
+      ch.pos.y = up; ch.vy = 0; ch.grounded = true;
+      return true;
+    }
+
+    // 3) 주변을 넓혀 가며 설 수 있는 가장 가까운 자리로 옮깁니다
+    for (let r = 0.7; r <= 4.2; r += 0.7) {
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2 + r;
+        const x = ch.pos.x + Math.cos(a) * r, z = ch.pos.z + Math.sin(a) * r;
+        const gy = World.groundY(x, z, ch.pos.y + 1.4);
+        if (Math.abs(gy - ch.pos.y) > 3.0) continue;
+        if (World.blocked(x, z, CFG.BODY_R, gy, gy + bodyH)) continue;
+        ch.pos.set(x, gy, z); ch.vy = 0; ch.grounded = true;
+        if (ch === this.player) this.pushFeed('끼임에서 빠져나왔습니다');
+        return true;
+      }
+    }
+    return false;
+  },
+
+  /* 움직이려는데 계속 제자리면(끼인 낌새) 나갈 길을 찾아 줍니다.
+     가려던 쪽에 가까운 방향만 살펴봅니다. 벽에 그냥 붙어 있는 것뿐인데
+     뒤로 밀려나면 오히려 조작이 이상해지기 때문입니다. */
+  unstickNudge(ch, mx, mz) {
+    const bodyH = ch.crouch ? 1.35 : CFG.BODY_H;
+    const want = Math.atan2(mx || 0, mz || 0);
+    // 가려던 방향에서 좌우로 조금씩 벌려 가며 찾습니다 (±100도 까지)
+    for (let i = 0; i <= 10; i++) {
+      for (const s of (i ? [1, -1] : [1])) {
+        const a = want + s * i * 0.175;
+        const x = ch.pos.x + Math.sin(a) * 0.55, z = ch.pos.z + Math.cos(a) * 0.55;
+        const gy = Math.max(ch.pos.y, World.groundY(x, z, ch.pos.y));
+        if (gy - ch.pos.y > CFG.STEP_UP) continue;
+        if (World.blocked(x, z, CFG.BODY_R, gy, gy + bodyH)) continue;
+        ch.pos.x = x; ch.pos.z = z;
+        return true;
+      }
+    }
+    return this.unstick(ch);
+  },
+
   /* ---------- 넘기·기어오르기 ----------
      앞쪽에 걸어서는 못 오르지만 매달려 오를 만한 턱이 있으면 그 자리를 돌려줍니다. */
   vaultTarget(ch) {
@@ -1076,6 +1136,7 @@ const Game = {
     if (len > 0.0001) { mx /= len; mz /= len; } else { mx = 0; mz = 0; }
     const before = { x: ch.pos.x, z: ch.pos.z };
     const bodyH = ch.crouch ? 1.35 : CFG.BODY_H;
+    this.unstick(ch);                       // 이미 끼어 있으면 먼저 빼냅니다
 
     /* 한 프레임에 벽을 뚫지 않도록 이동을 짧은 칸으로 나눠 처리합니다.
        칸마다 '그 자리에서 발이 놓일 높이'를 먼저 구하고, 그 높이를 기준으로
@@ -1138,6 +1199,14 @@ const Game = {
     }
 
     ch.speedNow = Math.hypot(ch.pos.x - before.x, ch.pos.z - before.z) / Math.max(dt, 1e-4);
+
+    // 가려는데 0.4초 넘게 제자리면 벽에 붙은 게 아니라 낀 것으로 보고 빼냅니다
+    if (speed > 0.5 && (mx || mz) && !ch.climb) {
+      if (ch.speedNow < speed * 0.12) {
+        ch.stuckT = (ch.stuckT || 0) + dt;
+        if (ch.stuckT > 0.4) { this.unstickNudge(ch, mx, mz); ch.stuckT = 0; }
+      } else ch.stuckT = 0;
+    } else ch.stuckT = 0;
   },
 
   /* ---------- 카메라 ---------- */
