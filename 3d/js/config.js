@@ -44,7 +44,7 @@ const CFG = {
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
   MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
-  BASE_AMMO_CAP: 180,     // 가방이 없을 때 총별 예비 탄약 한도
+  BASE_AMMO_CAP: 180,     // 가방이 없을 때 구경별 예비 탄약 한도
   BOT_VISION: 165,        // 봇 시야 거리 (m)
   MAX_DT: 0.1,          // 프레임이 느려도 슬로모션이 되지 않게 (이동은 잘게 나눠 처리)
 
@@ -61,19 +61,64 @@ const CFG = {
   DROP_OPEN: 4.0          // 보급 상자를 열 수 있는 거리
 };
 
+/* ============================================================
+   탄약 구경
+   총마다 따로 탄을 세지 않고 구경별로 한 주머니를 씁니다.
+   같은 구경을 쓰는 총끼리 탄약을 나눠 쓰게 되어,
+   무엇을 주워야 하는지가 훨씬 분명해집니다.
+   ============================================================ */
+const CALIBERS = {
+  '9mm':  { name: '9mm 권총탄',    short: '9mm',    color: 0xf2cc60, box: 45 },
+  '45':   { name: '.45 권총탄',    short: '.45',    color: 0xe0a24a, box: 40 },
+  '556':  { name: '5.56mm 소총탄', short: '5.56mm', color: 0x7ee787, box: 60 },
+  '762':  { name: '7.62mm 소총탄', short: '7.62mm', color: 0x79c0ff, box: 50 },
+  '12ga': { name: '12게이지 산탄', short: '12게이지', color: 0xffa657, box: 18 },
+  '300':  { name: '.300 매그넘',   short: '.300',   color: 0xd2a8ff, box: 20, dropOnly: true }
+};
+
 /* 무기: dmg 발당 피해, rpm 분당 발사수, spread 탄퍼짐(rad),
-   range 유효사거리(m), recoil 반동(rad) */
+   range 유효사거리(m), recoil 반동(rad), ammo 쓰는 구경,
+   model 생김새(없으면 키와 같은 모양), drop 이 true 면 보급 상자에서만 나옵니다 */
 const GUNS = {
-  pistol:  { name:'권총',     short:'P92',   dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, ammoPer:60,  auto:false, scope:1, canScope:false, color:0xc9d1d9 },
-  smg:     { name:'기관단총', short:'UMP',   dmg:16, rpm:720,  mag:30, reload:2.0, spread:0.045, adsSpread:0.020, range:110, recoil:0.014, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x7ee787 },
-  shotgun: { name:'산탄총',   short:'S686',  dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, ammoPer:40,  auto:false, pellets:8, scope:1, canScope:false, color:0xffa657 },
-  rifle:   { name:'돌격소총', short:'M416',  dmg:27, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x79c0ff },
-  dmr:     { name:'지정사수총',short:'SKS',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, ammoPer:80,  auto:false, scope:1, canScope:true, color:0xffd166 },
-  sniper:  { name:'저격총',   short:'AWM',   dmg:95, rpm:38,   mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018,range:500, recoil:0.070, ammoPer:25,  auto:false, scope:1, canScope:true, color:0xd2a8ff }
+  /* ---------- 권총 ---------- */
+  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xc9d1d9 },
+  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xb0763f, model:'pistol' },
+
+  /* ---------- 기관단총 ---------- */
+  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
+  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
+
+  /* ---------- 산탄총 ---------- */
+  shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
+  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xd98a3c, model:'shotgun' },
+
+  /* ---------- 돌격소총 ---------- */
+  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x79c0ff },
+  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x9ecbff, model:'rifle' },
+  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0xc09553, model:'rifle' },
+
+  /* ---------- 지정사수총 ---------- */
+  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
+  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
+
+  /* ---------- 저격총 ---------- */
+  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
+
+  /* ---------- 보급 상자에서만 나오는 무기 ---------- */
+  sniper:  { name:'저격총',     short:'AWM',    ammo:'300',  dmg:105, rpm:38,  mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018, range:500, recoil:0.070, auto:false, canScope:true, color:0xd2a8ff, drop:true },
+  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x6fbf73, drop:true, model:'lmg' },
+  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x8b6ad6, drop:true, model:'rifle' },
+  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0xff9d76, drop:true, model:'dmr' }
 };
 
 const GUN_KEYS = Object.keys(GUNS);
-const LOOT_GUNS = ['pistol','pistol','smg','smg','shotgun','rifle','rifle','dmr','sniper'];
+/* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
+const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','shotgun','s12k',
+                   'rifle','rifle','scar','ak','ak','dmr','mini14','kar98'];
+/* 보급 상자 전용 무기 */
+const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
+/* 바닥에 떨어지는 탄약 구경 */
+const LOOT_CALIBERS = Object.keys(CALIBERS).filter(c => !CALIBERS[c].dropOnly);
 
 const HEADSHOT = 2.1;   // 헤드샷 배수
 
@@ -117,7 +162,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 
 /* 보급 상자에 들어 있는 것 — 좋은 무기와 최고 등급 방어구 */
 const DROP_TABLE = {
-  guns: ['sniper', 'dmr', 'rifle'],
+  guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
   vest: 3, bag: 3, meds: 2
 };

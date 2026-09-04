@@ -133,7 +133,8 @@ const GunArt = {
     sk = sk || GUN_SKINS.stock;
     const B = Build, M = sk.metal, D = sk.dark, W = sk.wood, O = this.OLIVE;
     const A = GUNS[key].color;
-    switch (key) {
+    // 같은 계열 총은 생김새를 나눠 씁니다 (색은 총마다 다릅니다)
+    switch (GUNS[key].model || key) {
       case 'pistol': return [
         B.box(0.055, 0.085, 0.24, M, 0, 0.03, 0.04),
         B.box(0.05, 0.05, 0.19, D, 0, -0.03, 0.02),
@@ -189,6 +190,17 @@ const GunArt = {
         B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
         B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
       ];
+      case 'lmg': return [
+        B.box(0.085, 0.135, 0.46, M, 0, 0.02, 0.0),
+        B.tube(0.020, 0.40, M, 0, 0.03, 0.44),
+        B.tube(0.030, 0.07, D, 0, 0.03, 0.67),
+        B.box(0.115, 0.145, 0.20, O, 0, -0.03, 0.02),      // 탄통
+        B.box(0.05, 0.024, 0.40, A, 0, 0.10, 0.06),
+        B.box(0.048, 0.20, 0.085, D, 0, -0.13, -0.02, 0.12),
+        B.box(0.062, 0.115, 0.28, O, 0, 0.0, -0.34),
+        B.box(0.02, 0.18, 0.02, D, 0.05, -0.07, 0.52, 0, 0, -0.40),
+        B.box(0.02, 0.18, 0.02, D, -0.05, -0.07, 0.52, 0, 0, 0.40)
+      ];
       default: return [B.box(0.08, 0.1, 0.4, M, 0, 0, 0)];
     }
   }
@@ -233,8 +245,9 @@ const LootArt = {
     ];
   },
 
-  ammoParts(gun) {
-    const B = Build, A = GUNS[gun].color;
+  /* 탄약 상자. cal 은 구경 이름입니다 ('556' 처럼) */
+  ammoParts(cal) {
+    const B = Build, A = (CALIBERS[cal] || CALIBERS['9mm']).color;
     const box = 0x4b5340, lid = 0x3a4132, brass = 0xc79a3b;
     return [
       B.box(0.36, 0.22, 0.26, box, 0, 0.12, 0),
@@ -306,6 +319,7 @@ class Loot {
     const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
     this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
+    // 'ammo' 일 때는 gun 자리에 총 이름이 아니라 '구경' 이 들어옵니다 ('556' 등)
     this.gun = gun || null;
     this.amount = amount || 0;
     this.level = level || 0;          // 조준경 배율 / 방어구 등급
@@ -313,7 +327,7 @@ class Loot {
     this.spin = Math.random() * Math.PI * 2;
 
     const color = kind === 'gun' ? GUNS[gun].color
-      : (kind === 'ammo' ? 0xf2cc60
+      : (kind === 'ammo' ? (CALIBERS[gun] || CALIBERS['9mm']).color
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
       : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
@@ -337,7 +351,7 @@ class Loot {
 
   get label() {
     if (this.kind === 'gun') return GUNS[this.gun].name + ' · ' + GUNS[this.gun].short;
-    if (this.kind === 'ammo') return GUNS[this.gun].short + ' 탄약 ' + this.amount + '발';
+    if (this.kind === 'ammo') return (CALIBERS[this.gun] || CALIBERS['9mm']).name + ' ' + this.amount + '발';
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
@@ -621,7 +635,9 @@ class Char3D {
   get hasTwo() { return !!(this.guns[0] && this.guns[1]); }
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
-  get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
+  /* 지금 든 총이 쓰는 구경 */
+  get caliber() { return this.gun ? GUNS[this.gun].ammo : null; }
+  get reserveAmmo() { return this.gun ? (this.reserve[GUNS[this.gun].ammo] || 0) : 0; }
   get eyeY() { return this.pos.y + (this.crouch ? 0.98 : CFG.EYE); }
 
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
@@ -630,14 +646,18 @@ class Char3D {
   /* 조끼가 막아 주는 피해 비율 */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
 
-  /* 탄약을 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
-  addAmmo(key, n) {
-    const have = this.reserve[key] || 0;
+  /* 탄약을 구경별 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
+  addAmmo(cal, n) {
+    if (!cal) return 0;
+    const have = this.reserve[cal] || 0;
     const room = Math.max(0, this.ammoCap - have);
     const take = Math.min(n, room);
-    this.reserve[key] = have + take;
+    this.reserve[cal] = have + take;
     return take;
   }
+
+  /* 이 구경을 쓰는 총을 들고 있는가 */
+  usesCaliber(cal) { return this.guns.some(g => g && GUNS[g].ammo === cal); }
 
   /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
   wear(kind, level) {
@@ -695,7 +715,7 @@ class Char3D {
     this.mags[idx] = GUNS[key].mag;
     this.scopes[idx] = 0;
     this.scopeOff[idx] = false;
-    this.addAmmo(key, ammo == null ? GUNS[key].ammoPer : ammo);
+    this.addAmmo(GUNS[key].ammo, ammo == null ? CALIBERS[GUNS[key].ammo].box : ammo);
     this.reloading = 0;
     this.slot = idx;
     this.refreshGuns();
@@ -766,9 +786,10 @@ class Char3D {
   }
   finishReload() {
     const need = this.spec.mag - this.mag;
-    const take = Math.min(need, this.reserve[this.gun] || 0);
+    const cal = GUNS[this.gun].ammo;
+    const take = Math.min(need, this.reserve[cal] || 0);
     this.mag += take;
-    this.reserve[this.gun] -= take;
+    this.reserve[cal] -= take;
   }
   startHeal() {
     if (this.meds <= 0 || this.healing > 0 || this.hp >= this.maxHp) return false;
@@ -1281,7 +1302,7 @@ class Airdrop {
     const gun = t.guns[Math.floor(Math.random() * t.guns.length)];
     const scope = t.scopes[Math.floor(Math.random() * t.scopes.length)];
     return [
-      { kind: 'gun', gun, amount: GUNS[gun].ammoPer },
+      { kind: 'gun', gun, amount: CALIBERS[GUNS[gun].ammo].box * 2 },
       { kind: 'scope', level: scope },
       { kind: 'vest', level: t.vest },
       { kind: 'bag', level: t.bag },

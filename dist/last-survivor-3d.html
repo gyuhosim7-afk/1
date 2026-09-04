@@ -770,7 +770,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
       </label>
       <label class="row check">
         <input type="checkbox" data-set="edge">
-        <span>화면 끝 회전 보조 (커서가 가장자리에 닿으면 계속 회전)</span>
+        <span>화면 끝 회전 보조 (마우스 잠금이 안 될 때만 쓰세요 — 커서를 가장자리로 옮기면 그쪽으로 계속 돌아갑니다)</span>
       </label>
       <label class="row check">
         <input type="checkbox" data-set="fpv">
@@ -978,7 +978,7 @@ const CFG = {
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
   MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
-  BASE_AMMO_CAP: 180,     // 가방이 없을 때 총별 예비 탄약 한도
+  BASE_AMMO_CAP: 180,     // 가방이 없을 때 구경별 예비 탄약 한도
   BOT_VISION: 165,        // 봇 시야 거리 (m)
   MAX_DT: 0.1,          // 프레임이 느려도 슬로모션이 되지 않게 (이동은 잘게 나눠 처리)
 
@@ -995,19 +995,64 @@ const CFG = {
   DROP_OPEN: 4.0          // 보급 상자를 열 수 있는 거리
 };
 
+/* ============================================================
+   탄약 구경
+   총마다 따로 탄을 세지 않고 구경별로 한 주머니를 씁니다.
+   같은 구경을 쓰는 총끼리 탄약을 나눠 쓰게 되어,
+   무엇을 주워야 하는지가 훨씬 분명해집니다.
+   ============================================================ */
+const CALIBERS = {
+  '9mm':  { name: '9mm 권총탄',    short: '9mm',    color: 0xf2cc60, box: 45 },
+  '45':   { name: '.45 권총탄',    short: '.45',    color: 0xe0a24a, box: 40 },
+  '556':  { name: '5.56mm 소총탄', short: '5.56mm', color: 0x7ee787, box: 60 },
+  '762':  { name: '7.62mm 소총탄', short: '7.62mm', color: 0x79c0ff, box: 50 },
+  '12ga': { name: '12게이지 산탄', short: '12게이지', color: 0xffa657, box: 18 },
+  '300':  { name: '.300 매그넘',   short: '.300',   color: 0xd2a8ff, box: 20, dropOnly: true }
+};
+
 /* 무기: dmg 발당 피해, rpm 분당 발사수, spread 탄퍼짐(rad),
-   range 유효사거리(m), recoil 반동(rad) */
+   range 유효사거리(m), recoil 반동(rad), ammo 쓰는 구경,
+   model 생김새(없으면 키와 같은 모양), drop 이 true 면 보급 상자에서만 나옵니다 */
 const GUNS = {
-  pistol:  { name:'권총',     short:'P92',   dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, ammoPer:60,  auto:false, scope:1, canScope:false, color:0xc9d1d9 },
-  smg:     { name:'기관단총', short:'UMP',   dmg:16, rpm:720,  mag:30, reload:2.0, spread:0.045, adsSpread:0.020, range:110, recoil:0.014, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x7ee787 },
-  shotgun: { name:'산탄총',   short:'S686',  dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, ammoPer:40,  auto:false, pellets:8, scope:1, canScope:false, color:0xffa657 },
-  rifle:   { name:'돌격소총', short:'M416',  dmg:27, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, ammoPer:120, auto:true,  scope:1, canScope:true, color:0x79c0ff },
-  dmr:     { name:'지정사수총',short:'SKS',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, ammoPer:80,  auto:false, scope:1, canScope:true, color:0xffd166 },
-  sniper:  { name:'저격총',   short:'AWM',   dmg:95, rpm:38,   mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018,range:500, recoil:0.070, ammoPer:25,  auto:false, scope:1, canScope:true, color:0xd2a8ff }
+  /* ---------- 권총 ---------- */
+  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xc9d1d9 },
+  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xb0763f, model:'pistol' },
+
+  /* ---------- 기관단총 ---------- */
+  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
+  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
+
+  /* ---------- 산탄총 ---------- */
+  shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
+  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xd98a3c, model:'shotgun' },
+
+  /* ---------- 돌격소총 ---------- */
+  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x79c0ff },
+  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x9ecbff, model:'rifle' },
+  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0xc09553, model:'rifle' },
+
+  /* ---------- 지정사수총 ---------- */
+  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
+  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
+
+  /* ---------- 저격총 ---------- */
+  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
+
+  /* ---------- 보급 상자에서만 나오는 무기 ---------- */
+  sniper:  { name:'저격총',     short:'AWM',    ammo:'300',  dmg:105, rpm:38,  mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018, range:500, recoil:0.070, auto:false, canScope:true, color:0xd2a8ff, drop:true },
+  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x6fbf73, drop:true, model:'lmg' },
+  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x8b6ad6, drop:true, model:'rifle' },
+  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0xff9d76, drop:true, model:'dmr' }
 };
 
 const GUN_KEYS = Object.keys(GUNS);
-const LOOT_GUNS = ['pistol','pistol','smg','smg','shotgun','rifle','rifle','dmr','sniper'];
+/* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
+const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','shotgun','s12k',
+                   'rifle','rifle','scar','ak','ak','dmr','mini14','kar98'];
+/* 보급 상자 전용 무기 */
+const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
+/* 바닥에 떨어지는 탄약 구경 */
+const LOOT_CALIBERS = Object.keys(CALIBERS).filter(c => !CALIBERS[c].dropOnly);
 
 const HEADSHOT = 2.1;   // 헤드샷 배수
 
@@ -1051,7 +1096,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 
 /* 보급 상자에 들어 있는 것 — 좋은 무기와 최고 등급 방어구 */
 const DROP_TABLE = {
-  guns: ['sniper', 'dmr', 'rifle'],
+  guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
   vest: 3, bag: 3, meds: 2
 };
@@ -2999,7 +3044,11 @@ const Scenery = {
     const boxMesh = new THREE.InstancedMesh(boxGeo, boxMat, this.boxDefs.length);
     boxMesh.castShadow = true; boxMesh.receiveShadow = true;
     this.boxDefs.forEach((b, i) => {
-      e.set(b.tilt || 0, b.yaw, 0, 'YXZ');
+      /* 화면 상자의 방향은 충돌 상자와 반드시 같아야 합니다.
+         부품 자리는 local() 로 잡는데 그 회전이 three.js 의 Y 회전과 반대여서,
+         여기서 부호를 맞춰 주지 않으면 '벽이 없는데 막히고 벽이 있는데 통과되는'
+         어긋남이 생깁니다. */
+      e.set(b.tilt || 0, -b.yaw, 0, 'YXZ');
       q.setFromEuler(e);
       m.compose(v.set(b.x, b.y, b.z), q, sv.set(b.sx, b.sy, b.sz));
       boxMesh.setMatrixAt(i, m);
@@ -3236,7 +3285,8 @@ const GunArt = {
     sk = sk || GUN_SKINS.stock;
     const B = Build, M = sk.metal, D = sk.dark, W = sk.wood, O = this.OLIVE;
     const A = GUNS[key].color;
-    switch (key) {
+    // 같은 계열 총은 생김새를 나눠 씁니다 (색은 총마다 다릅니다)
+    switch (GUNS[key].model || key) {
       case 'pistol': return [
         B.box(0.055, 0.085, 0.24, M, 0, 0.03, 0.04),
         B.box(0.05, 0.05, 0.19, D, 0, -0.03, 0.02),
@@ -3292,6 +3342,17 @@ const GunArt = {
         B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
         B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
       ];
+      case 'lmg': return [
+        B.box(0.085, 0.135, 0.46, M, 0, 0.02, 0.0),
+        B.tube(0.020, 0.40, M, 0, 0.03, 0.44),
+        B.tube(0.030, 0.07, D, 0, 0.03, 0.67),
+        B.box(0.115, 0.145, 0.20, O, 0, -0.03, 0.02),      // 탄통
+        B.box(0.05, 0.024, 0.40, A, 0, 0.10, 0.06),
+        B.box(0.048, 0.20, 0.085, D, 0, -0.13, -0.02, 0.12),
+        B.box(0.062, 0.115, 0.28, O, 0, 0.0, -0.34),
+        B.box(0.02, 0.18, 0.02, D, 0.05, -0.07, 0.52, 0, 0, -0.40),
+        B.box(0.02, 0.18, 0.02, D, -0.05, -0.07, 0.52, 0, 0, 0.40)
+      ];
       default: return [B.box(0.08, 0.1, 0.4, M, 0, 0, 0)];
     }
   }
@@ -3336,8 +3397,9 @@ const LootArt = {
     ];
   },
 
-  ammoParts(gun) {
-    const B = Build, A = GUNS[gun].color;
+  /* 탄약 상자. cal 은 구경 이름입니다 ('556' 처럼) */
+  ammoParts(cal) {
+    const B = Build, A = (CALIBERS[cal] || CALIBERS['9mm']).color;
     const box = 0x4b5340, lid = 0x3a4132, brass = 0xc79a3b;
     return [
       B.box(0.36, 0.22, 0.26, box, 0, 0.12, 0),
@@ -3409,6 +3471,7 @@ class Loot {
     const y = fixedY == null ? World.height(x, z) : fixedY;
     this.pos = new THREE.Vector3(x, y, z);
     this.kind = kind;                 // 'gun' | 'ammo' | 'med' | 'scope' | 'vest' | 'bag'
+    // 'ammo' 일 때는 gun 자리에 총 이름이 아니라 '구경' 이 들어옵니다 ('556' 등)
     this.gun = gun || null;
     this.amount = amount || 0;
     this.level = level || 0;          // 조준경 배율 / 방어구 등급
@@ -3416,7 +3479,7 @@ class Loot {
     this.spin = Math.random() * Math.PI * 2;
 
     const color = kind === 'gun' ? GUNS[gun].color
-      : (kind === 'ammo' ? 0xf2cc60
+      : (kind === 'ammo' ? (CALIBERS[gun] || CALIBERS['9mm']).color
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
       : (kind === 'bag' ? 0xc7a86b : 0xff6b6b))));
@@ -3440,7 +3503,7 @@ class Loot {
 
   get label() {
     if (this.kind === 'gun') return GUNS[this.gun].name + ' · ' + GUNS[this.gun].short;
-    if (this.kind === 'ammo') return GUNS[this.gun].short + ' 탄약 ' + this.amount + '발';
+    if (this.kind === 'ammo') return (CALIBERS[this.gun] || CALIBERS['9mm']).name + ' ' + this.amount + '발';
     if (this.kind === 'scope') return SCOPES[this.level].name + ' (' + SCOPES[this.level].label + ')';
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
@@ -3724,7 +3787,9 @@ class Char3D {
   get hasTwo() { return !!(this.guns[0] && this.guns[1]); }
 
   get spec() { return this.gun ? GUNS[this.gun] : null; }
-  get reserveAmmo() { return this.gun ? (this.reserve[this.gun] || 0) : 0; }
+  /* 지금 든 총이 쓰는 구경 */
+  get caliber() { return this.gun ? GUNS[this.gun].ammo : null; }
+  get reserveAmmo() { return this.gun ? (this.reserve[GUNS[this.gun].ammo] || 0) : 0; }
   get eyeY() { return this.pos.y + (this.crouch ? 0.98 : CFG.EYE); }
 
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
@@ -3733,14 +3798,18 @@ class Char3D {
   /* 조끼가 막아 주는 피해 비율 */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
 
-  /* 탄약을 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
-  addAmmo(key, n) {
-    const have = this.reserve[key] || 0;
+  /* 탄약을 구경별 한도까지만 담습니다. 실제로 담은 양을 돌려줍니다 */
+  addAmmo(cal, n) {
+    if (!cal) return 0;
+    const have = this.reserve[cal] || 0;
     const room = Math.max(0, this.ammoCap - have);
     const take = Math.min(n, room);
-    this.reserve[key] = have + take;
+    this.reserve[cal] = have + take;
     return take;
   }
+
+  /* 이 구경을 쓰는 총을 들고 있는가 */
+  usesCaliber(cal) { return this.guns.some(g => g && GUNS[g].ammo === cal); }
 
   /* 방어구를 착용합니다. 이전에 입고 있던 등급(없으면 0)을 돌려줍니다 */
   wear(kind, level) {
@@ -3798,7 +3867,7 @@ class Char3D {
     this.mags[idx] = GUNS[key].mag;
     this.scopes[idx] = 0;
     this.scopeOff[idx] = false;
-    this.addAmmo(key, ammo == null ? GUNS[key].ammoPer : ammo);
+    this.addAmmo(GUNS[key].ammo, ammo == null ? CALIBERS[GUNS[key].ammo].box : ammo);
     this.reloading = 0;
     this.slot = idx;
     this.refreshGuns();
@@ -3869,9 +3938,10 @@ class Char3D {
   }
   finishReload() {
     const need = this.spec.mag - this.mag;
-    const take = Math.min(need, this.reserve[this.gun] || 0);
+    const cal = GUNS[this.gun].ammo;
+    const take = Math.min(need, this.reserve[cal] || 0);
     this.mag += take;
-    this.reserve[this.gun] -= take;
+    this.reserve[cal] -= take;
   }
   startHeal() {
     if (this.meds <= 0 || this.healing > 0 || this.hp >= this.maxHp) return false;
@@ -4384,7 +4454,7 @@ class Airdrop {
     const gun = t.guns[Math.floor(Math.random() * t.guns.length)];
     const scope = t.scopes[Math.floor(Math.random() * t.scopes.length)];
     return [
-      { kind: 'gun', gun, amount: GUNS[gun].ammoPer },
+      { kind: 'gun', gun, amount: CALIBERS[GUNS[gun].ammo].box * 2 },
       { kind: 'scope', level: scope },
       { kind: 'vest', level: t.vest },
       { kind: 'bag', level: t.bag },
@@ -4424,16 +4494,25 @@ const AI = {
       const dy = (enemy.pos.y + 1.05) - (bot.pos.y + 1.15);
       bot.pitch = this.approach(bot.pitch, Math.atan2(dy, dist), turn);
 
+      /* 교전 자세.
+         사거리 안에 들어와 조준이 끝났으면 '자리를 잡고' 쏩니다.
+         계속 뛰면서 쏘면 탄퍼짐이 두 배가 되어 아무리 쏴도 맞지 않습니다. */
       const want = this.preferredRange(bot);
+      const aimed = Math.abs(this.angleDiff(bot.yaw, toE)) < 0.2;
+      const settled = dist < want * 1.15 && aimed && a.reaction <= 0 && bot.hp >= 35;
+      bot.ads = settled;
+
       if (dist > want * 1.2) { mx += dx / dist; mz += dz / dist; speed = CFG.SPRINT * 0.8; }
       else if (dist < want * 0.55) { mx -= dx / dist; mz -= dz / dist; }
-      // 좌우 무빙
-      mx += Math.cos(toE) * a.strafe * 0.9;
-      mz += -Math.sin(toE) * a.strafe * 0.9;
+      // 좌우 무빙 (조준 중에는 살짝만)
+      const sw = settled ? 0.3 : 0.9;
+      mx += Math.cos(toE) * a.strafe * sw;
+      mz += -Math.sin(toE) * a.strafe * sw;
+      if (settled) speed = Math.min(speed, CFG.WALK * 0.45);   // 천천히 움직여야 탄이 모입니다
       if (bot.hp < 35) { mx -= dx / dist * 0.8; mz -= dz / dist * 0.8; speed = CFG.SPRINT; }
 
       this.shoot(bot, enemy, dist, game);
-    } else if (a.dest) {
+    } else if ((bot.ads = false) || a.dest) {
       const dx = a.dest.x - bot.pos.x, dz = a.dest.z - bot.pos.z;
       const dist = Math.hypot(dx, dz);
       if (dist > 1.2) {
@@ -4558,7 +4637,7 @@ const AI = {
       let target = null, bd = 80 * 80;
       for (const l of game.loots) {
         if (l.dead) continue;
-        if (l.kind === 'ammo' && (bot.guns.indexOf(l.gun) < 0 ||
+        if (l.kind === 'ammo' && (!bot.usesCaliber(l.gun) ||
             (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
@@ -4594,10 +4673,17 @@ const AI = {
     if (bot.gun && bot.mag < bot.spec.mag && bot.reserveAmmo > 0) bot.startReload();
   },
 
+  /* 붙어서 싸우는 거리.
+     예전에는 90m 까지 벌어져 서로 아무도 못 맞히는 싸움이 됐습니다. */
   preferredRange(bot) {
-    if (!bot.gun) return 30;
+    if (!bot.gun) return 22;
     const r = bot.spec.range;
-    return Math.max(12, Math.min(r * 0.45, 90));
+    return Math.max(9, Math.min(r * 0.28, 55));
+  },
+
+  /* 이 거리보다 멀면 아예 쏘지 않고 접근합니다 */
+  engageRange(bot) {
+    return Math.min(bot.spec.range, this.preferredRange(bot) * 1.6);
   },
 
   shoot(bot, enemy, dist, game) {
@@ -4606,7 +4692,7 @@ const AI = {
     if (!bot.gun) return;
     if (bot.needsReload()) { bot.startReload(); return; }
     if (!bot.canShoot()) return;
-    if (dist > bot.spec.range) return;
+    if (dist > this.engageRange(bot)) return;
 
     const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
     const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
@@ -4618,7 +4704,7 @@ const AI = {
 
     const v = this._v.set(ex - bx, ey - by, ez - bz).normalize();
     // 숙련도와 거리에 따른 조준 오차
-    const err = (1.05 - a.skill) * 0.045 * (0.5 + dist / 90);
+    const err = (1.05 - a.skill) * 0.036 * (0.55 + dist / 130);
     v.x += (Math.random() * 2 - 1) * err;
     v.y += (Math.random() * 2 - 1) * err * 0.6;
     v.z += (Math.random() * 2 - 1) * err;
@@ -4902,7 +4988,7 @@ const Game = {
       const b = new Char3D(s.x, s.z, false, nm, OUTFITS[i % OUTFITS.length]);
       b.netId = i;
       this.botById[i] = b;
-      for (const k of GUN_KEYS) b.reserve[k] = 90;
+      for (const c of LOOT_CALIBERS) b.reserve[c] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
       if (Math.random() < 0.25) b.wear('bag', 1);
@@ -4964,10 +5050,11 @@ const Game = {
       let l;
       if (roll < 0.34) {
         const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer, 0, y);
+        l = new Loot(x, z, 'gun', g, CALIBERS[GUNS[g].ammo].box, 0, y);
       } else if (roll < 0.58) {
-        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5), 0, y);
+        // 탄약은 총이 아니라 '구경' 단위로 떨어집니다
+        const c = LOOT_CALIBERS[Math.floor(rnd() * LOOT_CALIBERS.length)];
+        l = new Loot(x, z, 'ammo', c, CALIBERS[c].box, 0, y);
       } else if (roll < 0.72) {
         const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
         l = new Loot(x, z, 'scope', null, 0, lv, y);
@@ -5297,7 +5384,10 @@ const Game = {
     ch.recoil = 1;
     this.muzzleFlash(ox, oy, oz, ch === this.player);
     const pellets = spec.pellets || 1;
-    const spread = (ch.isPlayer && this.ads) ? spec.adsSpread : spec.spread;
+    /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
+       사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
+    const spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
+                               : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
     const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
 
     for (let i = 0; i < pellets; i++) {
@@ -5578,11 +5668,20 @@ const Game = {
   },
 
   dropLoot(c) {
+    // 들고 있던 구경의 예비 탄약은 총과 따로, 구경별로 한 번씩 떨굽니다
+    const dropped = {};
     c.guns.forEach((key, i) => {
       if (!key) return;
+      const cal = GUNS[key].ammo;
       const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
-                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)), 0, c.pos.y);
+                         Math.max(10, c.mags[i]), 0, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
+      if (!dropped[cal] && (c.reserve[cal] || 0) > 0) {
+        dropped[cal] = true;
+        const a = new Loot(c.pos.x + (i ? -1.5 : 1.5), c.pos.z + i * 0.6 - 0.7, 'ammo', cal,
+                           Math.max(10, Math.round(c.reserve[cal] * 0.7)), 0, c.pos.y);
+        this.scene.add(a.mesh); this.loots.push(a);
+      }
       if (c.scopes[i]) {
         const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i], c.pos.y);
         this.scene.add(s.mesh); this.loots.push(s);
@@ -5606,23 +5705,32 @@ const Game = {
     if (l.dead) return false;
     if (l.kind === 'gun') {
       if (ch.guns.indexOf(l.gun) >= 0) {          // 이미 가진 총이면 탄약만
-        const got = ch.addAmmo(l.gun, l.amount);
+        const cal = GUNS[l.gun].ammo;
+        const got = ch.addAmmo(cal, l.amount);
         if (ch === this.player) {
-          this.pushFeed(got > 0 ? GUNS[l.gun].short + ' 탄약 +' + got : '탄약이 가득 찼습니다 (가방을 구하세요)');
+          this.pushFeed(got > 0 ? CALIBERS[cal].short + ' +' + got + '발' : '탄약이 가득 찼습니다 (가방을 구하세요)');
         }
         if (got <= 0) return false;
       } else if (ch.guns.indexOf(null) >= 0) {    // 빈 칸에 넣기
         const idx = ch.giveGun(l.gun, l.amount);
         if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득 (' + (idx + 1) + '번 칸)');
       } else {                                    // 지금 든 무기와 교체
-        const old = ch.gun, oldAmmo = ch.mag + (ch.reserve[old] || 0);
+        const old = ch.gun, oldMag = ch.mag, oldCal = GUNS[old].ammo;
         ch.guns[ch.slot] = l.gun;
         ch.mags[ch.slot] = GUNS[l.gun].mag;
-        ch.addAmmo(l.gun, l.amount);
-        ch.reserve[old] = 0;
+        ch.addAmmo(GUNS[l.gun].ammo, l.amount);
         ch.reloading = 0;
         ch.refreshGuns();
-        const d = new Loot(l.pos.x + 1.2, l.pos.z, 'gun', old, Math.max(10, oldAmmo));
+        // 남은 총이 같은 구경을 쓰면 탄약은 그대로 둡니다
+        if (!ch.usesCaliber(oldCal)) {
+          const left = ch.reserve[oldCal] || 0;
+          ch.reserve[oldCal] = 0;
+          if (left > 0) {
+            const a = new Loot(l.pos.x + 1.9, l.pos.z - 0.6, 'ammo', oldCal, left);
+            this.scene.add(a.mesh); this.loots.push(a);
+          }
+        }
+        const d = new Loot(l.pos.x + 1.2, l.pos.z, 'gun', old, Math.max(10, oldMag));
         this.scene.add(d.mesh); this.loots.push(d);
         if (ch === this.player) this.pushFeed(GUNS[old].short + ' → ' + GUNS[l.gun].name + ' 교체');
       }
@@ -5640,16 +5748,17 @@ const Game = {
       }
       if (ch === this.player) this.pushFeed(SCOPES[l.level].name + ' 장착 (' + GUNS[ch.gun].short + ')');
     } else if (l.kind === 'ammo') {
-      if (ch.guns.indexOf(l.gun) < 0) {
-        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 을 쓰는 총이 없습니다');
+      const cal = l.gun;                          // 탄약 아이템은 구경을 담고 있습니다
+      if (!ch.usesCaliber(cal)) {
+        if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' 을 쓰는 총이 없습니다');
         return false;
       }
-      const got = ch.addAmmo(l.gun, l.amount);
+      const got = ch.addAmmo(cal, l.amount);
       if (got <= 0) {
         if (ch === this.player) this.pushFeed('탄약이 가득 찼습니다 (가방을 구하세요)');
         return false;
       }
-      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + got);
+      if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
     } else if (l.kind === 'vest' || l.kind === 'bag') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
@@ -7016,7 +7125,7 @@ const Lobby = {
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true, vol: 0.8 },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8 },
   controls: [],
 
   load() {
@@ -7031,7 +7140,7 @@ const Settings = {
     this.data.sens = Math.max(0.2, Math.min(4, +this.data.sens || 1));
     this.data.ads = Math.max(0.2, Math.min(1.5, +this.data.ads || 0.65));
     this.data.invert = !!this.data.invert;
-    this.data.edge = this.data.edge !== false;
+    this.data.edge = !!this.data.edge;      // 기본은 끔 (켜면 화면 끝에서 계속 돌아갑니다)
     this.data.fpv = this.data.fpv !== false;
     this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
     Sfx.setVolume(this.data.vol);
@@ -7128,7 +7237,7 @@ const UI = {
       this.el.gunName.textContent = GUNS[p.gun].short
         + (p.zoom > 1 ? ' · ' + SCOPES[p.zoom].label : (p.scopeStowed ? ' · 조준경 분리' : ''));
       this.el.ammo.textContent = p.swap > 0 ? '교체 중'
-        : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo));
+        : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo + '  ' + CALIBERS[p.caliber].short));
     } else {
       this.el.gunName.textContent = '맨손';
       this.el.ammo.textContent = '무기를 찾으세요';
@@ -7413,6 +7522,7 @@ const Input = {
     // 마우스를 멈추면 시점도 곧바로 멈춥니다.
     window.addEventListener('mousemove', e => {
       this.mouseX = e.clientX; this.mouseY = e.clientY; this.inside = true;
+      this.moveAt = performance.now();
       if (Game.state !== 'playing' || this.settingsOpen) return;
       const mx = e.movementX, my = e.movementY;
       if (mx === undefined) return;
@@ -7420,7 +7530,14 @@ const Input = {
       if (Math.abs(mx) > 220 || Math.abs(my) > 220) return;
       this.dx += mx; this.dy += my;
     });
-    window.addEventListener('mouseout', e => { if (!e.relatedTarget) this.inside = false; });
+    /* 커서가 창 밖으로 나가면 그 즉시 회전을 멈춥니다.
+       예전에는 4초 동안 마지막 방향으로 계속 돌아서, 커서가 창을 벗어난 뒤
+       가만히 둬도 화면이 빙빙 도는 문제가 있었습니다. */
+    const leave = () => { this.inside = false; this.edgeX = this.edgeY = 0; };
+    window.addEventListener('mouseout', e => { if (!e.relatedTarget) leave(); });
+    document.addEventListener('mouseleave', leave);
+    window.addEventListener('mouseleave', leave);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); });
     window.addEventListener('mouseover', () => { this.inside = true; });
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
@@ -7514,14 +7631,15 @@ const Input = {
     const W = window.innerWidth, H = window.innerHeight, band = 110;
     const rate = 8;                        // 프레임당 회전량 (감도 설정이 그대로 곱해집니다)
 
-    if (this.inside) {
-      const x = this.mouseX, y = this.mouseY;
-      this.edgeX = x <= band ? -1 : (x >= W - band ? 1 : 0);
-      this.edgeY = y <= band ? -1 : (y >= H - band ? 1 : 0);
-      this.edgeAt = performance.now();
-    } else if (performance.now() - (this.edgeAt || 0) > 4000) {
-      this.edgeX = this.edgeY = 0;         // 오래 창 밖에 있으면 멈춥니다
+    /* 커서가 창 안에 있고, 최근에 마우스를 움직였을 때만 돌립니다.
+       창 밖으로 나갔거나 2초 넘게 가만히 있으면 곧바로 멈춥니다. */
+    if (!this.inside || performance.now() - (this.moveAt || 0) > 2000) {
+      this.edgeX = this.edgeY = 0;
+      return;
     }
+    const x = this.mouseX, y = this.mouseY;
+    this.edgeX = x <= band ? -1 : (x >= W - band ? 1 : 0);
+    this.edgeY = y <= band ? -1 : (y >= H - band ? 1 : 0);
 
     if (this.edgeX) this.dx += this.edgeX * rate;
     if (this.edgeY) this.dy += this.edgeY * rate * 0.6;

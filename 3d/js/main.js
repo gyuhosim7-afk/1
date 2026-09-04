@@ -7,7 +7,7 @@
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true, vol: 0.8 },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8 },
   controls: [],
 
   load() {
@@ -22,7 +22,7 @@ const Settings = {
     this.data.sens = Math.max(0.2, Math.min(4, +this.data.sens || 1));
     this.data.ads = Math.max(0.2, Math.min(1.5, +this.data.ads || 0.65));
     this.data.invert = !!this.data.invert;
-    this.data.edge = this.data.edge !== false;
+    this.data.edge = !!this.data.edge;      // 기본은 끔 (켜면 화면 끝에서 계속 돌아갑니다)
     this.data.fpv = this.data.fpv !== false;
     this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
     Sfx.setVolume(this.data.vol);
@@ -119,7 +119,7 @@ const UI = {
       this.el.gunName.textContent = GUNS[p.gun].short
         + (p.zoom > 1 ? ' · ' + SCOPES[p.zoom].label : (p.scopeStowed ? ' · 조준경 분리' : ''));
       this.el.ammo.textContent = p.swap > 0 ? '교체 중'
-        : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo));
+        : (p.reloading > 0 ? '재장전' : (p.mag + ' / ' + p.reserveAmmo + '  ' + CALIBERS[p.caliber].short));
     } else {
       this.el.gunName.textContent = '맨손';
       this.el.ammo.textContent = '무기를 찾으세요';
@@ -404,6 +404,7 @@ const Input = {
     // 마우스를 멈추면 시점도 곧바로 멈춥니다.
     window.addEventListener('mousemove', e => {
       this.mouseX = e.clientX; this.mouseY = e.clientY; this.inside = true;
+      this.moveAt = performance.now();
       if (Game.state !== 'playing' || this.settingsOpen) return;
       const mx = e.movementX, my = e.movementY;
       if (mx === undefined) return;
@@ -411,7 +412,14 @@ const Input = {
       if (Math.abs(mx) > 220 || Math.abs(my) > 220) return;
       this.dx += mx; this.dy += my;
     });
-    window.addEventListener('mouseout', e => { if (!e.relatedTarget) this.inside = false; });
+    /* 커서가 창 밖으로 나가면 그 즉시 회전을 멈춥니다.
+       예전에는 4초 동안 마지막 방향으로 계속 돌아서, 커서가 창을 벗어난 뒤
+       가만히 둬도 화면이 빙빙 도는 문제가 있었습니다. */
+    const leave = () => { this.inside = false; this.edgeX = this.edgeY = 0; };
+    window.addEventListener('mouseout', e => { if (!e.relatedTarget) leave(); });
+    document.addEventListener('mouseleave', leave);
+    window.addEventListener('mouseleave', leave);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); });
     window.addEventListener('mouseover', () => { this.inside = true; });
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
@@ -505,14 +513,15 @@ const Input = {
     const W = window.innerWidth, H = window.innerHeight, band = 110;
     const rate = 8;                        // 프레임당 회전량 (감도 설정이 그대로 곱해집니다)
 
-    if (this.inside) {
-      const x = this.mouseX, y = this.mouseY;
-      this.edgeX = x <= band ? -1 : (x >= W - band ? 1 : 0);
-      this.edgeY = y <= band ? -1 : (y >= H - band ? 1 : 0);
-      this.edgeAt = performance.now();
-    } else if (performance.now() - (this.edgeAt || 0) > 4000) {
-      this.edgeX = this.edgeY = 0;         // 오래 창 밖에 있으면 멈춥니다
+    /* 커서가 창 안에 있고, 최근에 마우스를 움직였을 때만 돌립니다.
+       창 밖으로 나갔거나 2초 넘게 가만히 있으면 곧바로 멈춥니다. */
+    if (!this.inside || performance.now() - (this.moveAt || 0) > 2000) {
+      this.edgeX = this.edgeY = 0;
+      return;
     }
+    const x = this.mouseX, y = this.mouseY;
+    this.edgeX = x <= band ? -1 : (x >= W - band ? 1 : 0);
+    this.edgeY = y <= band ? -1 : (y >= H - band ? 1 : 0);
 
     if (this.edgeX) this.dx += this.edgeX * rate;
     if (this.edgeY) this.dy += this.edgeY * rate * 0.6;

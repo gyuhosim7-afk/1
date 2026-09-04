@@ -745,7 +745,11 @@ const Scenery = {
     const boxMesh = new THREE.InstancedMesh(boxGeo, boxMat, this.boxDefs.length);
     boxMesh.castShadow = true; boxMesh.receiveShadow = true;
     this.boxDefs.forEach((b, i) => {
-      e.set(b.tilt || 0, b.yaw, 0, 'YXZ');
+      /* 화면 상자의 방향은 충돌 상자와 반드시 같아야 합니다.
+         부품 자리는 local() 로 잡는데 그 회전이 three.js 의 Y 회전과 반대여서,
+         여기서 부호를 맞춰 주지 않으면 '벽이 없는데 막히고 벽이 있는데 통과되는'
+         어긋남이 생깁니다. */
+      e.set(b.tilt || 0, -b.yaw, 0, 'YXZ');
       q.setFromEuler(e);
       m.compose(v.set(b.x, b.y, b.z), q, sv.set(b.sx, b.sy, b.sz));
       boxMesh.setMatrixAt(i, m);

@@ -29,16 +29,25 @@ const AI = {
       const dy = (enemy.pos.y + 1.05) - (bot.pos.y + 1.15);
       bot.pitch = this.approach(bot.pitch, Math.atan2(dy, dist), turn);
 
+      /* 교전 자세.
+         사거리 안에 들어와 조준이 끝났으면 '자리를 잡고' 쏩니다.
+         계속 뛰면서 쏘면 탄퍼짐이 두 배가 되어 아무리 쏴도 맞지 않습니다. */
       const want = this.preferredRange(bot);
+      const aimed = Math.abs(this.angleDiff(bot.yaw, toE)) < 0.2;
+      const settled = dist < want * 1.15 && aimed && a.reaction <= 0 && bot.hp >= 35;
+      bot.ads = settled;
+
       if (dist > want * 1.2) { mx += dx / dist; mz += dz / dist; speed = CFG.SPRINT * 0.8; }
       else if (dist < want * 0.55) { mx -= dx / dist; mz -= dz / dist; }
-      // 좌우 무빙
-      mx += Math.cos(toE) * a.strafe * 0.9;
-      mz += -Math.sin(toE) * a.strafe * 0.9;
+      // 좌우 무빙 (조준 중에는 살짝만)
+      const sw = settled ? 0.3 : 0.9;
+      mx += Math.cos(toE) * a.strafe * sw;
+      mz += -Math.sin(toE) * a.strafe * sw;
+      if (settled) speed = Math.min(speed, CFG.WALK * 0.45);   // 천천히 움직여야 탄이 모입니다
       if (bot.hp < 35) { mx -= dx / dist * 0.8; mz -= dz / dist * 0.8; speed = CFG.SPRINT; }
 
       this.shoot(bot, enemy, dist, game);
-    } else if (a.dest) {
+    } else if ((bot.ads = false) || a.dest) {
       const dx = a.dest.x - bot.pos.x, dz = a.dest.z - bot.pos.z;
       const dist = Math.hypot(dx, dz);
       if (dist > 1.2) {
@@ -163,7 +172,7 @@ const AI = {
       let target = null, bd = 80 * 80;
       for (const l of game.loots) {
         if (l.dead) continue;
-        if (l.kind === 'ammo' && (bot.guns.indexOf(l.gun) < 0 ||
+        if (l.kind === 'ammo' && (!bot.usesCaliber(l.gun) ||
             (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
@@ -199,10 +208,17 @@ const AI = {
     if (bot.gun && bot.mag < bot.spec.mag && bot.reserveAmmo > 0) bot.startReload();
   },
 
+  /* 붙어서 싸우는 거리.
+     예전에는 90m 까지 벌어져 서로 아무도 못 맞히는 싸움이 됐습니다. */
   preferredRange(bot) {
-    if (!bot.gun) return 30;
+    if (!bot.gun) return 22;
     const r = bot.spec.range;
-    return Math.max(12, Math.min(r * 0.45, 90));
+    return Math.max(9, Math.min(r * 0.28, 55));
+  },
+
+  /* 이 거리보다 멀면 아예 쏘지 않고 접근합니다 */
+  engageRange(bot) {
+    return Math.min(bot.spec.range, this.preferredRange(bot) * 1.6);
   },
 
   shoot(bot, enemy, dist, game) {
@@ -211,7 +227,7 @@ const AI = {
     if (!bot.gun) return;
     if (bot.needsReload()) { bot.startReload(); return; }
     if (!bot.canShoot()) return;
-    if (dist > bot.spec.range) return;
+    if (dist > this.engageRange(bot)) return;
 
     const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
     const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
@@ -223,7 +239,7 @@ const AI = {
 
     const v = this._v.set(ex - bx, ey - by, ez - bz).normalize();
     // 숙련도와 거리에 따른 조준 오차
-    const err = (1.05 - a.skill) * 0.045 * (0.5 + dist / 90);
+    const err = (1.05 - a.skill) * 0.036 * (0.55 + dist / 130);
     v.x += (Math.random() * 2 - 1) * err;
     v.y += (Math.random() * 2 - 1) * err * 0.6;
     v.z += (Math.random() * 2 - 1) * err;

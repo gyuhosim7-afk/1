@@ -259,7 +259,7 @@ const Game = {
       const b = new Char3D(s.x, s.z, false, nm, OUTFITS[i % OUTFITS.length]);
       b.netId = i;
       this.botById[i] = b;
-      for (const k of GUN_KEYS) b.reserve[k] = 90;
+      for (const c of LOOT_CALIBERS) b.reserve[c] = 90;
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
       if (Math.random() < 0.25) b.wear('bag', 1);
@@ -321,10 +321,11 @@ const Game = {
       let l;
       if (roll < 0.34) {
         const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'gun', g, GUNS[g].ammoPer, 0, y);
+        l = new Loot(x, z, 'gun', g, CALIBERS[GUNS[g].ammo].box, 0, y);
       } else if (roll < 0.58) {
-        const g = LOOT_GUNS[Math.floor(rnd() * LOOT_GUNS.length)];
-        l = new Loot(x, z, 'ammo', g, Math.round(GUNS[g].ammoPer * 0.5), 0, y);
+        // 탄약은 총이 아니라 '구경' 단위로 떨어집니다
+        const c = LOOT_CALIBERS[Math.floor(rnd() * LOOT_CALIBERS.length)];
+        l = new Loot(x, z, 'ammo', c, CALIBERS[c].box, 0, y);
       } else if (roll < 0.72) {
         const lv = SCOPE_LEVELS[Math.floor(rnd() * SCOPE_LEVELS.length)];
         l = new Loot(x, z, 'scope', null, 0, lv, y);
@@ -654,7 +655,10 @@ const Game = {
     ch.recoil = 1;
     this.muzzleFlash(ox, oy, oz, ch === this.player);
     const pellets = spec.pellets || 1;
-    const spread = (ch.isPlayer && this.ads) ? spec.adsSpread : spec.spread;
+    /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
+       사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
+    const spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
+                               : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
     const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
 
     for (let i = 0; i < pellets; i++) {
@@ -935,11 +939,20 @@ const Game = {
   },
 
   dropLoot(c) {
+    // 들고 있던 구경의 예비 탄약은 총과 따로, 구경별로 한 번씩 떨굽니다
+    const dropped = {};
     c.guns.forEach((key, i) => {
       if (!key) return;
+      const cal = GUNS[key].ammo;
       const l = new Loot(c.pos.x + (i ? -0.9 : 0.9), c.pos.z + i * 0.6, 'gun', key,
-                         Math.max(15, c.mags[i] + (c.reserve[key] || 0)), 0, c.pos.y);
+                         Math.max(10, c.mags[i]), 0, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
+      if (!dropped[cal] && (c.reserve[cal] || 0) > 0) {
+        dropped[cal] = true;
+        const a = new Loot(c.pos.x + (i ? -1.5 : 1.5), c.pos.z + i * 0.6 - 0.7, 'ammo', cal,
+                           Math.max(10, Math.round(c.reserve[cal] * 0.7)), 0, c.pos.y);
+        this.scene.add(a.mesh); this.loots.push(a);
+      }
       if (c.scopes[i]) {
         const s = new Loot(c.pos.x + (i ? -1.6 : 1.6), c.pos.z + i * 0.6, 'scope', null, 0, c.scopes[i], c.pos.y);
         this.scene.add(s.mesh); this.loots.push(s);
@@ -963,23 +976,32 @@ const Game = {
     if (l.dead) return false;
     if (l.kind === 'gun') {
       if (ch.guns.indexOf(l.gun) >= 0) {          // 이미 가진 총이면 탄약만
-        const got = ch.addAmmo(l.gun, l.amount);
+        const cal = GUNS[l.gun].ammo;
+        const got = ch.addAmmo(cal, l.amount);
         if (ch === this.player) {
-          this.pushFeed(got > 0 ? GUNS[l.gun].short + ' 탄약 +' + got : '탄약이 가득 찼습니다 (가방을 구하세요)');
+          this.pushFeed(got > 0 ? CALIBERS[cal].short + ' +' + got + '발' : '탄약이 가득 찼습니다 (가방을 구하세요)');
         }
         if (got <= 0) return false;
       } else if (ch.guns.indexOf(null) >= 0) {    // 빈 칸에 넣기
         const idx = ch.giveGun(l.gun, l.amount);
         if (ch === this.player) this.pushFeed(GUNS[l.gun].name + ' 획득 (' + (idx + 1) + '번 칸)');
       } else {                                    // 지금 든 무기와 교체
-        const old = ch.gun, oldAmmo = ch.mag + (ch.reserve[old] || 0);
+        const old = ch.gun, oldMag = ch.mag, oldCal = GUNS[old].ammo;
         ch.guns[ch.slot] = l.gun;
         ch.mags[ch.slot] = GUNS[l.gun].mag;
-        ch.addAmmo(l.gun, l.amount);
-        ch.reserve[old] = 0;
+        ch.addAmmo(GUNS[l.gun].ammo, l.amount);
         ch.reloading = 0;
         ch.refreshGuns();
-        const d = new Loot(l.pos.x + 1.2, l.pos.z, 'gun', old, Math.max(10, oldAmmo));
+        // 남은 총이 같은 구경을 쓰면 탄약은 그대로 둡니다
+        if (!ch.usesCaliber(oldCal)) {
+          const left = ch.reserve[oldCal] || 0;
+          ch.reserve[oldCal] = 0;
+          if (left > 0) {
+            const a = new Loot(l.pos.x + 1.9, l.pos.z - 0.6, 'ammo', oldCal, left);
+            this.scene.add(a.mesh); this.loots.push(a);
+          }
+        }
+        const d = new Loot(l.pos.x + 1.2, l.pos.z, 'gun', old, Math.max(10, oldMag));
         this.scene.add(d.mesh); this.loots.push(d);
         if (ch === this.player) this.pushFeed(GUNS[old].short + ' → ' + GUNS[l.gun].name + ' 교체');
       }
@@ -997,16 +1019,17 @@ const Game = {
       }
       if (ch === this.player) this.pushFeed(SCOPES[l.level].name + ' 장착 (' + GUNS[ch.gun].short + ')');
     } else if (l.kind === 'ammo') {
-      if (ch.guns.indexOf(l.gun) < 0) {
-        if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 을 쓰는 총이 없습니다');
+      const cal = l.gun;                          // 탄약 아이템은 구경을 담고 있습니다
+      if (!ch.usesCaliber(cal)) {
+        if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' 을 쓰는 총이 없습니다');
         return false;
       }
-      const got = ch.addAmmo(l.gun, l.amount);
+      const got = ch.addAmmo(cal, l.amount);
       if (got <= 0) {
         if (ch === this.player) this.pushFeed('탄약이 가득 찼습니다 (가방을 구하세요)');
         return false;
       }
-      if (ch === this.player) this.pushFeed(GUNS[l.gun].short + ' 탄약 +' + got);
+      if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
     } else if (l.kind === 'vest' || l.kind === 'bag') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
