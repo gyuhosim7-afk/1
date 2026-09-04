@@ -404,11 +404,12 @@ const Game = {
       if (c.hitFlash > 0) c.hitFlash -= dt;
       if (c.reloading > 0) {
         c.reloading -= dt;
-        if (c.reloading <= 0) { c.finishReload(); if (c === this.player) Sfx.reload(); }
+        if (c.reloading <= 0) { c.finishReload(); if (c === this.player) Sfx.reloadDone(); }
       }
       if (c.healing > 0) {
+        if (c === this.player && !c._healSnd) { c._healSnd = true; Sfx.heal(); }
         c.healing -= dt;
-        if (c.healing <= 0) { c.meds--; c.hp = Math.min(c.maxHp, c.hp + CFG.HEAL_AMOUNT); }
+        if (c.healing <= 0) { c.meds--; c.hp = Math.min(c.maxHp, c.hp + CFG.HEAL_AMOUNT); c._healSnd = false; }
       }
       if (c.swap > 0) c.swap -= dt;
 
@@ -427,12 +428,20 @@ const Game = {
         continue;
       }
 
+      if (c.climb) {
+        this.updateClimb(c, dt);
+        c.syncMesh(dt, false);
+        continue;
+      }
+
       if (!c.isPlayer) AI.update(c, dt, this);
 
+      // 자기장은 마지막 한 명은 죽이지 않습니다 (승자 없이 끝나지 않도록)
       const dz = Math.hypot(c.pos.x - this.zone.x, c.pos.z - this.zone.z);
-      if (dz > this.zone.r) this.damage(c, this.zone.dps * dt, null, false, true);
+      if (dz > this.zone.r && this.alive > 1) this.damage(c, this.zone.dps * dt, null, false, true);
 
       c.syncMesh(dt, c === this.player ? this.ads : !!(c.ai && c.ai.state === 'fight'));
+      this.footsteps(c);
     }
 
     this.updateDrops(dt);
@@ -526,6 +535,7 @@ const Game = {
   updatePlayer(dt, input) {
     const p = this.player;
     if (p.victory > 0) { input.fire = false; return; }   // 승리 연출 중에는 조작을 멈춥니다
+    if (p.climb) { this.updateClimb(p, dt); input.fire = false; input.jump = false; return; }
 
     // 시점
     // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
@@ -546,6 +556,7 @@ const Game = {
       th = Math.max(-1, Math.min(1, th));
       st = Math.max(-1, Math.min(1, st));
       v.drive(dt, th, st, !!input.crouch);          // C 키가 브레이크
+      Sfx.engine(true, v.speed, v.spec.max, Math.abs(th));
       // 운전자는 차와 함께 움직입니다
       p.pos.set(v.pos.x, v.pos.y, v.pos.z);
       p.speedNow = Math.abs(v.speed);
@@ -583,7 +594,12 @@ const Game = {
     if (p.healing > 0) speed = Math.min(speed, 1.6);
     if (this.ads) speed = Math.min(speed, CFG.WALK * 0.6);
 
-    if (input.jump && p.grounded && p.healing <= 0) { p.vy = CFG.JUMP; input.jump = false; }
+    if (input.jump && p.healing <= 0) {
+      input.jump = false;
+      const v = this.vaultTarget(p);
+      if (v) { this.startClimb(p, v); return; }      // 앞에 턱이 있으면 기어오릅니다
+      if (p.grounded) p.vy = CFG.JUMP;
+    }
     this.moveChar(p, mx, mz, speed, dt);
 
     this.ads = !!input.ads && p.healing <= 0;
@@ -670,7 +686,10 @@ const Game = {
           this.damage(hit.char, dmg, ch, hit.head, false);
         }
       } else if (wallT < maxT) {
-        this.puff(ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
+        const ix = ox + d.x * endT, iy = oy + d.y * endT, iz = oz + d.z * endT;
+        this.puff(ix, iy, iz);
+        Sfx.impact(Math.hypot(ix - this.player.pos.x, iy - this.player.pos.y, iz - this.player.pos.z),
+                   this.surfaceAt(ix, iy, iz));
       }
       this.tracer(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT, ch.isPlayer);
       if (ch.isPlayer && this.online) {
@@ -678,8 +697,116 @@ const Game = {
       }
     }
 
-    Sfx.shot(ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos), ch.gun);
+    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos);
+    Sfx.shot(shotD, ch.gun, this.indoors(ch));
+    if (ch !== this.player) {
+      // 총알이 내 옆을 스치면 총성보다 먼저 '탁' 하는 파열음이 지나갑니다
+      const m = this.missDistance(ch, dir);
+      if (m < 7) Sfx.crack(m, ch.gun);
+    }
     if (ch.mag <= 0) ch.startReload();
+  },
+
+  /* ---------- 넘기·기어오르기 ----------
+     앞쪽에 걸어서는 못 오르지만 매달려 오를 만한 턱이 있으면 그 자리를 돌려줍니다. */
+  vaultTarget(ch) {
+    if (ch.climb || ch.flying || ch.vehicle || ch.dead) return null;
+    const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
+    const feet = ch.pos.y;
+    for (const reach of [0.95, 1.45]) {
+      const tx = ch.pos.x + fx * reach, tz = ch.pos.z + fz * reach;
+      let top = World.height(tx, tz);
+      for (const o of World.near(tx, tz, tx, tz, 1)) {
+        if (o.r !== undefined) continue;
+        if (o.top > feet + CFG.VAULT_MAX || o.top <= top) continue;
+        if (World.insideBox(o, tx, tz, 0)) top = o.top;
+      }
+      const rise = top - feet;
+      if (rise <= CFG.STEP_UP + 0.05) continue;      // 그냥 걸어 올라갈 수 있는 턱
+      if (rise > CFG.VAULT_MAX) continue;
+      // 올라선 자리에 몸이 들어가는지, 머리 위 공간이 있는지
+      if (World.blocked(tx, tz, CFG.BODY_R, top, top + CFG.BODY_H, 0.06)) continue;
+      if (World.ceilingY(tx, tz, top + 0.1) < top + CFG.BODY_H) continue;
+      return { x: tx, y: top, z: tz, rise };
+    }
+    return null;
+  },
+
+  startClimb(ch, target) {
+    ch.climb = {
+      t: 0,
+      dur: CFG.VAULT_TIME * (0.75 + target.rise / CFG.VAULT_MAX * 0.5),
+      from: { x: ch.pos.x, y: ch.pos.y, z: ch.pos.z },
+      to: target
+    };
+    ch.vy = 0;
+    ch.grounded = false;
+    if (ch === this.player) Sfx.vault();
+    else if (this.player.pos.distanceTo(ch.pos) < 22) Sfx.vault();
+    return true;
+  },
+
+  /* 올라가는 동안은 조작을 받지 않고 정해진 궤적을 따라갑니다 */
+  updateClimb(ch, dt) {
+    const c = ch.climb;
+    c.t += dt;
+    const k = Math.min(1, c.t / c.dur);
+    // 먼저 위로 솟았다가 앞으로 올라섭니다
+    const up = Math.min(1, k * 1.55);
+    const fwd = Math.max(0, (k - 0.35) / 0.65);
+    const ease = x => x * x * (3 - 2 * x);
+    ch.pos.y = c.from.y + (c.to.y + 0.06 - c.from.y) * ease(up);
+    ch.pos.x = c.from.x + (c.to.x - c.from.x) * ease(fwd);
+    ch.pos.z = c.from.z + (c.to.z - c.from.z) * ease(fwd);
+    ch.speedNow = 0;
+    if (k >= 1) {
+      ch.climb = null;
+      ch.pos.set(c.to.x, World.groundY(c.to.x, c.to.z, c.to.y + 0.3), c.to.z);
+      ch.vy = 0; ch.grounded = true;
+      if (ch === this.player) Sfx.land(0.15);
+    }
+  },
+
+  /* 발소리. 걷기 주기가 반 바퀴 돌 때마다 한 걸음씩 냅니다.
+     가까이 있는 적의 발소리도 들리게 해서 기척을 느낄 수 있습니다. */
+  footsteps(c) {
+    if (c.dead || c.flying || c.vehicle || !c.grounded || c.speedNow < 1.2) { c._stepSign = 0; return; }
+    const sign = Math.sin(c.stepPhase) >= 0 ? 1 : -1;
+    if (!c._stepSign) { c._stepSign = sign; return; }
+    if (sign === c._stepSign) return;
+    c._stepSign = sign;
+    const d = c === this.player ? 0 : this.player.pos.distanceTo(c.pos);
+    if (d > 26) return;
+    const near = c === this.player ? 1 : Math.max(0, 1 - d / 26);
+    // 건물 바닥·계단 위면 단단한 소리
+    const hard = c.pos.y > World.height(c.pos.x, c.pos.z) + 0.35;
+    Sfx.step(c.speedNow * near * near, hard);
+  },
+
+  /* 머리 위에 지붕이 있으면 실내로 봅니다 (총성 반사음이 달라집니다) */
+  indoors(ch) {
+    return World.ceilingY(ch.pos.x, ch.pos.z, ch.pos.y + 1.7) < ch.pos.y + 12;
+  },
+
+  /* 총알이 내 몸에서 얼마나 떨어져 지나가는지 (직선과 점 사이 거리) */
+  missDistance(ch, dir) {
+    const p = this.player.pos;
+    const px = p.x - ch.pos.x, py = p.y + 1.0 - (ch.pos.y + 1.0), pz = p.z - ch.pos.z;
+    const t = px * dir.x + py * dir.y + pz * dir.z;
+    if (t < 0) return 999;
+    return Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+  },
+
+  /* 탄착 지점의 재질 추정 */
+  surfaceAt(x, y, z) {
+    if (y < World.height(x, z) + 0.4) return 'dirt';
+    for (const o of World.near(x, z, x, z, 1.2)) {
+      if (o.r !== undefined) return 'wood';        // 나무 줄기·바위
+      if (y > o.bottom - 0.4 && y < o.top + 0.4 && World.boxDist(o, x, z) < 0.6) {
+        return (o.top - o.bottom) > 2.2 ? 'metal' : 'wood';
+      }
+    }
+    return 'dirt';
   },
 
   /* 캐릭터에 대한 광선 판정 (몸통 원기둥 + 머리 구) */
@@ -726,6 +853,7 @@ const Game = {
         Sfx.hit(head);
       }
       this.puff(target.pos.x, target.pos.y + 1.0, target.pos.z, 0xc23b32);
+      Sfx.impact(this.player.pos.distanceTo(target.pos), 'flesh');
       if (target === this.player && src) {
         this.damageDir = { yaw: Math.atan2(src.pos.x - target.pos.x, src.pos.z - target.pos.z), life: 1.4 };
         Sfx.hurt();
@@ -897,6 +1025,7 @@ const Game = {
   updateFlight(c, dt, mx, mz) {
     const ground = World.groundY(c.pos.x, c.pos.z, c.pos.y);
     const alt = c.pos.y - ground;
+    if (c === this.player) Sfx.wind(c.flying === 'freefall' ? 1 : 0.42);
 
     if (c.flying === 'freefall') {
       c.vy = Math.max(-CFG.FREEFALL_SPEED, c.vy - CFG.GRAVITY * 1.6 * dt);
@@ -935,7 +1064,8 @@ const Game = {
       if (c === this.player) {
         this.landDip = 0.25;
         this.pushFeed('착지 완료 — 무기를 찾으세요');
-        Sfx.land();
+        Sfx.land(0.6);
+        Sfx.wind(0);
       }
     }
   },
@@ -1177,7 +1307,7 @@ const Game = {
     this.scene.add(a.mesh);
     this.drops.push(a);
     this.pushFeed('보급 상자가 투하되었습니다 — 지도를 확인하세요');
-    Sfx.chute();
+    Sfx.drop();
   },
 
   /* 가장 가까운, 열 수 있는 보급 상자 */
@@ -1257,6 +1387,7 @@ const Game = {
   exitVehicle(ch) {
     const v = ch.vehicle;
     if (!v) return false;
+    if (ch === this.player) Sfx.engine(false);
     v.driver = null;
     ch.vehicle = null;
     // 차 옆으로 내려놓습니다
@@ -1288,6 +1419,7 @@ const Game = {
         z.tx = plan.x; z.tz = plan.z; z.tr = plan.r;
         z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
         this.pushFeed('자기장 ' + (z.phase + 1) + '단계 축소 시작');
+        Sfx.zone();
       }
     } else {
       const ph = PHASES[z.phase];
@@ -1384,6 +1516,7 @@ const Game = {
 
   finish(won) {
     if (this.state !== 'playing') return;
+    Sfx.engine(false); Sfx.wind(0);
     this.state = 'over';
     const p = this.player;
     this.result = {

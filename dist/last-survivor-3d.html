@@ -759,6 +759,11 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
         <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
         <b data-val="ads">0.65</b>
       </label>
+      <label class="row">
+        <span>소리 크기</span>
+        <input type="range" data-set="vol" min="0" max="1" step="0.05">
+        <b data-val="vol">0.80</b>
+      </label>
       <label class="row check">
         <input type="checkbox" data-set="invert">
         <span>Y축 반전</span>
@@ -949,7 +954,9 @@ const CFG = {
   EYE: 1.28,            // 눈높이 (폴가이즈 체형)
   BODY_R: 0.40,         // 몸통 반지름 (충돌)
   BODY_H: 1.55,
-  STEP_UP: 0.60,        // 걸어서 올라설 수 있는 턱 높이 (계단 한 칸 = 0.42)
+  STEP_UP: 0.60,        // 걸어서 올라설 수 있는 턱 높이 (계단 한 칸 = 0.36)
+  VAULT_MAX: 2.0,       // 매달려 기어오를 수 있는 최대 높이
+  VAULT_TIME: 0.55,     // 기어오르는 데 걸리는 시간
 
   CAM_DIST: 4.6,        // 3인칭 카메라 거리
   CAM_HEIGHT: 1.30,
@@ -1124,6 +1131,368 @@ const REWARD = {
 /* 봇이 입는 옷 (스킨 목록에서 골라 씁니다) */
 const BOT_SKINS = ['recruit', 'ranger', 'militia', 'desert', 'urban', 'medic'];
 const OUTFITS = BOT_SKINS.map(k => SKINS[k]);
+
+/* ============================================================
+   소리
+   외부 음원 파일 없이 웹오디오로 직접 합성합니다.
+   핵심은 세 가지입니다.
+   1) 잡음(노이즈)을 필터로 깎아 총성·발소리·바람을 만듭니다.
+      단순 사각파 '삐' 소리와 달리 실제 소리는 대부분 잡음 성분입니다.
+   2) 거리에 따라 소리가 작아질 뿐 아니라 고음이 먼저 사라지고,
+      소리가 도착하는 데 시간이 걸립니다(음속 340m/s).
+      멀리서 나는 총성이 '퍽' 하고 둔하게 들리는 이유입니다.
+   3) 짧은 반사음(꼬리)을 붙여 벌판의 울림을 흉내 냅니다.
+   ============================================================ */
+const Sfx = {
+  ctx: null, master: null, comp: null, noiseBuf: null,
+  enabled: true, volume: 0.8, ready: false,
+  _engine: null, _wind: null,
+
+  init() {
+    if (this.ctx) { this.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { this.enabled = false; return; }
+      const ctx = this.ctx = new AC();
+
+      // 여러 소리가 겹쳐도 찢어지지 않도록 압축기를 겁니다
+      const comp = this.comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18; comp.knee.value = 20;
+      comp.ratio.value = 9; comp.attack.value = 0.003; comp.release.value = 0.16;
+
+      const master = this.master = ctx.createGain();
+      master.gain.value = this.volume;
+      master.connect(comp); comp.connect(ctx.destination);
+
+      // 2초짜리 흰 잡음 (모든 잡음 계열 소리의 재료)
+      const len = ctx.sampleRate * 2;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuf = buf;
+
+      this.ready = true;
+    } catch (e) { this.enabled = false; }
+  },
+
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+  },
+
+  setVolume(v) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.value = this.volume;
+  },
+
+  get t() { return this.ctx.currentTime; },
+  ok() { return this.enabled && this.ready && this.ctx; },
+
+  /* ---------- 재료 ---------- */
+
+  /* 잡음 한 조각.
+     type/freq/q 로 음색을 깎고, atk~dec 로 세기를 그립니다. */
+  noise(o) {
+    const c = this.ctx, t0 = this.t + (o.delay || 0);
+    const src = c.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    src.playbackRate.value = o.rate || 1;
+    // 매번 다른 구간을 써야 같은 소리가 반복되지 않습니다
+    const off = Math.random() * 1.5;
+
+    const filt = c.createBiquadFilter();
+    filt.type = o.type || 'lowpass';
+    filt.frequency.setValueAtTime(o.freq, t0);
+    if (o.freqTo) filt.frequency.exponentialRampToValueAtTime(Math.max(40, o.freqTo), t0 + o.dec);
+    filt.Q.value = o.q == null ? 0.7 : o.q;
+
+    const g = c.createGain();
+    const atk = o.atk == null ? 0.002 : o.atk;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol), t0 + atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + atk + o.dec);
+
+    let node = filt;
+    src.connect(filt);
+    if (o.hp) {                                   // 저역을 잘라 '탁' 하는 느낌
+      const hp = c.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = o.hp;
+      filt.connect(hp); node = hp;
+    }
+    node.connect(g);
+    g.connect(o.dest || this.master);
+    src.start(t0, off);
+    src.stop(t0 + atk + o.dec + 0.05);
+    return g;
+  },
+
+  /* 사인/삼각파 한 조각 (총성의 저음, 금속 울림 등) */
+  tone(o) {
+    const c = this.ctx, t0 = this.t + (o.delay || 0);
+    const osc = c.createOscillator();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(o.freq, t0);
+    if (o.freqTo) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.freqTo), t0 + o.dec);
+    const g = c.createGain();
+    const atk = o.atk == null ? 0.002 : o.atk;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol), t0 + atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + atk + o.dec);
+    osc.connect(g); g.connect(o.dest || this.master);
+    osc.start(t0); osc.stop(t0 + atk + o.dec + 0.05);
+    return g;
+  },
+
+  /* 거리에 따른 감쇠·저역화·지연을 한 번에 계산합니다 */
+  dist(d) {
+    const far = Math.min(1, d / 300);
+    return {
+      gain: 1 / (1 + d / 22),                 // 거리 감쇠
+      cut: 16000 * Math.pow(0.06, far) + 260, // 멀수록 고음이 사라짐
+      delay: Math.min(1.2, d / 340)           // 음속만큼 늦게 도착
+    };
+  },
+
+  /* ---------- 총성 ---------- */
+  /* 총마다 저음/파열음/꼬리 길이를 달리해 성격을 나눕니다 */
+  GUN: {
+    pistol:  { low: 150, body: 1700, dec: 0.10, tail: 0.28, vol: 0.55, crack: 0.7 },
+    smg:     { low: 165, body: 2100, dec: 0.075, tail: 0.22, vol: 0.5,  crack: 0.7 },
+    shotgun: { low: 95,  body: 1100, dec: 0.16, tail: 0.42, vol: 0.9,  crack: 0.3 },
+    rifle:   { low: 125, body: 1900, dec: 0.11, tail: 0.34, vol: 0.7,  crack: 0.9 },
+    dmr:     { low: 105, body: 1600, dec: 0.14, tail: 0.44, vol: 0.85, crack: 1.0 },
+    sniper:  { low: 78,  body: 1250, dec: 0.20, tail: 0.62, vol: 1.0,  crack: 1.2 }
+  },
+
+  shot(d, gun, indoors) {
+    if (!this.ok()) return;
+    this.resume();
+    const S = this.GUN[gun] || this.GUN.rifle;
+    const D = this.dist(d);
+    if (D.gain < 0.01) return;
+    const v = S.vol * D.gain * 0.9;
+    const near = Math.max(0, 1 - d / 120);      // 가까울수록 파열음이 살아 있습니다
+
+    // 1) 격발 순간의 날카로운 파열
+    this.noise({ freq: Math.min(D.cut, S.body * 2.2), type: 'lowpass', hp: 900 * near + 120,
+                 vol: v * 0.9 * (0.25 + 0.75 * near), atk: 0.0012, dec: 0.022, delay: D.delay });
+    // 2) 몸통 — 총성의 '탕'
+    this.noise({ freq: Math.min(D.cut, S.body), freqTo: Math.min(D.cut, S.body * 0.25),
+                 type: 'lowpass', q: 1.1, vol: v, atk: 0.002, dec: S.dec, delay: D.delay });
+    // 3) 저음 — 무게감
+    this.tone({ freq: S.low, freqTo: S.low * 0.55, type: 'sine',
+                vol: v * 0.85, atk: 0.004, dec: S.dec * 1.5, delay: D.delay });
+    // 4) 꼬리 — 벌판/실내 반사음
+    const tail = S.tail * (indoors ? 0.55 : 1) * (0.6 + 0.8 * Math.min(1, d / 90));
+    this.noise({ freq: Math.min(D.cut, indoors ? 2400 : 900), freqTo: 240, type: 'lowpass',
+                 vol: v * (indoors ? 0.5 : 0.34), atk: 0.02, dec: tail, delay: D.delay + 0.03 });
+    if (indoors) {   // 실내는 짧고 날카로운 반사가 한 번 더
+      this.noise({ freq: Math.min(D.cut, 3600), type: 'bandpass', q: 1.6,
+                   vol: v * 0.3, atk: 0.006, dec: 0.16, delay: D.delay + 0.012 });
+    }
+  },
+
+  /* 총알이 귓가를 스칠 때 나는 초음속 파열음. 총성보다 먼저 도착합니다 */
+  crack(missDist, gun) {
+    if (!this.ok()) return;
+    const S = this.GUN[gun] || this.GUN.rifle;
+    const v = Math.max(0, 1 - missDist / 7) * 0.5 * S.crack;
+    if (v < 0.02) return;
+    this.noise({ freq: 7000, freqTo: 1400, type: 'bandpass', q: 0.8, hp: 1200,
+                 vol: v, atk: 0.0008, dec: 0.045 });
+  },
+
+  /* 탄착: 흙 / 나무 / 금속 / 살 */
+  impact(d, kind) {
+    if (!this.ok()) return;
+    const D = this.dist(d);
+    const v = D.gain * 0.5;
+    if (v < 0.008) return;
+    if (kind === 'flesh') {
+      this.noise({ freq: Math.min(D.cut, 900), freqTo: 200, type: 'lowpass',
+                   vol: v * 1.1, atk: 0.001, dec: 0.09, delay: D.delay });
+      this.tone({ freq: 110, freqTo: 60, vol: v * 0.5, dec: 0.07, delay: D.delay });
+    } else if (kind === 'metal') {
+      this.noise({ freq: Math.min(D.cut, 5200), type: 'bandpass', q: 2.4,
+                   vol: v, atk: 0.001, dec: 0.13, delay: D.delay });
+      this.tone({ freq: 2100, freqTo: 1500, type: 'triangle', vol: v * 0.35, dec: 0.2, delay: D.delay });
+    } else if (kind === 'wood') {
+      this.noise({ freq: Math.min(D.cut, 2200), freqTo: 500, type: 'lowpass', q: 1.2,
+                   vol: v, atk: 0.001, dec: 0.11, delay: D.delay });
+    } else {                                      // 흙·돌
+      this.noise({ freq: Math.min(D.cut, 1500), freqTo: 320, type: 'lowpass',
+                   vol: v * 0.9, atk: 0.001, dec: 0.14, delay: D.delay });
+    }
+  },
+
+  /* ---------- 피격 ---------- */
+  hit(head) {
+    if (!this.ok()) return;
+    // 맞았다는 신호음: 머리는 높고 짧게
+    this.tone({ freq: head ? 1750 : 1150, freqTo: head ? 1300 : 900, type: 'triangle',
+                vol: head ? 0.3 : 0.2, atk: 0.001, dec: head ? 0.09 : 0.06 });
+    if (head) this.tone({ freq: 2600, type: 'sine', vol: 0.16, atk: 0.001, dec: 0.12, delay: 0.02 });
+  },
+
+  hurt() {
+    if (!this.ok()) return;
+    this.noise({ freq: 700, freqTo: 180, type: 'lowpass', vol: 0.5, atk: 0.002, dec: 0.22 });
+    this.tone({ freq: 90, freqTo: 55, vol: 0.35, dec: 0.28 });
+  },
+
+  kill() {
+    if (!this.ok()) return;
+    this.tone({ freq: 660, type: 'triangle', vol: 0.22, dec: 0.1 });
+    this.tone({ freq: 990, type: 'triangle', vol: 0.18, dec: 0.16, delay: 0.07 });
+  },
+
+  /* ---------- 장비 ---------- */
+  /* 금속 부품이 맞물리는 짧은 딸깍 */
+  click(o) {
+    o = o || {};
+    this.noise({ freq: o.freq || 3200, type: 'bandpass', q: o.q || 3.2,
+                 vol: o.vol || 0.28, atk: 0.0008, dec: o.dec || 0.035, delay: o.delay || 0 });
+    this.tone({ freq: (o.freq || 3200) * 0.55, type: 'square', vol: (o.vol || 0.28) * 0.25,
+                atk: 0.0008, dec: 0.02, delay: o.delay || 0 });
+  },
+
+  reload() {                       // 재장전 시작: 탄창 빼는 소리
+    if (!this.ok()) return;
+    this.click({ freq: 2400, vol: 0.3, dec: 0.05 });
+    this.click({ freq: 1500, vol: 0.24, dec: 0.06, delay: 0.13 });
+  },
+
+  reloadDone() {                   // 재장전 끝: 탄창 삽입 + 노리쇠
+    if (!this.ok()) return;
+    this.click({ freq: 1200, q: 2.2, vol: 0.34, dec: 0.07 });
+    this.click({ freq: 3400, q: 3.6, vol: 0.3, dec: 0.05, delay: 0.11 });
+    this.tone({ freq: 900, freqTo: 600, type: 'triangle', vol: 0.12, dec: 0.09, delay: 0.11 });
+  },
+
+  swap() {                         // 무기 교체
+    if (!this.ok()) return;
+    this.noise({ freq: 1800, type: 'bandpass', q: 1.4, vol: 0.22, atk: 0.004, dec: 0.09 });
+    this.click({ freq: 2600, vol: 0.2, dec: 0.04, delay: 0.08 });
+  },
+
+  pick() {                         // 아이템 획득
+    if (!this.ok()) return;
+    this.noise({ freq: 2600, type: 'bandpass', q: 2.0, vol: 0.2, atk: 0.003, dec: 0.06 });
+    this.tone({ freq: 1320, type: 'triangle', vol: 0.12, dec: 0.07, delay: 0.03 });
+  },
+
+  heal() {
+    if (!this.ok()) return;
+    this.noise({ freq: 1400, freqTo: 3000, type: 'bandpass', q: 1.1, vol: 0.16, atk: 0.05, dec: 0.4 });
+  },
+
+  /* ---------- 몸 ---------- */
+  step(speed, hard) {
+    if (!this.ok()) return;
+    const v = Math.min(0.24, 0.05 + speed * 0.022);
+    this.noise({ freq: hard ? 2600 : 1500, freqTo: hard ? 700 : 320, type: 'lowpass', q: 1.0,
+                 vol: v, atk: 0.001, dec: hard ? 0.07 : 0.1, rate: 0.9 + Math.random() * 0.3 });
+    if (hard) this.click({ freq: 4200, q: 4, vol: v * 0.4, dec: 0.02 });
+  },
+
+  land(fall) {                     // 착지 (fall: 낙하 세기 0~1)
+    if (!this.ok()) return;
+    const v = 0.25 + fall * 0.4;
+    this.noise({ freq: 900, freqTo: 160, type: 'lowpass', vol: v, atk: 0.002, dec: 0.16 });
+    this.tone({ freq: 80, freqTo: 45, vol: v * 0.7, dec: 0.22 });
+  },
+
+  vault() {                        // 넘어오르기
+    if (!this.ok()) return;
+    this.noise({ freq: 2400, freqTo: 600, type: 'lowpass', vol: 0.2, atk: 0.01, dec: 0.22 });
+    this.noise({ freq: 1100, freqTo: 300, type: 'lowpass', vol: 0.22, atk: 0.002, dec: 0.12, delay: 0.28 });
+  },
+
+  chute() {                        // 낙하산이 펴질 때
+    if (!this.ok()) return;
+    this.noise({ freq: 2800, freqTo: 500, type: 'lowpass', vol: 0.55, atk: 0.012, dec: 0.5 });
+    this.tone({ freq: 150, freqTo: 70, vol: 0.2, dec: 0.4 });
+  },
+
+  /* 자유낙하·낙하산 바람. level 0 이면 멈춥니다 */
+  wind(level) {
+    if (!this.ok()) { return; }
+    if (level <= 0.001) {
+      if (this._wind) { try { this._wind.src.stop(); } catch (e) { /* 무시 */ } this._wind = null; }
+      return;
+    }
+    if (!this._wind) {
+      const c = this.ctx;
+      const src = c.createBufferSource();
+      src.buffer = this.noiseBuf; src.loop = true;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120;
+      const g = c.createGain(); g.gain.value = 0;
+      src.connect(lp); lp.connect(hp); hp.connect(g); g.connect(this.master);
+      src.start(0, Math.random());
+      this._wind = { src, g, lp };
+    }
+    const w = this._wind, t = this.t;
+    w.g.gain.setTargetAtTime(Math.min(0.5, level * 0.42), t, 0.15);
+    w.lp.frequency.setTargetAtTime(500 + level * 1900, t, 0.2);
+  },
+
+  /* ---------- 차량 ---------- */
+  /* 엔진: 낮은 톱니 두 개를 살짝 어긋나게 겹치고 잡음을 섞습니다 */
+  engine(on, speed, maxSpeed, throttle) {
+    if (!this.ok()) return;
+    if (!on) {
+      if (this._engine) {
+        const e = this._engine;
+        e.g.gain.setTargetAtTime(0.0001, this.t, 0.08);
+        setTimeout(() => { try { e.a.stop(); e.b.stop(); e.n.stop(); } catch (err) { /* 무시 */ } }, 400);
+        this._engine = null;
+      }
+      return;
+    }
+    if (!this._engine) {
+      const c = this.ctx;
+      const a = c.createOscillator(), b = c.createOscillator();
+      a.type = 'sawtooth'; b.type = 'sawtooth';
+      const n = c.createBufferSource(); n.buffer = this.noiseBuf; n.loop = true;
+      const ng = c.createGain(); ng.gain.value = 0.12;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500; lp.Q.value = 1.2;
+      const g = c.createGain(); g.gain.value = 0.0001;
+      a.connect(lp); b.connect(lp); n.connect(ng); ng.connect(lp);
+      lp.connect(g); g.connect(this.master);
+      a.start(); b.start(); n.start(0, Math.random());
+      this._engine = { a, b, n, lp, g };
+    }
+    const e = this._engine, t = this.t;
+    const rev = 0.18 + Math.min(1, Math.abs(speed) / Math.max(1, maxSpeed)) * 0.82;
+    const f = 38 + rev * 116;
+    e.a.frequency.setTargetAtTime(f, t, 0.06);
+    e.b.frequency.setTargetAtTime(f * 1.007, t, 0.06);
+    e.lp.frequency.setTargetAtTime(320 + rev * 1500, t, 0.08);
+    e.g.gain.setTargetAtTime(0.10 + rev * 0.12 + (throttle > 0.2 ? 0.05 : 0), t, 0.07);
+  },
+
+  /* ---------- 상황 ---------- */
+  zone() {                         // 자기장 축소 시작 경보
+    if (!this.ok()) return;
+    this.tone({ freq: 320, freqTo: 240, type: 'sine', vol: 0.18, atk: 0.05, dec: 0.6 });
+    this.noise({ freq: 400, freqTo: 150, type: 'lowpass', vol: 0.12, atk: 0.1, dec: 0.9 });
+  },
+
+  drop() {                         // 보급 투하 (비행기 지나가는 소리)
+    if (!this.ok()) return;
+    this.noise({ freq: 300, freqTo: 900, type: 'lowpass', vol: 0.16, atk: 0.9, dec: 1.6 });
+    this.tone({ freq: 62, freqTo: 78, vol: 0.12, atk: 0.8, dec: 1.8 });
+  },
+
+  win() {
+    if (!this.ok()) return;
+    [[392, 0], [523, 0.14], [659, 0.28], [784, 0.42]].forEach(([f, d], i) => {
+      this.tone({ freq: f, type: 'triangle', vol: 0.2, atk: 0.01, dec: i === 3 ? 0.8 : 0.3, delay: d });
+      this.tone({ freq: f * 2, type: 'sine', vol: 0.07, atk: 0.01, dec: 0.25, delay: d });
+    });
+  }
+};
 
 /* ============================================================
    플레이어 계정: BP, 보유 스킨, 장착, 전적, 상자 뽑기
@@ -1924,7 +2293,8 @@ const Scenery = {
        먼저 자리만 정해 터를 평탄하게 만든 다음, 지형 메시를 만들고,
        그 위에 건물을 세웁니다. 실내 바닥이 울퉁불퉁하면 계단 첫 칸이
        걸음 높이를 넘어가 못 올라가는 자리가 생기기 때문입니다. */
-    const FOOT = { warehouse: 17, apartment: 13, house: 10, shed: 6, container: 4 };
+    const FOOT = { warehouse: 17, apartment: 13, tower: 16, house: 10, shed: 6, container: 4,
+                   ruin: 9, waterTower: 6, rockPile: 0, mast: 0, haystack: 0, fence: 0 };
     const plan = [];
     const put = (kind, x, z, yaw) => plan.push({ kind, x, z, yaw });
 
@@ -1939,7 +2309,7 @@ const Scenery = {
           if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 32)) continue;
           placed.push({ x, z });
           const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.2;
-          if (bigOne) { bigOne = false; put('apartment', x, z, yaw); break; }
+          if (bigOne) { bigOne = false; put(rnd() < 0.35 ? 'tower' : 'apartment', x, z, yaw); break; }
           const roll = rnd();
           if (roll < 0.30) put('warehouse', x, z, yaw);
           else if (roll < 0.80) put('house', x, z, yaw);
@@ -1956,19 +2326,34 @@ const Scenery = {
     for (let i = 0; i < 30; i++) {
       const sp = World.freeSpot(20);
       const r = rnd(), yaw = rnd() * Math.PI * 2;
-      if (r < 0.42) put('shed', sp.x, sp.z, yaw);
-      else if (r < 0.60) put('house', sp.x, sp.z, yaw);
-      else if (r < 0.72) put('warehouse', sp.x, sp.z, yaw);
+      if (r < 0.34) put('shed', sp.x, sp.z, yaw);
+      else if (r < 0.50) put('house', sp.x, sp.z, yaw);
+      else if (r < 0.60) put('warehouse', sp.x, sp.z, yaw);
+      else if (r < 0.76) put('ruin', sp.x, sp.z, yaw);
       else put('container', sp.x, sp.z, yaw);
     }
 
+    // 벌판을 채우는 지형지물
+    for (let i = 0; i < 8; i++) { const sp = World.freeSpot(12); put('waterTower', sp.x, sp.z, 0); }
+    for (let i = 0; i < 5; i++) { const sp = World.freeSpot(14); put('mast', sp.x, sp.z, 0); }
+    for (let i = 0; i < 34; i++) { const sp = World.freeSpot(8); put('rockPile', sp.x, sp.z, 0); }
+    for (let i = 0; i < 26; i++) { const sp = World.freeSpot(4); put('haystack', sp.x, sp.z, 0); }
+    // 담장: 마을 언저리와 벌판에 길게 (뛰어넘는 재미)
+    for (let i = 0; i < 40; i++) {
+      const sp = World.freeSpot(6);
+      plan.push({ kind: 'fence', x: sp.x, z: sp.z, yaw: rnd() * Math.PI * 2, len: 10 + rnd() * 16 });
+    }
+
     // 건물이 앉을 터를 평탄하게 (문턱과 계단이 지형에 묻히지 않도록)
-    for (const b of plan) World.flatten(b.x, b.z, FOOT[b.kind] + 5);
+    for (const b of plan) { const f = FOOT[b.kind]; if (f) World.flatten(b.x, b.z, f + 5); }
 
     this.buildTerrain(scene);
     this.buildWater(scene);
 
-    for (const b of plan) this[b.kind](b.x, b.z, b.yaw);
+    for (const b of plan) {
+      if (b.kind === 'fence') this.fence(b.x, b.z, b.yaw, b.len);
+      else this[b.kind](b.x, b.z, b.yaw);
+    }
 
     this.scatterNature(towns);
     this.buildInstances(scene);
@@ -2334,22 +2719,25 @@ const Scenery = {
 
     // 가구와 아이템
     this.crateStack(cx, cz, yaw, w / 2 - 2.5, -d / 2 + 2.2, base);
-    this.shelf(cx, cz, yaw, w / 2 - 1.0, 2.0, base, 4);
+    this.shelf(cx, cz, yaw, -w / 2 + 3.4, d / 2 - 1.0, base, 4);
     for (let i = 0; i < 3; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.4) * (w - 5), (rnd() - 0.5) * (d - 4), base + 0.05);
     for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, holeW + rnd() * (w - holeW - 3) - w / 2 + 1.5, (rnd() - 0.5) * (d - 4), y2 + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'house', r: Math.max(w, d) / 2 });
   },
 
   /* ---------- 3층 아파트: 마을의 랜드마크 ---------- */
-  apartment(cx, cz, yaw) {
-    const w = 19, d = 14, fh = 3.0;
+  /* 층수와 크기를 받아 아파트/고층 빌딩을 같은 방식으로 세웁니다 */
+  apartment(cx, cz, yaw, opt) {
+    opt = opt || {};
+    const floors = opt.floors || 3;
+    const w = opt.w || 19, d = opt.d || 14, fh = 3.0;
     const base = this.padY(cx, cz, w, d, yaw);
-    const wall = 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
+    const wall = opt.wall || 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
     const holeW = 3.6;
     this.groundFloor(cx, cz, yaw, w, d, base, floorC);
 
-    this.walls(cx, cz, yaw, w, d, fh * 3, 0.34, base, wall, ['front', 'back'], 2.4);
-    for (let f = 0; f < 3; f++) this.windows(cx, cz, yaw, w, d, fh, base, 4, fh * f + 1.9);
+    this.walls(cx, cz, yaw, w, d, fh * floors, 0.34, base, wall, ['front', 'back'], 2.4);
+    for (let f = 0; f < floors; f++) this.windows(cx, cz, yaw, w, d, fh, base, opt.win || 4, fh * f + 1.9);
     this.trim(cx, cz, yaw, 0, base + 1.2, -d / 2 - 0.03, 2.6, 2.4, 0.1, 0x5c5f63);
 
     /* 계단실: 반 층씩 올라가 뒤쪽 참에서 꺾어 앞쪽으로 다시 올라옵니다.
@@ -2360,7 +2748,7 @@ const Scenery = {
     const zB = zA + runLen + 1.6;                      // 뒤쪽 참을 지난 자리
     const stairEnd = zB + 0.5 + d / 2;                 // 앞벽에서 계단실 끝까지의 깊이
     const frontD = 1.9;                                // 층마다 앞쪽 발판 깊이
-    for (let f = 0; f < 3; f++) {
+    for (let f = 0; f < floors; f++) {
       const y = base + fh * f, mid = y + fh / 2, top = y + fh;
       this.stairs(cx, cz, yaw, laneA, zA, y, mid, holeW * 0.42, 1, 0xa79f92);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, zA + runLen + 0.8, holeW, 1.7, mid, floorC, 0.30);
@@ -2368,9 +2756,9 @@ const Scenery = {
     }
     /* 층 바닥: 오른쪽 큰 판 + 계단실 앞 발판 + 계단실 뒤 바닥.
        f = 3 은 옥상 바닥이 됩니다 (계단실은 뚫려 있어 계단으로 올라옵니다). */
-    for (let f = 1; f <= 3; f++) {
+    for (let f = 1; f <= floors; f++) {
       const y = base + fh * f;
-      const c = f === 3 ? 0x8a8578 : floorC;
+      const c = f === floors ? 0x8a8578 : floorC;
       this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW + 0.4, d + 0.4, y, c, 0.34);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + frontD / 2, holeW + 0.4, frontD, y, c, 0.34);
       // 계단 B 라인 쪽으로 발판을 조금 더 내밀어 마지막 단과 사이가 벌어지지 않게 합니다
@@ -2378,7 +2766,7 @@ const Scenery = {
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd + (d - stairEnd) / 2,
                 holeW + 0.4, d - stairEnd + 0.2, y, c, 0.34);
       this.rail(cx, cz, yaw, -w / 2 + holeW + 0.15, -d / 2 + stairEnd / 2, 0.16, stairEnd - 0.6, y, steel);
-      if (f === 3) {
+      if (f === floors) {
         /* 옥상은 위로 이어지는 계단이 없으므로 계단실 구멍을 난간으로 막습니다.
            올라온 쪽(계단 B 라인)만 열어 두어 다시 내려갈 수 있습니다. */
         this.rail(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd - 0.15, holeW, 0.16, y, steel);
@@ -2387,24 +2775,29 @@ const Scenery = {
     }
 
     // 옥상 난간과 처마
-    const ry = base + fh * 3;
+    const ry = base + fh * floors;
     for (const s of [-1, 1]) {
       this.rail(cx, cz, yaw, s * (w / 2 + 0.12), 0, 0.22, d + 0.7, ry, steel);
       this.rail(cx, cz, yaw, 0, s * (d / 2 + 0.12), w + 0.7, 0.22, ry, steel);
     }
     this.trim(cx, cz, yaw, 0, ry - 0.28, 0, w + 0.9, 0.2, d + 0.9, 0x6f6a60);
 
-    for (let f = 0; f < 3; f++) {
+    for (let f = 0; f < floors; f++) {
       const y = base + fh * f + 0.05;
       if (f === 0) {
-        this.shelf(cx, cz, yaw, w / 2 - 1.2, 0, base, 6);
+        this.shelf(cx, cz, yaw, 0, d / 2 - 1.0, base, 6);
         for (let i = 0; i < 2; i++) this.crateStack(cx, cz, yaw, (rnd() - 0.3) * (w - 8), (rnd() - 0.5) * (d - 5), base);
       }
       for (let i = 0; i < 3; i++) {
         this.lootSpot(cx, cz, yaw, holeW + 1 - w / 2 + rnd() * (w - holeW - 3), (rnd() - 0.5) * (d - 4), y);
       }
     }
-    World.buildings.push({ x: cx, z: cz, kind: 'apartment', r: Math.max(w, d) / 2 });
+    World.buildings.push({ x: cx, z: cz, kind: opt.kind || 'apartment', r: Math.max(w, d) / 2 });
+  },
+
+  /* 마을의 랜드마크가 되는 고층 빌딩. 12층 36m 이고 옥상까지 걸어 올라갑니다 */
+  tower(cx, cz, yaw) {
+    this.apartment(cx, cz, yaw, { floors: 12, w: 24, d: 17, win: 5, wall: 0xb9c2cc, kind: 'tower' });
   },
 
   shed(cx, cz, yaw) {
@@ -2416,6 +2809,107 @@ const Scenery = {
     if (rnd() < 0.6) this.crateStack(cx, cz, yaw, w / 2 - 1.4, d / 2 - 1.4, base);
     for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * (w - 3), (rnd() - 0.5) * (d - 3), base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'shed', r: Math.max(w, d) / 2 });
+  },
+
+  /* ---------- 지형지물 ----------
+     걸어 넘거나(담장) 기어올라(바위·건초) 엄폐물로 쓰는 것들입니다. */
+
+  /* 담장: 기둥과 가로대. 1.1m 라서 뛰어넘어야 지나갈 수 있습니다 */
+  fence(cx, cz, yaw, len) {
+    const post = 0x6b563c, rail = 0x7d6748;
+    const n = Math.max(2, Math.round(len / 2.4));
+    const seg = len / n;
+    for (let i = 0; i <= n; i++) {
+      const lx = -len / 2 + seg * i;
+      const [x, z] = this.local(cx, cz, yaw, lx, 0);
+      const base = World.height(x, z);
+      this.boxDefs.push({ x, y: base + 0.62, z, sx: 0.16, sy: 1.24, sz: 0.16, yaw, color: post, solid: false });
+    }
+    // 가로대 두 줄 (충돌은 이쪽 한 덩어리로 처리)
+    const base = World.height(cx, cz);
+    this.box(cx, base + 0.62, cz, len, 1.1, 0.16, yaw, rail);
+    this.trim(cx, cz, yaw, 0, base + 0.98, 0, len, 0.12, 0.2, post);
+  },
+
+  /* 바위 무더기: 계단처럼 딛고 올라설 수 있는 엄폐물 */
+  rockPile(cx, cz) {
+    const base = World.height(cx, cz);
+    const n = 3 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2, r = rnd() * 3.4;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      const sc = 1.1 + rnd() * 1.5;
+      this.rocks.push({ x, y: World.height(x, z), z, s: sc, rot: rnd() * Math.PI * 2 });
+      World.addCyl({ x, z, r: 1.45 * sc, top: World.height(x, z) + 1.4 * sc, h: 3 * sc });
+    }
+    // 가운데에 올라설 수 있는 넓적한 바위
+    this.box(cx, base + 0.55, cz, 3.0, 1.1, 2.6, rnd() * Math.PI, 0x7d7a72);
+    this.lootSpot(cx, cz, 0, 0, 2.4, base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'rocks', r: 5 });
+  },
+
+  /* 급수탑: 다리 네 개 위에 물탱크. 사다리 대신 옆 컨테이너를 딛고 오릅니다 */
+  waterTower(cx, cz) {
+    const base = this.padY(cx, cz, 6, 6, 0);
+    const leg = 0x6f6a60, tank = 0x9aa3ab;
+    const H = 9.5;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      this.box(cx + sx * 2.2, base + H / 2, cz + sz * 2.2, 0.35, H, 0.35, 0, leg);
+      this.trim(cx, cz, 0, sx * 1.1, base + H * 0.45, sz * 1.1, 4.6, 0.16, 4.6, leg);
+    }
+    this.box(cx, base + H, cz, 6.4, 0.4, 6.4, 0, leg);                 // 발판
+    this.box(cx, base + H + 2.1, cz, 5.2, 3.8, 5.2, 0, tank);          // 물탱크
+    this.trim(cx, cz, 0, 0, base + H + 4.2, 0, 5.6, 0.5, 5.6, 0x7c8288);
+    // 딛고 올라갈 계단 상자
+    this.box(cx + 3.4, base + 0.55, cz, 1.6, 1.1, 1.6, 0, 0x8a6a42);
+    this.box(cx + 3.4, base + 1.65, cz + 1.7, 1.6, 1.1, 1.6, 0, 0x8a6a42);
+    this.lootSpot(cx, cz, 0, 0, 0, base + H + 0.25);
+    World.buildings.push({ x: cx, z: cz, kind: 'watertower', r: 4 });
+  },
+
+  /* 폐허: 높이가 제각각인 벽 조각들 */
+  ruin(cx, cz, yaw) {
+    const base = this.padY(cx, cz, 12, 9, yaw);
+    const wall = 0xa89f92;
+    const segs = [[-5, -4, 6, 3.2], [4.5, -4, 4, 1.4], [-5.5, 3.5, 5, 2.4], [3, 4, 5, 1.1]];
+    for (const [lx, lz, len, h] of segs) {
+      const [x, z] = this.local(cx, cz, yaw, lx, lz);
+      const horiz = Math.abs(lz) > Math.abs(lx) || len > 4;
+      this.box(x, base + h / 2, z, horiz ? len : 0.4, h, horiz ? 0.4 : len, yaw, wall);
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = rnd() * Math.PI * 2, r = 1 + rnd() * 4;
+      this.crateStack(cx, cz, yaw, Math.cos(a) * r, Math.sin(a) * r, base);
+    }
+    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 8, (rnd() - 0.5) * 6, base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'ruin', r: 7 });
+  },
+
+  /* 송신탑: 멀리서도 보이는 이정표 */
+  mast(cx, cz) {
+    const base = World.height(cx, cz);
+    const steel = 0x8a8f96, red = 0xc23b32;
+    const H = 26;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      this.boxDefs.push({ x: cx + sx * 1.1, y: base + H / 2, z: cz + sz * 1.1,
+                          sx: 0.22, sy: H, sz: 0.22, yaw: 0, color: steel, solid: false,
+                          tilt: 0, ry: 0, rz: 0 });
+    }
+    this.box(cx, base + 1.4, cz, 2.8, 2.8, 2.8, 0, steel);             // 아랫부분만 충돌
+    for (let i = 1; i < 7; i++) {
+      const y = base + i * (H / 7);
+      this.trim(cx, cz, 0, 0, y, 0, 2.6, 0.16, 2.6, i % 2 ? steel : red);
+    }
+    this.trim(cx, cz, 0, 0, base + H + 0.5, 0, 0.5, 1.0, 0.5, red);
+  },
+
+  /* 건초 더미: 딛고 올라설 수 있는 부드러운 엄폐물 */
+  haystack(cx, cz) {
+    const base = World.height(cx, cz);
+    const hay = 0xc9a94e;
+    this.box(cx, base + 0.55, cz, 2.4, 1.1, 2.4, rnd() * 0.6, hay);
+    if (rnd() < 0.6) this.box(cx + 0.3, base + 1.6, cz - 0.2, 2.0, 1.0, 2.0, rnd() * 0.6, 0xbb9c46);
+    if (rnd() < 0.4) this.lootSpot(cx, cz, 0, 1.8, 0, base + 0.05);
   },
 
   container(cx, cz, yaw) {
@@ -3130,6 +3624,7 @@ class Char3D {
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
     this.vehicle = null;           // 타고 있는 차량
+    this.climb = null;             // 기어오르는 중 { t, from, to }
     this.reloading = 0;
     this.cooldown = 0;
     this.healing = 0;
@@ -3395,6 +3890,18 @@ class Char3D {
       t.gunX = 0;
       rate = 9;
       this.chute.visible = false;
+    } else if (this.climb) {                          // 기어오르기
+      const k = Math.min(1, this.climb.t / this.climb.dur);
+      const pull = Math.sin(Math.min(1, k * 1.35) * Math.PI * 0.5);   // 팔로 당기는 구간
+      t.armLx = -2.5 + pull * 1.1; t.armRx = -2.5 + pull * 1.1;
+      t.armLz = 0.35; t.armRz = -0.35; t.armLy = 0.15; t.armRy = -0.15;
+      t.legLx = -1.15 + pull * 1.0; t.legRx = -0.85 + pull * 0.8;
+      t.kneeLx = -1.5 + pull * 1.3; t.kneeRx = -1.2 + pull * 1.0;
+      t.legLz = 0.1; t.legRz = -0.1;
+      t.bodyX = -0.35 + pull * 0.35; t.bodyZ = 0;
+      t.bodyY = 0; t.hipsX = 0.2 - pull * 0.2; t.hipsZ = 0;
+      t.gunX = 0;
+      rate = 14;
     } else if (this.flying) {                         // 낙하
       if (this.flying === 'chute' && !this.chuteMesh) {
         this.chuteMesh = new THREE.Mesh(ChuteArt.build(),
@@ -3925,6 +4432,14 @@ const AI = {
       const y = bot.pos.y + 1.0;
       const ahead = World.ray(bot.pos.x, y, bot.pos.z, mx, 0, mz, 3.2);
       if (ahead < 3.2) {
+        // 막힌 게 넘어갈 만한 턱이면 기어오릅니다 (담장·상자·낮은 지붕)
+        if (ahead < 1.8 && bot.grounded) {
+          const oldYaw = bot.yaw;
+          bot.yaw = Math.atan2(mx, mz);
+          const v = game.vaultTarget(bot);
+          if (v) { game.startClimb(bot, v); return; }
+          bot.yaw = oldYaw;
+        }
         const side = a.strafe;
         const rx = mx * Math.cos(0.9 * side) - mz * Math.sin(0.9 * side);
         const rz = mx * Math.sin(0.9 * side) + mz * Math.cos(0.9 * side);
@@ -4512,11 +5027,12 @@ const Game = {
       if (c.hitFlash > 0) c.hitFlash -= dt;
       if (c.reloading > 0) {
         c.reloading -= dt;
-        if (c.reloading <= 0) { c.finishReload(); if (c === this.player) Sfx.reload(); }
+        if (c.reloading <= 0) { c.finishReload(); if (c === this.player) Sfx.reloadDone(); }
       }
       if (c.healing > 0) {
+        if (c === this.player && !c._healSnd) { c._healSnd = true; Sfx.heal(); }
         c.healing -= dt;
-        if (c.healing <= 0) { c.meds--; c.hp = Math.min(c.maxHp, c.hp + CFG.HEAL_AMOUNT); }
+        if (c.healing <= 0) { c.meds--; c.hp = Math.min(c.maxHp, c.hp + CFG.HEAL_AMOUNT); c._healSnd = false; }
       }
       if (c.swap > 0) c.swap -= dt;
 
@@ -4535,12 +5051,20 @@ const Game = {
         continue;
       }
 
+      if (c.climb) {
+        this.updateClimb(c, dt);
+        c.syncMesh(dt, false);
+        continue;
+      }
+
       if (!c.isPlayer) AI.update(c, dt, this);
 
+      // 자기장은 마지막 한 명은 죽이지 않습니다 (승자 없이 끝나지 않도록)
       const dz = Math.hypot(c.pos.x - this.zone.x, c.pos.z - this.zone.z);
-      if (dz > this.zone.r) this.damage(c, this.zone.dps * dt, null, false, true);
+      if (dz > this.zone.r && this.alive > 1) this.damage(c, this.zone.dps * dt, null, false, true);
 
       c.syncMesh(dt, c === this.player ? this.ads : !!(c.ai && c.ai.state === 'fight'));
+      this.footsteps(c);
     }
 
     this.updateDrops(dt);
@@ -4634,6 +5158,7 @@ const Game = {
   updatePlayer(dt, input) {
     const p = this.player;
     if (p.victory > 0) { input.fire = false; return; }   // 승리 연출 중에는 조작을 멈춥니다
+    if (p.climb) { this.updateClimb(p, dt); input.fire = false; input.jump = false; return; }
 
     // 시점
     // 감도 = 기본 배율 × 설정값 (정조준 중에는 정조준 배율을 곱합니다)
@@ -4654,6 +5179,7 @@ const Game = {
       th = Math.max(-1, Math.min(1, th));
       st = Math.max(-1, Math.min(1, st));
       v.drive(dt, th, st, !!input.crouch);          // C 키가 브레이크
+      Sfx.engine(true, v.speed, v.spec.max, Math.abs(th));
       // 운전자는 차와 함께 움직입니다
       p.pos.set(v.pos.x, v.pos.y, v.pos.z);
       p.speedNow = Math.abs(v.speed);
@@ -4691,7 +5217,12 @@ const Game = {
     if (p.healing > 0) speed = Math.min(speed, 1.6);
     if (this.ads) speed = Math.min(speed, CFG.WALK * 0.6);
 
-    if (input.jump && p.grounded && p.healing <= 0) { p.vy = CFG.JUMP; input.jump = false; }
+    if (input.jump && p.healing <= 0) {
+      input.jump = false;
+      const v = this.vaultTarget(p);
+      if (v) { this.startClimb(p, v); return; }      // 앞에 턱이 있으면 기어오릅니다
+      if (p.grounded) p.vy = CFG.JUMP;
+    }
     this.moveChar(p, mx, mz, speed, dt);
 
     this.ads = !!input.ads && p.healing <= 0;
@@ -4778,7 +5309,10 @@ const Game = {
           this.damage(hit.char, dmg, ch, hit.head, false);
         }
       } else if (wallT < maxT) {
-        this.puff(ox + d.x * endT, oy + d.y * endT, oz + d.z * endT);
+        const ix = ox + d.x * endT, iy = oy + d.y * endT, iz = oz + d.z * endT;
+        this.puff(ix, iy, iz);
+        Sfx.impact(Math.hypot(ix - this.player.pos.x, iy - this.player.pos.y, iz - this.player.pos.z),
+                   this.surfaceAt(ix, iy, iz));
       }
       this.tracer(ox, oy, oz, ox + d.x * endT, oy + d.y * endT, oz + d.z * endT, ch.isPlayer);
       if (ch.isPlayer && this.online) {
@@ -4786,8 +5320,116 @@ const Game = {
       }
     }
 
-    Sfx.shot(ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos), ch.gun);
+    const shotD = ch === this.player ? 0 : this.player.pos.distanceTo(ch.pos);
+    Sfx.shot(shotD, ch.gun, this.indoors(ch));
+    if (ch !== this.player) {
+      // 총알이 내 옆을 스치면 총성보다 먼저 '탁' 하는 파열음이 지나갑니다
+      const m = this.missDistance(ch, dir);
+      if (m < 7) Sfx.crack(m, ch.gun);
+    }
     if (ch.mag <= 0) ch.startReload();
+  },
+
+  /* ---------- 넘기·기어오르기 ----------
+     앞쪽에 걸어서는 못 오르지만 매달려 오를 만한 턱이 있으면 그 자리를 돌려줍니다. */
+  vaultTarget(ch) {
+    if (ch.climb || ch.flying || ch.vehicle || ch.dead) return null;
+    const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
+    const feet = ch.pos.y;
+    for (const reach of [0.95, 1.45]) {
+      const tx = ch.pos.x + fx * reach, tz = ch.pos.z + fz * reach;
+      let top = World.height(tx, tz);
+      for (const o of World.near(tx, tz, tx, tz, 1)) {
+        if (o.r !== undefined) continue;
+        if (o.top > feet + CFG.VAULT_MAX || o.top <= top) continue;
+        if (World.insideBox(o, tx, tz, 0)) top = o.top;
+      }
+      const rise = top - feet;
+      if (rise <= CFG.STEP_UP + 0.05) continue;      // 그냥 걸어 올라갈 수 있는 턱
+      if (rise > CFG.VAULT_MAX) continue;
+      // 올라선 자리에 몸이 들어가는지, 머리 위 공간이 있는지
+      if (World.blocked(tx, tz, CFG.BODY_R, top, top + CFG.BODY_H, 0.06)) continue;
+      if (World.ceilingY(tx, tz, top + 0.1) < top + CFG.BODY_H) continue;
+      return { x: tx, y: top, z: tz, rise };
+    }
+    return null;
+  },
+
+  startClimb(ch, target) {
+    ch.climb = {
+      t: 0,
+      dur: CFG.VAULT_TIME * (0.75 + target.rise / CFG.VAULT_MAX * 0.5),
+      from: { x: ch.pos.x, y: ch.pos.y, z: ch.pos.z },
+      to: target
+    };
+    ch.vy = 0;
+    ch.grounded = false;
+    if (ch === this.player) Sfx.vault();
+    else if (this.player.pos.distanceTo(ch.pos) < 22) Sfx.vault();
+    return true;
+  },
+
+  /* 올라가는 동안은 조작을 받지 않고 정해진 궤적을 따라갑니다 */
+  updateClimb(ch, dt) {
+    const c = ch.climb;
+    c.t += dt;
+    const k = Math.min(1, c.t / c.dur);
+    // 먼저 위로 솟았다가 앞으로 올라섭니다
+    const up = Math.min(1, k * 1.55);
+    const fwd = Math.max(0, (k - 0.35) / 0.65);
+    const ease = x => x * x * (3 - 2 * x);
+    ch.pos.y = c.from.y + (c.to.y + 0.06 - c.from.y) * ease(up);
+    ch.pos.x = c.from.x + (c.to.x - c.from.x) * ease(fwd);
+    ch.pos.z = c.from.z + (c.to.z - c.from.z) * ease(fwd);
+    ch.speedNow = 0;
+    if (k >= 1) {
+      ch.climb = null;
+      ch.pos.set(c.to.x, World.groundY(c.to.x, c.to.z, c.to.y + 0.3), c.to.z);
+      ch.vy = 0; ch.grounded = true;
+      if (ch === this.player) Sfx.land(0.15);
+    }
+  },
+
+  /* 발소리. 걷기 주기가 반 바퀴 돌 때마다 한 걸음씩 냅니다.
+     가까이 있는 적의 발소리도 들리게 해서 기척을 느낄 수 있습니다. */
+  footsteps(c) {
+    if (c.dead || c.flying || c.vehicle || !c.grounded || c.speedNow < 1.2) { c._stepSign = 0; return; }
+    const sign = Math.sin(c.stepPhase) >= 0 ? 1 : -1;
+    if (!c._stepSign) { c._stepSign = sign; return; }
+    if (sign === c._stepSign) return;
+    c._stepSign = sign;
+    const d = c === this.player ? 0 : this.player.pos.distanceTo(c.pos);
+    if (d > 26) return;
+    const near = c === this.player ? 1 : Math.max(0, 1 - d / 26);
+    // 건물 바닥·계단 위면 단단한 소리
+    const hard = c.pos.y > World.height(c.pos.x, c.pos.z) + 0.35;
+    Sfx.step(c.speedNow * near * near, hard);
+  },
+
+  /* 머리 위에 지붕이 있으면 실내로 봅니다 (총성 반사음이 달라집니다) */
+  indoors(ch) {
+    return World.ceilingY(ch.pos.x, ch.pos.z, ch.pos.y + 1.7) < ch.pos.y + 12;
+  },
+
+  /* 총알이 내 몸에서 얼마나 떨어져 지나가는지 (직선과 점 사이 거리) */
+  missDistance(ch, dir) {
+    const p = this.player.pos;
+    const px = p.x - ch.pos.x, py = p.y + 1.0 - (ch.pos.y + 1.0), pz = p.z - ch.pos.z;
+    const t = px * dir.x + py * dir.y + pz * dir.z;
+    if (t < 0) return 999;
+    return Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
+  },
+
+  /* 탄착 지점의 재질 추정 */
+  surfaceAt(x, y, z) {
+    if (y < World.height(x, z) + 0.4) return 'dirt';
+    for (const o of World.near(x, z, x, z, 1.2)) {
+      if (o.r !== undefined) return 'wood';        // 나무 줄기·바위
+      if (y > o.bottom - 0.4 && y < o.top + 0.4 && World.boxDist(o, x, z) < 0.6) {
+        return (o.top - o.bottom) > 2.2 ? 'metal' : 'wood';
+      }
+    }
+    return 'dirt';
   },
 
   /* 캐릭터에 대한 광선 판정 (몸통 원기둥 + 머리 구) */
@@ -4834,6 +5476,7 @@ const Game = {
         Sfx.hit(head);
       }
       this.puff(target.pos.x, target.pos.y + 1.0, target.pos.z, 0xc23b32);
+      Sfx.impact(this.player.pos.distanceTo(target.pos), 'flesh');
       if (target === this.player && src) {
         this.damageDir = { yaw: Math.atan2(src.pos.x - target.pos.x, src.pos.z - target.pos.z), life: 1.4 };
         Sfx.hurt();
@@ -5005,6 +5648,7 @@ const Game = {
   updateFlight(c, dt, mx, mz) {
     const ground = World.groundY(c.pos.x, c.pos.z, c.pos.y);
     const alt = c.pos.y - ground;
+    if (c === this.player) Sfx.wind(c.flying === 'freefall' ? 1 : 0.42);
 
     if (c.flying === 'freefall') {
       c.vy = Math.max(-CFG.FREEFALL_SPEED, c.vy - CFG.GRAVITY * 1.6 * dt);
@@ -5043,7 +5687,8 @@ const Game = {
       if (c === this.player) {
         this.landDip = 0.25;
         this.pushFeed('착지 완료 — 무기를 찾으세요');
-        Sfx.land();
+        Sfx.land(0.6);
+        Sfx.wind(0);
       }
     }
   },
@@ -5285,7 +5930,7 @@ const Game = {
     this.scene.add(a.mesh);
     this.drops.push(a);
     this.pushFeed('보급 상자가 투하되었습니다 — 지도를 확인하세요');
-    Sfx.chute();
+    Sfx.drop();
   },
 
   /* 가장 가까운, 열 수 있는 보급 상자 */
@@ -5365,6 +6010,7 @@ const Game = {
   exitVehicle(ch) {
     const v = ch.vehicle;
     if (!v) return false;
+    if (ch === this.player) Sfx.engine(false);
     v.driver = null;
     ch.vehicle = null;
     // 차 옆으로 내려놓습니다
@@ -5396,6 +6042,7 @@ const Game = {
         z.tx = plan.x; z.tz = plan.z; z.tr = plan.r;
         z.shrinking = true; z.timer = ph.shrink; z.dps = ph.dps;
         this.pushFeed('자기장 ' + (z.phase + 1) + '단계 축소 시작');
+        Sfx.zone();
       }
     } else {
       const ph = PHASES[z.phase];
@@ -5492,6 +6139,7 @@ const Game = {
 
   finish(won) {
     if (this.state !== 'playing') return;
+    Sfx.engine(false); Sfx.wind(0);
     this.state = 'over';
     const p = this.player;
     this.result = {
@@ -6271,55 +6919,15 @@ const Lobby = {
 };
 
 /* ============================================================
-   효과음, HUD, 입력, 메인 루프
+   HUD, 입력, 메인 루프  (소리는 sfx.js)
    ============================================================ */
-const Sfx = {
-  ctx: null, enabled: true,
-  init() {
-    if (this.ctx) return;
-    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    catch (e) { this.enabled = false; }
-  },
-  tone(freq, dur, type, vol) {
-    if (!this.enabled || !this.ctx) return;
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    const t = this.ctx.currentTime;
-    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
-    o.type = type || 'square';
-    o.frequency.setValueAtTime(freq, t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.35), t + dur);
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.ctx.destination);
-    o.start(t); o.stop(t + dur + 0.02);
-  },
-  shot(dist, gun) {
-    const far = Math.max(0, 1 - dist / 220);
-    if (far <= 0.02) return;
-    const base = gun === 'sniper' ? 130 : (gun === 'shotgun' ? 110 : 240);
-    this.tone(base, 0.09 + far * 0.05, 'square', 0.05 * far * far + 0.004);
-  },
-  hit(head) { this.tone(head ? 1100 : 720, 0.06, 'triangle', 0.06); },
-  hurt() { this.tone(140, 0.2, 'sawtooth', 0.07); },
-  pick() { this.tone(880, 0.07, 'triangle', 0.05); },
-  kill() { this.tone(520, 0.25, 'triangle', 0.07); },
-  reload() { this.tone(300, 0.07, 'triangle', 0.04); },
-  swap() { this.tone(420, 0.06, 'triangle', 0.04); },
-  chute() { this.tone(220, 0.35, 'sine', 0.05); },
-  land() { this.tone(110, 0.16, 'sine', 0.06); },
-  win() {
-    [0, 0.13, 0.26, 0.44].forEach((d, i) => {
-      setTimeout(() => this.tone([523, 659, 784, 1047][i], i === 3 ? 0.5 : 0.16, 'triangle', 0.06), d * 1000);
-    });
-  }
-};
 
 /* ============================================================
    사용자 설정 (마우스 감도 등) — 브라우저에 저장됩니다
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true, vol: 0.8 },
   controls: [],
 
   load() {
@@ -6336,6 +6944,8 @@ const Settings = {
     this.data.invert = !!this.data.invert;
     this.data.edge = this.data.edge !== false;
     this.data.fpv = this.data.fpv !== false;
+    this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
+    Sfx.setVolume(this.data.vol);
   },
 
   /* data-set 이 붙은 조절기를 모두 연결하고, 값이 바뀌면 서로 맞춰 줍니다 */

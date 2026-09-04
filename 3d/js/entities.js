@@ -541,6 +541,7 @@ class Char3D {
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
     this.vehicle = null;           // 타고 있는 차량
+    this.climb = null;             // 기어오르는 중 { t, from, to }
     this.reloading = 0;
     this.cooldown = 0;
     this.healing = 0;
@@ -806,6 +807,18 @@ class Char3D {
       t.gunX = 0;
       rate = 9;
       this.chute.visible = false;
+    } else if (this.climb) {                          // 기어오르기
+      const k = Math.min(1, this.climb.t / this.climb.dur);
+      const pull = Math.sin(Math.min(1, k * 1.35) * Math.PI * 0.5);   // 팔로 당기는 구간
+      t.armLx = -2.5 + pull * 1.1; t.armRx = -2.5 + pull * 1.1;
+      t.armLz = 0.35; t.armRz = -0.35; t.armLy = 0.15; t.armRy = -0.15;
+      t.legLx = -1.15 + pull * 1.0; t.legRx = -0.85 + pull * 0.8;
+      t.kneeLx = -1.5 + pull * 1.3; t.kneeRx = -1.2 + pull * 1.0;
+      t.legLz = 0.1; t.legRz = -0.1;
+      t.bodyX = -0.35 + pull * 0.35; t.bodyZ = 0;
+      t.bodyY = 0; t.hipsX = 0.2 - pull * 0.2; t.hipsZ = 0;
+      t.gunX = 0;
+      rate = 14;
     } else if (this.flying) {                         // 낙하
       if (this.flying === 'chute' && !this.chuteMesh) {
         this.chuteMesh = new THREE.Mesh(ChuteArt.build(),

@@ -1,53 +1,13 @@
 /* ============================================================
-   효과음, HUD, 입력, 메인 루프
+   HUD, 입력, 메인 루프  (소리는 sfx.js)
    ============================================================ */
-const Sfx = {
-  ctx: null, enabled: true,
-  init() {
-    if (this.ctx) return;
-    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    catch (e) { this.enabled = false; }
-  },
-  tone(freq, dur, type, vol) {
-    if (!this.enabled || !this.ctx) return;
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    const t = this.ctx.currentTime;
-    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
-    o.type = type || 'square';
-    o.frequency.setValueAtTime(freq, t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.35), t + dur);
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.ctx.destination);
-    o.start(t); o.stop(t + dur + 0.02);
-  },
-  shot(dist, gun) {
-    const far = Math.max(0, 1 - dist / 220);
-    if (far <= 0.02) return;
-    const base = gun === 'sniper' ? 130 : (gun === 'shotgun' ? 110 : 240);
-    this.tone(base, 0.09 + far * 0.05, 'square', 0.05 * far * far + 0.004);
-  },
-  hit(head) { this.tone(head ? 1100 : 720, 0.06, 'triangle', 0.06); },
-  hurt() { this.tone(140, 0.2, 'sawtooth', 0.07); },
-  pick() { this.tone(880, 0.07, 'triangle', 0.05); },
-  kill() { this.tone(520, 0.25, 'triangle', 0.07); },
-  reload() { this.tone(300, 0.07, 'triangle', 0.04); },
-  swap() { this.tone(420, 0.06, 'triangle', 0.04); },
-  chute() { this.tone(220, 0.35, 'sine', 0.05); },
-  land() { this.tone(110, 0.16, 'sine', 0.06); },
-  win() {
-    [0, 0.13, 0.26, 0.44].forEach((d, i) => {
-      setTimeout(() => this.tone([523, 659, 784, 1047][i], i === 3 ? 0.5 : 0.16, 'triangle', 0.06), d * 1000);
-    });
-  }
-};
 
 /* ============================================================
    사용자 설정 (마우스 감도 등) — 브라우저에 저장됩니다
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: true, fpv: true, vol: 0.8 },
   controls: [],
 
   load() {
@@ -64,6 +24,8 @@ const Settings = {
     this.data.invert = !!this.data.invert;
     this.data.edge = this.data.edge !== false;
     this.data.fpv = this.data.fpv !== false;
+    this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
+    Sfx.setVolume(this.data.vol);
   },
 
   /* data-set 이 붙은 조절기를 모두 연결하고, 값이 바뀌면 서로 맞춰 줍니다 */

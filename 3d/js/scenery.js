@@ -39,7 +39,8 @@ const Scenery = {
        먼저 자리만 정해 터를 평탄하게 만든 다음, 지형 메시를 만들고,
        그 위에 건물을 세웁니다. 실내 바닥이 울퉁불퉁하면 계단 첫 칸이
        걸음 높이를 넘어가 못 올라가는 자리가 생기기 때문입니다. */
-    const FOOT = { warehouse: 17, apartment: 13, house: 10, shed: 6, container: 4 };
+    const FOOT = { warehouse: 17, apartment: 13, tower: 16, house: 10, shed: 6, container: 4,
+                   ruin: 9, waterTower: 6, rockPile: 0, mast: 0, haystack: 0, fence: 0 };
     const plan = [];
     const put = (kind, x, z, yaw) => plan.push({ kind, x, z, yaw });
 
@@ -54,7 +55,7 @@ const Scenery = {
           if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 32)) continue;
           placed.push({ x, z });
           const yaw = Math.round(rnd() * 4) * Math.PI / 2 + (rnd() - 0.5) * 0.2;
-          if (bigOne) { bigOne = false; put('apartment', x, z, yaw); break; }
+          if (bigOne) { bigOne = false; put(rnd() < 0.35 ? 'tower' : 'apartment', x, z, yaw); break; }
           const roll = rnd();
           if (roll < 0.30) put('warehouse', x, z, yaw);
           else if (roll < 0.80) put('house', x, z, yaw);
@@ -71,19 +72,34 @@ const Scenery = {
     for (let i = 0; i < 30; i++) {
       const sp = World.freeSpot(20);
       const r = rnd(), yaw = rnd() * Math.PI * 2;
-      if (r < 0.42) put('shed', sp.x, sp.z, yaw);
-      else if (r < 0.60) put('house', sp.x, sp.z, yaw);
-      else if (r < 0.72) put('warehouse', sp.x, sp.z, yaw);
+      if (r < 0.34) put('shed', sp.x, sp.z, yaw);
+      else if (r < 0.50) put('house', sp.x, sp.z, yaw);
+      else if (r < 0.60) put('warehouse', sp.x, sp.z, yaw);
+      else if (r < 0.76) put('ruin', sp.x, sp.z, yaw);
       else put('container', sp.x, sp.z, yaw);
     }
 
+    // 벌판을 채우는 지형지물
+    for (let i = 0; i < 8; i++) { const sp = World.freeSpot(12); put('waterTower', sp.x, sp.z, 0); }
+    for (let i = 0; i < 5; i++) { const sp = World.freeSpot(14); put('mast', sp.x, sp.z, 0); }
+    for (let i = 0; i < 34; i++) { const sp = World.freeSpot(8); put('rockPile', sp.x, sp.z, 0); }
+    for (let i = 0; i < 26; i++) { const sp = World.freeSpot(4); put('haystack', sp.x, sp.z, 0); }
+    // 담장: 마을 언저리와 벌판에 길게 (뛰어넘는 재미)
+    for (let i = 0; i < 40; i++) {
+      const sp = World.freeSpot(6);
+      plan.push({ kind: 'fence', x: sp.x, z: sp.z, yaw: rnd() * Math.PI * 2, len: 10 + rnd() * 16 });
+    }
+
     // 건물이 앉을 터를 평탄하게 (문턱과 계단이 지형에 묻히지 않도록)
-    for (const b of plan) World.flatten(b.x, b.z, FOOT[b.kind] + 5);
+    for (const b of plan) { const f = FOOT[b.kind]; if (f) World.flatten(b.x, b.z, f + 5); }
 
     this.buildTerrain(scene);
     this.buildWater(scene);
 
-    for (const b of plan) this[b.kind](b.x, b.z, b.yaw);
+    for (const b of plan) {
+      if (b.kind === 'fence') this.fence(b.x, b.z, b.yaw, b.len);
+      else this[b.kind](b.x, b.z, b.yaw);
+    }
 
     this.scatterNature(towns);
     this.buildInstances(scene);
@@ -449,22 +465,25 @@ const Scenery = {
 
     // 가구와 아이템
     this.crateStack(cx, cz, yaw, w / 2 - 2.5, -d / 2 + 2.2, base);
-    this.shelf(cx, cz, yaw, w / 2 - 1.0, 2.0, base, 4);
+    this.shelf(cx, cz, yaw, -w / 2 + 3.4, d / 2 - 1.0, base, 4);
     for (let i = 0; i < 3; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.4) * (w - 5), (rnd() - 0.5) * (d - 4), base + 0.05);
     for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, holeW + rnd() * (w - holeW - 3) - w / 2 + 1.5, (rnd() - 0.5) * (d - 4), y2 + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'house', r: Math.max(w, d) / 2 });
   },
 
   /* ---------- 3층 아파트: 마을의 랜드마크 ---------- */
-  apartment(cx, cz, yaw) {
-    const w = 19, d = 14, fh = 3.0;
+  /* 층수와 크기를 받아 아파트/고층 빌딩을 같은 방식으로 세웁니다 */
+  apartment(cx, cz, yaw, opt) {
+    opt = opt || {};
+    const floors = opt.floors || 3;
+    const w = opt.w || 19, d = opt.d || 14, fh = 3.0;
     const base = this.padY(cx, cz, w, d, yaw);
-    const wall = 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
+    const wall = opt.wall || 0xcfc5b1, floorC = 0x9a9382, steel = 0x6f7378;
     const holeW = 3.6;
     this.groundFloor(cx, cz, yaw, w, d, base, floorC);
 
-    this.walls(cx, cz, yaw, w, d, fh * 3, 0.34, base, wall, ['front', 'back'], 2.4);
-    for (let f = 0; f < 3; f++) this.windows(cx, cz, yaw, w, d, fh, base, 4, fh * f + 1.9);
+    this.walls(cx, cz, yaw, w, d, fh * floors, 0.34, base, wall, ['front', 'back'], 2.4);
+    for (let f = 0; f < floors; f++) this.windows(cx, cz, yaw, w, d, fh, base, opt.win || 4, fh * f + 1.9);
     this.trim(cx, cz, yaw, 0, base + 1.2, -d / 2 - 0.03, 2.6, 2.4, 0.1, 0x5c5f63);
 
     /* 계단실: 반 층씩 올라가 뒤쪽 참에서 꺾어 앞쪽으로 다시 올라옵니다.
@@ -475,7 +494,7 @@ const Scenery = {
     const zB = zA + runLen + 1.6;                      // 뒤쪽 참을 지난 자리
     const stairEnd = zB + 0.5 + d / 2;                 // 앞벽에서 계단실 끝까지의 깊이
     const frontD = 1.9;                                // 층마다 앞쪽 발판 깊이
-    for (let f = 0; f < 3; f++) {
+    for (let f = 0; f < floors; f++) {
       const y = base + fh * f, mid = y + fh / 2, top = y + fh;
       this.stairs(cx, cz, yaw, laneA, zA, y, mid, holeW * 0.42, 1, 0xa79f92);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, zA + runLen + 0.8, holeW, 1.7, mid, floorC, 0.30);
@@ -483,9 +502,9 @@ const Scenery = {
     }
     /* 층 바닥: 오른쪽 큰 판 + 계단실 앞 발판 + 계단실 뒤 바닥.
        f = 3 은 옥상 바닥이 됩니다 (계단실은 뚫려 있어 계단으로 올라옵니다). */
-    for (let f = 1; f <= 3; f++) {
+    for (let f = 1; f <= floors; f++) {
       const y = base + fh * f;
-      const c = f === 3 ? 0x8a8578 : floorC;
+      const c = f === floors ? 0x8a8578 : floorC;
       this.slab(cx, cz, yaw, -w / 2 + holeW + (w - holeW) / 2, 0, w - holeW + 0.4, d + 0.4, y, c, 0.34);
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + frontD / 2, holeW + 0.4, frontD, y, c, 0.34);
       // 계단 B 라인 쪽으로 발판을 조금 더 내밀어 마지막 단과 사이가 벌어지지 않게 합니다
@@ -493,7 +512,7 @@ const Scenery = {
       this.slab(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd + (d - stairEnd) / 2,
                 holeW + 0.4, d - stairEnd + 0.2, y, c, 0.34);
       this.rail(cx, cz, yaw, -w / 2 + holeW + 0.15, -d / 2 + stairEnd / 2, 0.16, stairEnd - 0.6, y, steel);
-      if (f === 3) {
+      if (f === floors) {
         /* 옥상은 위로 이어지는 계단이 없으므로 계단실 구멍을 난간으로 막습니다.
            올라온 쪽(계단 B 라인)만 열어 두어 다시 내려갈 수 있습니다. */
         this.rail(cx, cz, yaw, -w / 2 + holeW / 2, -d / 2 + stairEnd - 0.15, holeW, 0.16, y, steel);
@@ -502,24 +521,29 @@ const Scenery = {
     }
 
     // 옥상 난간과 처마
-    const ry = base + fh * 3;
+    const ry = base + fh * floors;
     for (const s of [-1, 1]) {
       this.rail(cx, cz, yaw, s * (w / 2 + 0.12), 0, 0.22, d + 0.7, ry, steel);
       this.rail(cx, cz, yaw, 0, s * (d / 2 + 0.12), w + 0.7, 0.22, ry, steel);
     }
     this.trim(cx, cz, yaw, 0, ry - 0.28, 0, w + 0.9, 0.2, d + 0.9, 0x6f6a60);
 
-    for (let f = 0; f < 3; f++) {
+    for (let f = 0; f < floors; f++) {
       const y = base + fh * f + 0.05;
       if (f === 0) {
-        this.shelf(cx, cz, yaw, w / 2 - 1.2, 0, base, 6);
+        this.shelf(cx, cz, yaw, 0, d / 2 - 1.0, base, 6);
         for (let i = 0; i < 2; i++) this.crateStack(cx, cz, yaw, (rnd() - 0.3) * (w - 8), (rnd() - 0.5) * (d - 5), base);
       }
       for (let i = 0; i < 3; i++) {
         this.lootSpot(cx, cz, yaw, holeW + 1 - w / 2 + rnd() * (w - holeW - 3), (rnd() - 0.5) * (d - 4), y);
       }
     }
-    World.buildings.push({ x: cx, z: cz, kind: 'apartment', r: Math.max(w, d) / 2 });
+    World.buildings.push({ x: cx, z: cz, kind: opt.kind || 'apartment', r: Math.max(w, d) / 2 });
+  },
+
+  /* 마을의 랜드마크가 되는 고층 빌딩. 12층 36m 이고 옥상까지 걸어 올라갑니다 */
+  tower(cx, cz, yaw) {
+    this.apartment(cx, cz, yaw, { floors: 12, w: 24, d: 17, win: 5, wall: 0xb9c2cc, kind: 'tower' });
   },
 
   shed(cx, cz, yaw) {
@@ -531,6 +555,107 @@ const Scenery = {
     if (rnd() < 0.6) this.crateStack(cx, cz, yaw, w / 2 - 1.4, d / 2 - 1.4, base);
     for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * (w - 3), (rnd() - 0.5) * (d - 3), base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'shed', r: Math.max(w, d) / 2 });
+  },
+
+  /* ---------- 지형지물 ----------
+     걸어 넘거나(담장) 기어올라(바위·건초) 엄폐물로 쓰는 것들입니다. */
+
+  /* 담장: 기둥과 가로대. 1.1m 라서 뛰어넘어야 지나갈 수 있습니다 */
+  fence(cx, cz, yaw, len) {
+    const post = 0x6b563c, rail = 0x7d6748;
+    const n = Math.max(2, Math.round(len / 2.4));
+    const seg = len / n;
+    for (let i = 0; i <= n; i++) {
+      const lx = -len / 2 + seg * i;
+      const [x, z] = this.local(cx, cz, yaw, lx, 0);
+      const base = World.height(x, z);
+      this.boxDefs.push({ x, y: base + 0.62, z, sx: 0.16, sy: 1.24, sz: 0.16, yaw, color: post, solid: false });
+    }
+    // 가로대 두 줄 (충돌은 이쪽 한 덩어리로 처리)
+    const base = World.height(cx, cz);
+    this.box(cx, base + 0.62, cz, len, 1.1, 0.16, yaw, rail);
+    this.trim(cx, cz, yaw, 0, base + 0.98, 0, len, 0.12, 0.2, post);
+  },
+
+  /* 바위 무더기: 계단처럼 딛고 올라설 수 있는 엄폐물 */
+  rockPile(cx, cz) {
+    const base = World.height(cx, cz);
+    const n = 3 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2, r = rnd() * 3.4;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      const sc = 1.1 + rnd() * 1.5;
+      this.rocks.push({ x, y: World.height(x, z), z, s: sc, rot: rnd() * Math.PI * 2 });
+      World.addCyl({ x, z, r: 1.45 * sc, top: World.height(x, z) + 1.4 * sc, h: 3 * sc });
+    }
+    // 가운데에 올라설 수 있는 넓적한 바위
+    this.box(cx, base + 0.55, cz, 3.0, 1.1, 2.6, rnd() * Math.PI, 0x7d7a72);
+    this.lootSpot(cx, cz, 0, 0, 2.4, base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'rocks', r: 5 });
+  },
+
+  /* 급수탑: 다리 네 개 위에 물탱크. 사다리 대신 옆 컨테이너를 딛고 오릅니다 */
+  waterTower(cx, cz) {
+    const base = this.padY(cx, cz, 6, 6, 0);
+    const leg = 0x6f6a60, tank = 0x9aa3ab;
+    const H = 9.5;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      this.box(cx + sx * 2.2, base + H / 2, cz + sz * 2.2, 0.35, H, 0.35, 0, leg);
+      this.trim(cx, cz, 0, sx * 1.1, base + H * 0.45, sz * 1.1, 4.6, 0.16, 4.6, leg);
+    }
+    this.box(cx, base + H, cz, 6.4, 0.4, 6.4, 0, leg);                 // 발판
+    this.box(cx, base + H + 2.1, cz, 5.2, 3.8, 5.2, 0, tank);          // 물탱크
+    this.trim(cx, cz, 0, 0, base + H + 4.2, 0, 5.6, 0.5, 5.6, 0x7c8288);
+    // 딛고 올라갈 계단 상자
+    this.box(cx + 3.4, base + 0.55, cz, 1.6, 1.1, 1.6, 0, 0x8a6a42);
+    this.box(cx + 3.4, base + 1.65, cz + 1.7, 1.6, 1.1, 1.6, 0, 0x8a6a42);
+    this.lootSpot(cx, cz, 0, 0, 0, base + H + 0.25);
+    World.buildings.push({ x: cx, z: cz, kind: 'watertower', r: 4 });
+  },
+
+  /* 폐허: 높이가 제각각인 벽 조각들 */
+  ruin(cx, cz, yaw) {
+    const base = this.padY(cx, cz, 12, 9, yaw);
+    const wall = 0xa89f92;
+    const segs = [[-5, -4, 6, 3.2], [4.5, -4, 4, 1.4], [-5.5, 3.5, 5, 2.4], [3, 4, 5, 1.1]];
+    for (const [lx, lz, len, h] of segs) {
+      const [x, z] = this.local(cx, cz, yaw, lx, lz);
+      const horiz = Math.abs(lz) > Math.abs(lx) || len > 4;
+      this.box(x, base + h / 2, z, horiz ? len : 0.4, h, horiz ? 0.4 : len, yaw, wall);
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = rnd() * Math.PI * 2, r = 1 + rnd() * 4;
+      this.crateStack(cx, cz, yaw, Math.cos(a) * r, Math.sin(a) * r, base);
+    }
+    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 8, (rnd() - 0.5) * 6, base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'ruin', r: 7 });
+  },
+
+  /* 송신탑: 멀리서도 보이는 이정표 */
+  mast(cx, cz) {
+    const base = World.height(cx, cz);
+    const steel = 0x8a8f96, red = 0xc23b32;
+    const H = 26;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      this.boxDefs.push({ x: cx + sx * 1.1, y: base + H / 2, z: cz + sz * 1.1,
+                          sx: 0.22, sy: H, sz: 0.22, yaw: 0, color: steel, solid: false,
+                          tilt: 0, ry: 0, rz: 0 });
+    }
+    this.box(cx, base + 1.4, cz, 2.8, 2.8, 2.8, 0, steel);             // 아랫부분만 충돌
+    for (let i = 1; i < 7; i++) {
+      const y = base + i * (H / 7);
+      this.trim(cx, cz, 0, 0, y, 0, 2.6, 0.16, 2.6, i % 2 ? steel : red);
+    }
+    this.trim(cx, cz, 0, 0, base + H + 0.5, 0, 0.5, 1.0, 0.5, red);
+  },
+
+  /* 건초 더미: 딛고 올라설 수 있는 부드러운 엄폐물 */
+  haystack(cx, cz) {
+    const base = World.height(cx, cz);
+    const hay = 0xc9a94e;
+    this.box(cx, base + 0.55, cz, 2.4, 1.1, 2.4, rnd() * 0.6, hay);
+    if (rnd() < 0.6) this.box(cx + 0.3, base + 1.6, cz - 0.2, 2.0, 1.0, 2.0, rnd() * 0.6, 0xbb9c46);
+    if (rnd() < 0.4) this.lootSpot(cx, cz, 0, 1.8, 0, base + 0.05);
   },
 
   container(cx, cz, yaw) {

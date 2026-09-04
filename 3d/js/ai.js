@@ -57,6 +57,14 @@ const AI = {
       const y = bot.pos.y + 1.0;
       const ahead = World.ray(bot.pos.x, y, bot.pos.z, mx, 0, mz, 3.2);
       if (ahead < 3.2) {
+        // 막힌 게 넘어갈 만한 턱이면 기어오릅니다 (담장·상자·낮은 지붕)
+        if (ahead < 1.8 && bot.grounded) {
+          const oldYaw = bot.yaw;
+          bot.yaw = Math.atan2(mx, mz);
+          const v = game.vaultTarget(bot);
+          if (v) { game.startClimb(bot, v); return; }
+          bot.yaw = oldYaw;
+        }
         const side = a.strafe;
         const rx = mx * Math.cos(0.9 * side) - mz * Math.sin(0.9 * side);
         const rz = mx * Math.sin(0.9 * side) + mz * Math.cos(0.9 * side);
