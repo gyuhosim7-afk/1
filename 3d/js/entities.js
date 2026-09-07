@@ -455,7 +455,7 @@ class Plane {
     this.total = this.len / CFG.PLANE_SPEED;
     this.t = 0;
     this.pos = this.a.clone();
-    this.mesh = new THREE.Mesh(Plane.geo(), Mats.vc({ roughness: 0.72, metalness: 0.18 }));
+    this.mesh = Plane.build();
     this.mesh.position.copy(this.pos);
     this.mesh.rotation.y = this.yaw;
   }
@@ -480,32 +480,44 @@ class Plane {
     this.mesh.rotation.y = this.yaw;
   }
 
-  static geo() {
-    if (this._geo) return this._geo;
-    const B = Build;
-    const body = 0xb9c2cc, dark = 0x394452, wing = 0x8f9aa6, glass = 0x2f4a5e;
-    const parts = [
-      // 동체
-      B.sphere(2.6, body, 0, 0, 0, 1.0, 0.95, 5.4, 16),
-      B.sphere(2.4, body, 0, 0, 12.6, 1.0, 0.92, 1.6, 14),        // 기수
-      B.box(2.6, 1.6, 1.2, glass, 0, 0.9, 12.0),                  // 조종석 창
-      // 주익
-      B.box(21.0, 0.55, 4.2, wing, 0, 1.5, 1.0),
-      B.box(3.0, 1.1, 2.0, dark, -6.2, 0.6, 1.6),                 // 엔진
-      B.box(3.0, 1.1, 2.0, dark, 6.2, 0.6, 1.6),
-      B.box(2.2, 0.9, 1.6, dark, -9.6, 0.7, 1.2),
-      B.box(2.2, 0.9, 1.6, dark, 9.6, 0.7, 1.2),
-      // 꼬리
-      B.box(0.7, 5.4, 3.6, wing, 0, 3.0, -12.0),
-      B.box(9.0, 0.45, 2.6, wing, 0, 4.6, -13.0),
-      // 뒷문 (열려 있습니다)
-      B.box(3.2, 0.3, 3.4, dark, 0, -1.5, -14.6, -0.5),
-      // 동체 줄무늬
-      B.box(0.4, 0.5, 22.0, 0xf0c453, -2.3, 0.4, 0),
-      B.box(0.4, 0.5, 22.0, 0xf0c453, 2.3, 0.4, 0)
-    ];
-    this._geo = Build.merge(parts);
-    return this._geo;
+  /* 강하선. 섬에 있는 것과 같은 기지 부품으로 짰습니다.
+     기수는 착륙선, 동체는 통로 캡슐 두 칸, 옆에 태양광 날개와 화물칸.
+     정면은 +Z 이고, 뒷문 램프는 -Z 쪽에 답니다 (사람은 램프 위에 섭니다). */
+  static build() {
+    const g = new THREE.Group();
+    const put = (name, x, y, z, ry, s, rz) => {
+      const geo = SpaceKit.geo[name];
+      if (!geo) return;
+      const m = new THREE.Mesh(geo, SpaceKit.mat);
+      m.position.set(x, y, z);
+      m.rotation.set(0, ry || 0, rz || 0);
+      m.scale.setScalar(s);
+      m.castShadow = true;
+      g.add(m);
+    };
+    const H = Math.PI / 2;
+    put('tunnel_straight_A', 0, 0, 6.4, H, 6.4);      // 앞 동체
+    put('tunnel_straight_B', 0, 0, -6.4, H, 6.4);     // 뒤 동체
+    put('lander_A', 0, -1.2, 15.5, 0, 5.2);           // 기수(조종실)
+    /* 태양광 판은 납작해서 옆에서 보면 사라집니다. 대신 실루엣에 남는
+       것들로 답니다 — 뒤쪽 추진기 두 기와 위쪽 골조. */
+    put('drill_structure', -4.6, -0.2, -13.0, 0, 4.2, Math.PI / 2);
+    put('drill_structure', 4.6, -0.2, -13.0, 0, 4.2, Math.PI / 2);
+    put('structure_low', 0, 2.2, -1.0, H, 3.0);       // 동체 위 골조
+    put('cargo_A', -5.0, -1.4, 4.0, 0.4, 3.4);        // 옆구리 화물
+    put('cargo_B', 5.0, -1.4, 4.0, -0.4, 3.4);
+    put('lights', 0, 3.4, 6.0, 0, 2.6);               // 항법등
+
+    // 뒷문 램프 — 사람이 서는 자리라 모양을 직접 잡습니다
+    const ramp = new THREE.Mesh(
+      Build.merge([Build.box(4.4, 0.35, 6.0, 0x4a525c, 0, 0, 0, -0.42),
+                   Build.box(0.3, 0.9, 6.0, 0x6f7a86, -2.2, 0.5, 0, -0.42),
+                   Build.box(0.3, 0.9, 6.0, 0x6f7a86, 2.2, 0.5, 0, -0.42)]),
+      Mats.vc({ roughness: 0.72, metalness: 0.18 }));
+    ramp.position.set(0, -2.9, -15.6);
+    ramp.castShadow = true;
+    g.add(ramp);
+    return g;
   }
 }
 

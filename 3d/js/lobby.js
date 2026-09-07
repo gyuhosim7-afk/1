@@ -2,13 +2,13 @@
    로비: 캐릭터 미리보기(3D) + 상자·스킨·전적 화면
    ============================================================ */
 const Lobby = {
-  scene: null, camera: null, group: null, spin: 0, ready: false,
+  scene: null, camera: null, group: null, spin: 0, ready: false, backdropDone: false,
 
   /* ---------- 3D 미리보기 (해질녘 벌판에 선 캐릭터) ---------- */
   initScene() {
     if (this.scene) return;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(THEME.fog), 14, 62);
+    this.scene.fog = new THREE.Fog(srgb(THEME.fog), 22, 130);   // 뒤쪽 기지가 안개에 묻히지 않도록
     this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
     this.camera.position.set(0, 0.95, 4.5);
     this.camera.lookAt(0, 0.80, 0);
@@ -32,19 +32,10 @@ const Lobby = {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 뒤쪽 실루엣 (나무와 폐허)
-    const dark = new THREE.MeshStandardMaterial({ color: srgb(THEME.trunk), roughness: 1 });
-    for (let i = 0; i < 14; i++) {
-      const ang = -Math.PI * 0.15 + (i / 13) * Math.PI * 1.3;
-      const dist = 22 + Math.random() * 16;
-      const h = 5 + Math.random() * 6;
-      const tree = new THREE.Mesh(new THREE.ConeGeometry(1.4 + Math.random(), h, 7), dark);
-      tree.position.set(Math.sin(ang) * dist, h / 2, -Math.abs(Math.cos(ang)) * dist - 4);
-      this.scene.add(tree);
-    }
-    const ruin = new THREE.Mesh(new THREE.BoxGeometry(6, 4.4, 5), dark);
-    ruin.position.set(-9.5, 2.2, -16);
-    this.scene.add(ruin);
+    /* 뒤쪽 배경: 게임에 쓰는 기지 부품을 그대로 세워 둡니다.
+       로비와 실제 섬이 같은 세계로 보이게 하는 것이 목적이라,
+       모델을 못 읽었으면 그냥 빈 벌판으로 둡니다. */
+    this.buildBackdrop();
 
     // 조명: 따뜻한 역광 + 앞쪽 보조광
     this.scene.add(new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, 0.95));
@@ -66,6 +57,48 @@ const Lobby = {
     this.group = new THREE.Group();
     this.scene.add(this.group);
     this.ready = true;
+  },
+
+  /* 캐릭터 뒤로 전초 기지 한 채. 카메라가 +Z 에 있으므로 모두 -Z 쪽에 둡니다. */
+  buildBackdrop() {
+    if (!this.scene || !SpaceKit.ready || this.backdropDone) return;
+    this.backdropDone = true;
+    const put = (name, x, y, z, ry, s) => {
+      const geo = SpaceKit.geo[name];
+      if (!geo) return null;
+      const m = new THREE.Mesh(geo, SpaceKit.mat);
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      m.scale.setScalar(s);
+      m.castShadow = true; m.receiveShadow = true;
+      this.scene.add(m);
+      return m;
+    };
+    // 발밑 착륙장 — 캐릭터가 그 위에 선 것처럼 보이도록 살짝 묻습니다
+    put('landingpad_large', 0, -0.42, -0.3, 0.4, 1.4);
+    /* 화면이 답답해지지 않도록 캡슐은 멀리(-20m 밖) 두고,
+       가까이에는 낮은 것들만 놓아 캐릭터를 가리지 않게 합니다. */
+    put('basemodule_A', -11.5, 0, -24.0, 0.7, 2.6);
+    put('basemodule_C', 12.5, 0, -27.0, -0.5, 2.4);
+    put('basemodule_E', -1.0, 0, -38.0, 0.2, 3.0);
+    put('tunnel_straight_A', -6.5, 3.6, -25.5, 0.35, 2.2);
+    // 가까이: 허리 아래로만
+    put('cargo_B', -5.2, 0, -9.5, 0.3, 1.6);
+    put('containers_B', 6.0, 0, -10.5, -0.2, 2.6);
+    put('rock_B', -9.5, 0, -13.0, 0.4, 2.8);
+    // 멀리: 실루엣
+    put('rocks_B', 17.0, 0, -20.0, 1.2, 2.4);
+    put('structure_tall', 21.0, 0, -33.0, 0.6, 3.2);
+    put('drill_structure', -22.0, 0, -31.0, -0.3, 4.0);
+    put('solarpanel', 9.5, 0, -18.0, 0.9, 2.6);
+    // 가로등 두 개는 스스로 빛나게 (밤 배경에서 화면이 살아납니다)
+    const lampMat = SpaceKit.mat.clone();
+    lampMat.emissive = new THREE.Color(srgb(0x64e2d8));
+    lampMat.emissiveIntensity = 0.6;
+    for (const [lx, lz] of [[-4.6, -7.0], [4.8, -7.6]]) {
+      const lamp = put('lights', lx, 0, lz, Math.random() * 6.28, 1.7);
+      if (lamp) lamp.material = lampMat;
+    }
   },
 
   /* 장착한 스킨으로 미리보기 캐릭터를 다시 만듭니다 (편히 선 자세) */

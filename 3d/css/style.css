@@ -1,16 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap');
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --panel: rgba(10, 14, 20, 0.78);
-  --line: rgba(255, 255, 255, 0.14);
-  --text: #e9eef4;
-  --muted: #9fb0c0;
-  --accent: #58a6ff;
+  --panel: rgba(9, 12, 22, 0.82);
+  --line: rgba(122, 214, 226, 0.22);      /* 청록 실선 — 기지 조명과 같은 색 */
+  --text: #e6ecf5;
+  --muted: #8fa2bb;
+  --accent: #64e2d8;                      /* 강조: 기지 유도등 */
+  --accent-dim: rgba(100, 226, 216, .14);
+  --gold: #f0c453;                         /* BP 처럼 값을 나타내는 곳에만 */
   --danger: #f85149;
-  --display: 'Black Han Sans', 'IBM Plex Sans KR', system-ui, sans-serif;
-  --body: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  /* 서체는 파일 안에 심어 두었습니다 (css/font-*.css) — 외부에서 받지 않습니다 */
+  --display: 'Orbit', 'PlexKR', system-ui, sans-serif;
+  --body: 'PlexKR', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
 
 html, body {
@@ -255,8 +256,8 @@ kbd {
 
 button {
   width: 100%; padding: 13px; font-size: 16px; font-weight: 700; font-family: inherit;
-  color: #fff; background: linear-gradient(180deg, #2f81f7, #1f6feb);
-  border: 0; border-radius: 10px; cursor: pointer; transition: filter .15s;
+  color: #04120f; background: linear-gradient(180deg, #8bf2e8, #35b8ad);
+  border: 0; border-radius: 8px; cursor: pointer; transition: filter .15s;
 }
 button:hover { filter: brightness(1.12); }
 button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -381,8 +382,8 @@ body.playing.paused { cursor: default; }
   padding: 0 26px; gap: 20px;
   background: linear-gradient(180deg, rgba(6,9,13,.95), rgba(6,9,13,.55) 70%, transparent);
 }
-.navBar .logo { font-family: var(--display); font-size: 20px; letter-spacing: .02em; }
-.navBar .logo em { font-style: normal; color: #f0c453; }
+.navBar .logo { font-family: var(--display); font-size: 21px; letter-spacing: .06em; }
+.navBar .logo em { font-style: normal; color: var(--accent); text-shadow: 0 0 14px rgba(100,226,216,.5); }
 .navBar .tabs { display: flex; justify-content: center; gap: 26px; border: 0; }
 .navBar .tabs button {
   width: auto; padding: 6px 2px; background: none; border: 0; border-radius: 0;
@@ -390,56 +391,83 @@ body.playing.paused { cursor: default; }
   color: rgba(255,255,255,.55); cursor: pointer; position: relative;
 }
 .navBar .tabs button:hover { color: #fff; filter: none; }
-.navBar .tabs button.on { color: #f0c453; }
+.navBar .tabs button.on { color: var(--accent); }
 .navBar .tabs button.on::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; background: #f0c453;
+  content: ''; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px;
+  background: var(--accent); box-shadow: 0 0 10px rgba(100,226,216,.8);
 }
 .account { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; }
 .account .bpTag { font-size: 10px; color: var(--muted); letter-spacing: .12em; }
-.account b { font-size: 17px; color: #f0c453; font-variant-numeric: tabular-nums; }
+.account b { font-size: 17px; color: var(--gold); font-family: var(--display); font-variant-numeric: tabular-nums; }
 .account .nick {
   margin-left: 10px; padding: 4px 10px; font-size: 12px; color: #cfd8e3;
   background: rgba(255,255,255,.07); border: 1px solid var(--line); border-radius: 6px;
 }
 
-/* 좌하단 시작 패널 */
+/* 좌하단 시작 패널 — 기지 단말기처럼 모서리를 깎고 청록 실선을 씁니다 */
 .playDock {
-  position: absolute; left: 26px; bottom: 26px; width: 268px;
-  display: flex; flex-direction: column; gap: 12px;
+  /* .panel 의 큰 상자 스타일을 여기서 되돌립니다 (가운데 정렬·테두리·여백) */
+  position: absolute; left: 26px; bottom: 26px; width: 282px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+  padding: 0; text-align: left;
 }
 .dockGroup {
-  background: rgba(8, 11, 16, .72); border: 1px solid var(--line);
-  border-radius: 8px; padding: 10px 12px;
+  position: relative;
+  background: linear-gradient(180deg, rgba(14,20,32,.86), rgba(8,11,20,.9));
+  border: 1px solid var(--line);
+  /* 오른쪽 위 모서리를 깎아 계기판 느낌을 냅니다 */
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  padding: 11px 13px;
 }
-.dockLabel { display: block; font-size: 10px; color: var(--muted); letter-spacing: .12em; margin-bottom: 6px; }
+/* 왼쪽에 세로 강조선 */
+.dockGroup::before {
+  content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px;
+  background: var(--accent); opacity: .55;
+}
+.dockLabel {
+  display: block; font-size: 9px; color: var(--accent); opacity: .85;
+  letter-spacing: .2em; margin-bottom: 7px; font-weight: 700;
+}
 .dockRow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
-.dockRow b { color: #f0c453; }
+.dockRow b { color: var(--text); font-family: var(--display); letter-spacing: .06em; }
 .dockRow span { font-size: 12px; color: var(--muted); }
 .dockRow input {
-  width: 52px; margin: 0 4px; padding: 4px 6px; text-align: center;
-  background: #0d1117; border: 1px solid var(--line); border-radius: 5px;
-  color: var(--text); font-family: inherit; font-size: 12px;
+  width: 54px; margin: 0 4px; padding: 4px 6px; text-align: center;
+  background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 0;
+  color: var(--accent); font-family: var(--display); font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 .segmented { display: flex; gap: 6px; }
 .segmented button {
-  flex: 1; width: auto; padding: 7px 0; font-size: 12px; font-weight: 600;
-  background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 6px;
-  color: var(--muted); cursor: pointer;
+  flex: 1; width: auto; padding: 8px 0; font-size: 12px; font-weight: 700;
+  letter-spacing: .06em;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 0;
+  color: var(--muted); cursor: pointer; transition: background .12s, color .12s;
 }
-.segmented button.on { background: rgba(240, 196, 83, .16); border-color: #f0c453; color: #f0c453; }
+.segmented button:hover { color: var(--text); }
+.segmented button.on {
+  background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+  box-shadow: inset 0 0 12px rgba(100,226,216,.16);
+}
 .startBtn {
-  width: 100%; padding: 15px; font-size: 19px; font-weight: 800; letter-spacing: .08em;
-  color: #1a1405; background: linear-gradient(180deg, #ffd75e, #e0ac1f);
-  border: 0; border-radius: 6px; cursor: pointer;
-  box-shadow: 0 6px 20px rgba(224, 172, 31, .28);
+  width: 100%; padding: 15px; font-size: 21px; font-weight: 400; letter-spacing: .1em;
+  font-family: var(--display); text-indent: .1em;       /* 자간만큼 왼쪽으로 쏠리는 것 보정 */
+  color: #04120f; background: linear-gradient(180deg, #8bf2e8, #35b8ad);
+  border: 0; border-radius: 0; cursor: pointer;
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  box-shadow: 0 6px 24px rgba(53, 184, 173, .3);
+  transition: filter .12s, box-shadow .12s;
 }
-.startBtn:hover { filter: brightness(1.08); }
-.dockHint { font-size: 10px; color: rgba(255,255,255,.45); line-height: 1.6; }
+.startBtn:hover { filter: brightness(1.1); box-shadow: 0 8px 30px rgba(53, 184, 173, .48); }
+.dockHint { font-size: 10px; color: rgba(214,230,240,.42); line-height: 1.65; padding-left: 2px; }
+.dockHint b { color: var(--accent); font-weight: 700; }
 
 .dockGroup input[type="text"] {
-  width: 100%; padding: 7px 9px; font-size: 13px; font-family: inherit;
-  background: #0d1117; border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+  width: 100%; padding: 8px 9px; font-size: 13px; font-family: inherit;
+  background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 0; color: var(--text);
 }
+.dockGroup input:focus { outline: none; border-color: var(--accent); }
 .peerList { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 .peerList .dot {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;

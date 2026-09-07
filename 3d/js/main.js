@@ -636,7 +636,7 @@ const Main = {
     });
     // 캐릭터와 기지 부품은 첫 화면을 띄우면서 곧바로 읽어 둡니다
     CharModel.load(this.MODEL_URL).then(() => { if (Lobby.ready) Lobby.refresh(); });
-    SpaceKit.load(this.KIT_URL);
+    SpaceKit.load(this.KIT_URL).then(() => Lobby.buildBackdrop());
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
