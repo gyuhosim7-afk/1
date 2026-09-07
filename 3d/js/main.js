@@ -606,8 +606,12 @@ const Main = {
     const src = tag ? tag.getAttribute('src') : '';
     return src.replace(/vendor\/three\.min\.js.*$/, '');
   },
-  get MODEL_URL() { return this.ASSET_BASE + 'models/Soldier.glb'; },
-  get KIT_URL() { return this.ASSET_BASE + 'models/spacebits.glb'; },
+  /* 모델 주소에도 판 딱지를 붙입니다. 안 붙이면 브라우저가 예전에 받아 둔
+     모델을 계속 써서, 새 코드에 옛 모델이 물리는 일이 생깁니다.
+     (딱지는 빌드가 index.html 에 심어 둡니다. 개발용 /3d/ 에서는 없습니다) */
+  get ASSET_TAG() { return window.ASSET_VER ? '?v=' + window.ASSET_VER : ''; },
+  get MODEL_URL() { return this.ASSET_BASE + 'models/Soldier.glb' + this.ASSET_TAG; },
+  get KIT_URL() { return this.ASSET_BASE + 'models/spacebits.glb' + this.ASSET_TAG; },
   last: 0,
   init() {
     UI.init();

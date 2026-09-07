@@ -5,6 +5,8 @@
 프로젝트의 CSS/JS 는 모두 파일 안에 인라인됩니다.
 """
 import re
+import subprocess
+import time
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -19,15 +21,40 @@ TARGETS = [
 ROOT_FROM = '3d/index.html'
 
 
+def asset_version():
+    """이번 판을 가리키는 짧은 딱지. 커밋이 있으면 커밋, 없으면 시각."""
+    try:
+        v = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', '--short=8', 'HEAD'],
+                           capture_output=True, text=True, timeout=10)
+        if v.returncode == 0 and v.stdout.strip():
+            return v.stdout.strip()
+    except Exception:
+        pass
+    return time.strftime('%Y%m%d%H%M')
+
+
 def build_root():
-    """저장소 첫 화면(index.html)을 3d/index.html 에서 만들어 냅니다."""
+    """저장소 첫 화면(index.html)을 3d/index.html 에서 만들어 냅니다.
+
+    파일 이름 뒤에 이번 판 딱지(?v=...)를 붙입니다. 이게 없으면 브라우저가
+    예전에 받아 둔 js 를 계속 쓰기 때문에, 새로 올려도 친구들 화면은
+    옛날 그대로이거나 새 html 에 옛 js 가 섞여 깨집니다.
+    딱지가 바뀌면 주소가 바뀌므로 반드시 새로 받아 갑니다."""
     src = ROOT / ROOT_FROM
     html = src.read_text(encoding='utf-8')
     html = re.sub(r'(src|href)="(?!https?:|//|/|#)([^"]+)"', r'\1="3d/\2"', html)
+
+    ver = asset_version()
+    html = re.sub(r'(<(?:script|link)[^>]*(?:src|href)="3d/[^"]+)"',
+                  r'\1?v=' + ver + '"', html)
+    # 모델처럼 js 안에서 부르는 파일에도 같은 딱지를 붙일 수 있게 알려 줍니다
+    html = html.replace('<script src="3d/vendor/three.min.js',
+                        '<script>window.ASSET_VER=%r;</script>\n<script src="3d/vendor/three.min.js' % ver)
+
     note = ('<!-- 이 파일은 tools/build-single.py 가 3d/index.html 에서 만들어 냅니다.\n'
             '     직접 고치지 마세요. 고칠 곳은 3d/index.html 입니다. -->\n')
     (ROOT / 'index.html').write_text(note + html, encoding='utf-8')
-    print('index.html  <-  %s (경로를 3d/ 로 바꿔서)' % ROOT_FROM)
+    print('index.html  <-  %s (경로를 3d/ 로, 판 딱지 v=%s)' % (ROOT_FROM, ver))
 
 
 def build(src_rel, out_name):
