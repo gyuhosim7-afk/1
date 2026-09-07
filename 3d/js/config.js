@@ -54,6 +54,9 @@ const CFG = {
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
   MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
+  MAX_THROW: 2,           // 가방이 없을 때 종류별로 들 수 있는 투척 무기 수
+  THROW_SPEED: 21,        // 던지는 힘 (m/s)
+  THROW_UP: 0.22,         // 던질 때 위로 들어 올리는 정도 (rad)
   BASE_AMMO_CAP: 180,     // 가방이 없을 때 구경별 예비 탄약 한도
   BOT_VISION: 165,        // 봇 시야 거리 (m)
   MAX_DT: 0.1,          // 프레임이 느려도 슬로모션이 되지 않게 (이동은 잘게 나눠 처리)
@@ -153,6 +156,18 @@ const VESTS = {
   2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
   3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
 };
+/* ============================================================
+   투척 무기
+   fuse 던진 뒤 터지기까지(초), radius 효과 반경(m)
+   ============================================================ */
+const THROWABLES = {
+  frag:  { name: '수류탄',  short: '수류탄', key: 'G', color: 0x4a5340, tint: 0xff8a4a,
+           fuse: 3.4, radius: 8.0, dmg: 110, minDmg: 12, cook: true },
+  smoke: { name: '연막탄',  short: '연막',   key: 'H', color: 0x5b6a76, tint: 0xdfe6ec,
+           fuse: 1.6, radius: 7.2, life: 20, cook: false }
+};
+const THROW_KEYS = Object.keys(THROWABLES);
+
 /* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
 const HELMETS = {
   1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
@@ -160,9 +175,9 @@ const HELMETS = {
   3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
 };
 const BAGS = {
-  1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
-  2: { name: '가방 Lv2', meds: 4, ammo: 260, color: 0x4a5539 },
-  3: { name: '가방 Lv3', meds: 6, ammo: 420, color: 0x2f3a2a }
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x6b5a3c },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x4a5539 },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2f3a2a }
 };
 /* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
 const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
@@ -187,7 +202,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 const DROP_TABLE = {
   guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
-  vest: 3, bag: 3, helmet: 3, meds: 2
+  vest: 3, bag: 3, helmet: 3, meds: 2, frag: 2
 };
 
 /* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.

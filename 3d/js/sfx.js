@@ -274,6 +274,34 @@ const Sfx = {
     this.noise({ freq: 1100, freqTo: 300, type: 'lowpass', vol: 0.22, atk: 0.002, dec: 0.12, delay: 0.28 });
   },
 
+  /* 수류탄 폭발: 낮은 '쿵' + 흩어지는 파편 + 멀수록 길게 남는 꼬리 */
+  blast(d) {
+    if (!this.ok()) return;
+    const D = this.dist(d);
+    const v = D.gain * 1.6;
+    if (v < 0.006) return;
+    this.tone({ freq: 78, freqTo: 32, vol: v * 0.95, atk: 0.002, dec: 0.55, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 2400), freqTo: 180, type: 'lowpass',
+                 vol: v, atk: 0.001, dec: 0.42, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 5200), type: 'highpass',
+                 vol: v * 0.5, atk: 0.001, dec: 0.16, delay: D.delay });
+    // 벌판에 남는 울림
+    this.noise({ freq: Math.min(D.cut, 900), freqTo: 120, type: 'lowpass',
+                 vol: v * 0.4, atk: 0.05, dec: 0.9, delay: D.delay + 0.09 });
+  },
+
+  /* 연막탄이 터지며 새어 나오는 소리 */
+  smoke(d) {
+    if (!this.ok()) return;
+    const D = this.dist(d);
+    const v = D.gain * 0.8;
+    if (v < 0.006) return;
+    this.noise({ freq: Math.min(D.cut, 1400), freqTo: 700, type: 'bandpass', q: 0.8,
+                 vol: v * 0.5, atk: 0.02, dec: 0.16, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 3600), freqTo: 2200, type: 'highpass',
+                 vol: v * 0.45, atk: 0.06, dec: 1.6, delay: D.delay + 0.06 });
+  },
+
   chute() {                        // 낙하산이 펴질 때
     if (!this.ok()) return;
     this.noise({ freq: 2800, freqTo: 500, type: 'lowpass', vol: 0.55, atk: 0.012, dec: 0.5 });

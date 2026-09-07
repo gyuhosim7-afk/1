@@ -64,7 +64,7 @@ const UI = {
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug'];
+      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -169,6 +169,14 @@ const UI = {
       el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
       el.title = lv ? table[lv].name : '없음';
     };
+    // 투척 무기 개수
+    const thr = (el, n) => {
+      el.className = 'gearTag' + (n > 0 ? '' : ' off');
+      el.querySelector('b').textContent = n > 0 ? n : '-';
+    };
+    thr(this.el.fragTag, p.throws.frag);
+    thr(this.el.smokeTag, p.throws.smoke);
+
     tag(this.el.helmetTag, p.helmet, HELMETS);
     tag(this.el.vestTag, p.vest, VESTS);
     tag(this.el.bagTag, p.bag, BAGS);
@@ -510,6 +518,8 @@ const Input = {
         else this.jump = true;
       }
       if (c === 'KeyZ') Game.placePing();
+      if (c === 'KeyG') Game.throwItem(Game.player, 'frag');
+      if (c === 'KeyH') Game.throwItem(Game.player, 'smoke');
       if (c === 'KeyR') Game.player.startReload();
       if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
       if (c === 'KeyQ') Game.player.startHeal();

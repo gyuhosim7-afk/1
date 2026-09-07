@@ -597,6 +597,22 @@ button.ghost { background: rgba(255, 255, 255, .08); border: 1px solid var(--lin
 }
 .gi.vest::before { left: 2px; }
 .gi.vest::after { right: 2px; }
+.gi.frag {
+  background: #4a5340; border-radius: 5px 5px 6px 6px; height: 12px; margin-top: 1px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+}
+.gi.frag::before {
+  content: ''; position: absolute; left: 4px; top: -3px; width: 5px; height: 4px;
+  background: #8a9299; border-radius: 1px;
+}
+.gi.smoke {
+  background: #5b6a76; border-radius: 3px; width: 9px; height: 13px; margin-left: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+}
+.gi.smoke::before {
+  content: ''; position: absolute; left: 2px; top: -3px; width: 5px; height: 4px;
+  background: #8a9299; border-radius: 1px;
+}
 .gi.helmet {
   background: #d9e2ec; border-radius: 7px 7px 3px 3px; height: 11px; margin-top: 2px;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
@@ -724,6 +740,8 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
       <span id="hpText">100</span>
       <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
       <div id="gear">
+        <span id="fragTag" class="gearTag off" title="수류탄 (G)"><i class="gi frag"></i><b>-</b></span>
+        <span id="smokeTag" class="gearTag off" title="연막탄 (H)"><i class="gi smoke"></i><b>-</b></span>
         <span id="helmetTag" class="gearTag off"><i class="gi helmet"></i><b>-</b></span>
         <span id="vestTag" class="gearTag off"><i class="gi vest"></i><b>-</b></span>
         <span id="bagTag" class="gearTag off"><i class="gi bag"></i><b>-</b></span>
@@ -748,7 +766,8 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
     <span><kbd>WASD</kbd> 이동</span><span><kbd>Shift</kbd> 질주</span><span><kbd>Space</kbd> 점프</span>
     <span><kbd>C</kbd> 앉기·브레이크</span><span><kbd>우클릭</kbd> 정조준</span>
     <span><kbd>F</kbd> 줍기·탑승·상자</span>
-    <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span><span><kbd>Z</kbd> 지점 표시</span><span><kbd>Tab</kbd> 지도</span><span><kbd>P</kbd> 진단</span>
+    <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span>
+    <span><kbd>G</kbd> 수류탄</span><span><kbd>H</kbd> 연막탄</span><span><kbd>Z</kbd> 지점 표시</span><span><kbd>Tab</kbd> 지도</span><span><kbd>P</kbd> 진단</span>
   </div>
 </div>
 
@@ -998,6 +1017,9 @@ const CFG = {
   HEAL_TIME: 4.0,
   HEAL_AMOUNT: 55,
   MAX_MEDS: 2,            // 가방이 없을 때 들 수 있는 구급상자 수
+  MAX_THROW: 2,           // 가방이 없을 때 종류별로 들 수 있는 투척 무기 수
+  THROW_SPEED: 21,        // 던지는 힘 (m/s)
+  THROW_UP: 0.22,         // 던질 때 위로 들어 올리는 정도 (rad)
   BASE_AMMO_CAP: 180,     // 가방이 없을 때 구경별 예비 탄약 한도
   BOT_VISION: 165,        // 봇 시야 거리 (m)
   MAX_DT: 0.1,          // 프레임이 느려도 슬로모션이 되지 않게 (이동은 잘게 나눠 처리)
@@ -1097,6 +1119,18 @@ const VESTS = {
   2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
   3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
 };
+/* ============================================================
+   투척 무기
+   fuse 던진 뒤 터지기까지(초), radius 효과 반경(m)
+   ============================================================ */
+const THROWABLES = {
+  frag:  { name: '수류탄',  short: '수류탄', key: 'G', color: 0x4a5340, tint: 0xff8a4a,
+           fuse: 3.4, radius: 8.0, dmg: 110, minDmg: 12, cook: true },
+  smoke: { name: '연막탄',  short: '연막',   key: 'H', color: 0x5b6a76, tint: 0xdfe6ec,
+           fuse: 1.6, radius: 7.2, life: 20, cook: false }
+};
+const THROW_KEYS = Object.keys(THROWABLES);
+
 /* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
 const HELMETS = {
   1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
@@ -1104,9 +1138,9 @@ const HELMETS = {
   3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
 };
 const BAGS = {
-  1: { name: '가방 Lv1', meds: 2, ammo: 120, color: 0x6b5a3c },
-  2: { name: '가방 Lv2', meds: 4, ammo: 260, color: 0x4a5539 },
-  3: { name: '가방 Lv3', meds: 6, ammo: 420, color: 0x2f3a2a }
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x6b5a3c },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x4a5539 },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2f3a2a }
 };
 /* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
 const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
@@ -1131,7 +1165,7 @@ const VEHICLE_KEYS = Object.keys(VEHICLES);
 const DROP_TABLE = {
   guns: DROP_GUNS,                 // AWM · M249 · 그로자 · MK14 는 여기서만 나옵니다
   scopes: [8, 8, 4],
-  vest: 3, bag: 3, helmet: 3, meds: 2
+  vest: 3, bag: 3, helmet: 3, meds: 2, frag: 2
 };
 
 /* 자기장 단계 — 맵이 넓어진 만큼 대기·축소 시간을 늘려 천천히 좁혀 옵니다.
@@ -1484,6 +1518,34 @@ const Sfx = {
     if (!this.ok()) return;
     this.noise({ freq: 2400, freqTo: 600, type: 'lowpass', vol: 0.2, atk: 0.01, dec: 0.22 });
     this.noise({ freq: 1100, freqTo: 300, type: 'lowpass', vol: 0.22, atk: 0.002, dec: 0.12, delay: 0.28 });
+  },
+
+  /* 수류탄 폭발: 낮은 '쿵' + 흩어지는 파편 + 멀수록 길게 남는 꼬리 */
+  blast(d) {
+    if (!this.ok()) return;
+    const D = this.dist(d);
+    const v = D.gain * 1.6;
+    if (v < 0.006) return;
+    this.tone({ freq: 78, freqTo: 32, vol: v * 0.95, atk: 0.002, dec: 0.55, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 2400), freqTo: 180, type: 'lowpass',
+                 vol: v, atk: 0.001, dec: 0.42, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 5200), type: 'highpass',
+                 vol: v * 0.5, atk: 0.001, dec: 0.16, delay: D.delay });
+    // 벌판에 남는 울림
+    this.noise({ freq: Math.min(D.cut, 900), freqTo: 120, type: 'lowpass',
+                 vol: v * 0.4, atk: 0.05, dec: 0.9, delay: D.delay + 0.09 });
+  },
+
+  /* 연막탄이 터지며 새어 나오는 소리 */
+  smoke(d) {
+    if (!this.ok()) return;
+    const D = this.dist(d);
+    const v = D.gain * 0.8;
+    if (v < 0.006) return;
+    this.noise({ freq: Math.min(D.cut, 1400), freqTo: 700, type: 'bandpass', q: 0.8,
+                 vol: v * 0.5, atk: 0.02, dec: 0.16, delay: D.delay });
+    this.noise({ freq: Math.min(D.cut, 3600), freqTo: 2200, type: 'highpass',
+                 vol: v * 0.45, atk: 0.06, dec: 1.6, delay: D.delay + 0.06 });
   },
 
   chute() {                        // 낙하산이 펴질 때
@@ -3412,6 +3474,148 @@ const GunArt = {
    경기 시작에 섬을 가로질러 날아갑니다.
    모두 이 안에서 시작해 원하는 자리에서 뛰어내립니다.
    ============================================================ */
+/* 투척 무기 모양 (바닥에 떨어진 것과 날아가는 것이 같은 모양을 씁니다) */
+const ThrowArt = {
+  cache: {},
+  geo(type) {
+    if (!this.cache[type]) {
+      const B = Build, T = THROWABLES[type];
+      const dark = 0x2a2d33, metal = 0x6f7378;
+      const parts = type === 'frag' ? [
+        B.sphere(0.085, T.color, 0, 0, 0, 1, 1.18, 1, 12),        // 파인애플 몸통
+        B.box(0.155, 0.018, 0.155, 0x3a4136, 0, 0.028, 0),        // 홈
+        B.box(0.155, 0.018, 0.155, 0x3a4136, 0, -0.028, 0),
+        B.pillar(0.030, 0.034, 0.045, metal, 0, 0.115, 0),        // 뇌관
+        B.box(0.016, 0.075, 0.030, metal, 0.036, 0.098, 0, 0, 0, 0.22)  // 안전 손잡이
+      ] : [
+        B.pillar(0.062, 0.062, 0.215, T.color, 0, 0, 0),          // 원통
+        B.pillar(0.066, 0.066, 0.022, 0x8a9299, 0, 0.085, 0),
+        B.pillar(0.066, 0.066, 0.022, 0x8a9299, 0, -0.085, 0),
+        B.pillar(0.028, 0.032, 0.040, metal, 0, 0.128, 0),
+        B.box(0.014, 0.070, 0.028, metal, 0.032, 0.112, 0, 0, 0, 0.20)
+      ];
+      this.cache[type] = Build.merge(parts);
+    }
+    return this.cache[type];
+  }
+};
+
+/* 날아가는 투척 무기 */
+class Grenade {
+  constructor(type, x, y, z, vx, vy, vz, owner) {
+    this.type = type;
+    this.spec = THROWABLES[type];
+    this.pos = new THREE.Vector3(x, y, z);
+    this.vel = new THREE.Vector3(vx, vy, vz);
+    this.owner = owner;
+    this.fuse = this.spec.fuse;
+    this.spin = new THREE.Vector3(Math.random() * 8 - 4, Math.random() * 8 - 4, Math.random() * 8 - 4);
+    this.dead = false;
+    this.rest = 0;                       // 멈춰 있는 시간
+    this.mesh = new THREE.Mesh(ThrowArt.geo(type), Mats.vc({ roughness: 0.6, metalness: 0.2 }));
+    this.mesh.castShadow = true;
+    this.mesh.position.copy(this.pos);
+  }
+
+  /* 지형과 건물에 튕기며 굴러갑니다 */
+  update(dt) {
+    this.fuse -= dt;
+    this.vel.y -= CFG.GRAVITY * dt;
+    const r = 0.09;
+    // 한 프레임에 벽을 뚫지 않도록 잘게 나눠 옮깁니다
+    const step = Math.max(1, Math.ceil(this.vel.length() * dt / 0.25));
+    for (let i = 0; i < step; i++) {
+      const d = dt / step;
+      const nx = this.pos.x + this.vel.x * d;
+      const ny = this.pos.y + this.vel.y * d;
+      const nz = this.pos.z + this.vel.z * d;
+      const g = World.groundY(nx, nz, Math.max(this.pos.y, ny) + 0.4);
+      if (ny <= g + r) {                                  // 바닥에 닿음
+        this.pos.set(nx, g + r, nz);
+        this.vel.y = Math.abs(this.vel.y) * 0.32;
+        this.vel.x *= 0.62; this.vel.z *= 0.62;
+        if (this.vel.length() < 0.6) { this.vel.set(0, 0, 0); this.rest += d; }
+        continue;
+      }
+      // 옆으로 벽에 부딪히면 튕깁니다
+      if (World.blocked(nx, nz, r, ny, ny + 0.18, 0)) {
+        const bx = World.blocked(nx, this.pos.z, r, ny, ny + 0.18, 0);
+        const bz = World.blocked(this.pos.x, nz, r, ny, ny + 0.18, 0);
+        if (bx) this.vel.x *= -0.42;
+        if (bz) this.vel.z *= -0.42;
+        if (!bx && !bz) { this.vel.x *= -0.42; this.vel.z *= -0.42; }
+        this.pos.y = ny;
+        continue;
+      }
+      this.pos.set(nx, ny, nz);
+    }
+    this.mesh.position.copy(this.pos);
+    if (this.vel.lengthSq() > 0.04) {
+      this.mesh.rotation.x += this.spin.x * dt;
+      this.mesh.rotation.y += this.spin.y * dt;
+      this.mesh.rotation.z += this.spin.z * dt;
+    }
+  }
+}
+
+/* 연막: 반투명한 덩어리 여러 개로 이루어진 구름. 시야를 가립니다 */
+class Smoke {
+  constructor(x, y, z) {
+    this.pos = new THREE.Vector3(x, y, z);
+    this.r = 0;
+    this.maxR = THROWABLES.smoke.radius;
+    this.life = THROWABLES.smoke.life;
+    this.dead = false;
+    this.t = 0;
+    if (!Smoke._geo) Smoke._geo = new THREE.IcosahedronGeometry(1, 1);
+    const mat = new THREE.MeshLambertMaterial({
+      color: srgb(0xd6dde3), transparent: true, opacity: 0.0, depthWrite: false
+    });
+    this.mat = mat;
+    this.mesh = new THREE.Group();
+    this.blobs = [];
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(Smoke._geo, mat);
+      const a = Math.random() * Math.PI * 2, rr = Math.pow(Math.random(), 0.6);
+      this.blobs.push({ m, ox: Math.cos(a) * rr, oz: Math.sin(a) * rr,
+                        oy: 0.15 + Math.random() * 0.75, s: 0.42 + Math.random() * 0.42,
+                        ph: Math.random() * 6.28 });
+      this.mesh.add(m);
+    }
+    this.mesh.position.set(x, y, z);
+  }
+
+  update(dt) {
+    this.t += dt;
+    this.life -= dt;
+    if (this.life <= 0) { this.dead = true; return; }
+    // 처음 1.5초 동안 부풀고, 마지막 3초 동안 옅어집니다
+    this.r = this.maxR * Math.min(1, this.t / 1.5);
+    const fade = Math.min(1, this.t / 0.8) * Math.min(1, this.life / 3);
+    this.mat.opacity = 0.52 * fade;
+    for (const b of this.blobs) {
+      const drift = Math.sin(this.t * 0.7 + b.ph) * 0.25;
+      b.m.position.set(b.ox * this.r * 0.8 + drift, b.oy * this.r * 0.55 + this.t * 0.06,
+                       b.oz * this.r * 0.8 - drift);
+      b.m.scale.setScalar(b.s * this.r * 0.62);
+    }
+  }
+
+  /* 이 선분이 연막을 가로지르는가 (봇 시야 판정에 씁니다) */
+  blocks(x1, y1, z1, x2, y2, z2) {
+    if (this.r < 1) return false;
+    const cx = this.pos.x, cy = this.pos.y + this.r * 0.35, cz = this.pos.z;
+    const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    const len2 = dx * dx + dy * dy + dz * dz;
+    if (len2 < 1e-6) return false;
+    let t = ((cx - x1) * dx + (cy - y1) * dy + (cz - z1) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = x1 + dx * t, py = y1 + dy * t, pz = z1 + dz * t;
+    const rr = this.r * 0.85;
+    return (px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2 < rr * rr;
+  }
+}
+
 /* 지점 표시(핑) 표식: 공중에 뜬 마름모 + 바닥 기둥 */
 const PingArt = {
   make() {
@@ -3516,6 +3720,7 @@ const LootArt = {
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
       else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
       else if (kind === 'helmet') this.cache[key] = Build.merge(this.helmetParts(level));
+      else if (kind === 'throw') this.cache[key] = ThrowArt.geo(gun);
       else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
@@ -3641,7 +3846,8 @@ class Loot {
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
       : (kind === 'bag' ? 0xc7a86b
-      : (kind === 'helmet' ? 0xd9e2ec : 0xff6b6b)))));
+      : (kind === 'helmet' ? 0xd9e2ec
+      : (kind === 'throw' ? THROWABLES[gun].tint : 0xff6b6b))))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -3667,6 +3873,7 @@ class Loot {
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
     if (this.kind === 'helmet') return HELMETS[this.level].name + ' (머리 피해 -' + Math.round(HELMETS[this.level].reduce * 100) + '%)';
+    if (this.kind === 'throw') return THROWABLES[this.gun].name + ' ' + this.amount + '개';
     return '구급상자';
   }
 
@@ -3875,6 +4082,7 @@ class Char3D {
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
+    this.throws = { frag: 0, smoke: 0 };      // 지니고 있는 투척 무기
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
     this.helmet = 0;               // 헬멧 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
@@ -3970,6 +4178,7 @@ class Char3D {
 
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
   get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
+  get throwCap() { return CFG.MAX_THROW + (this.bag ? BAGS[this.bag].throw : 0); }
   get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
   /* 조끼가 막아 주는 피해 비율 (몸통) */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
@@ -4655,7 +4864,8 @@ class Airdrop {
       { kind: 'vest', level: t.vest },
       { kind: 'helmet', level: t.helmet },
       { kind: 'bag', level: t.bag },
-      { kind: 'med', amount: t.meds }
+      { kind: 'med', amount: t.meds },
+      { kind: 'throw', gun: 'frag', amount: t.frag }
     ];
   }
 }
@@ -4672,6 +4882,7 @@ const AI = {
     a.think -= dt;
     a.strafeT -= dt;
     a.reaction -= dt;
+    a.nadeT = (a.nadeT || 0) - dt;
     if (a.strafeT <= 0) { a.strafe *= -1; a.strafeT = 0.8 + Math.random() * 1.8; }
 
     if (a.think <= 0) { this.think(bot, game); a.think = 0.10 + Math.random() * 0.12; }
@@ -4774,6 +4985,8 @@ const AI = {
       if (d > CFG.BOT_VISION || d > best) continue;
       // 시야각 밖(뒤쪽)은 조금 늦게 인지
       if (!World.clear(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
+      // 연막 너머는 보이지 않습니다
+      if (game.smoked(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       best = d; enemy = c;
     }
     if (enemy && enemy !== a.target) a.reaction = (1.3 - a.skill) * (0.25 + Math.random() * 0.35);
@@ -4839,6 +5052,7 @@ const AI = {
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
         if (l.kind === 'helmet' && bot.helmet >= l.level) continue;
+        if (l.kind === 'throw' && (bot.throws[l.gun] || 0) >= bot.throwCap) continue;
         if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;
@@ -4895,6 +5109,20 @@ const AI = {
     const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
     const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
     if (!World.clear(bx, by, bz, ex, ey, ez)) return;
+
+    /* 알맞은 거리면 가끔 수류탄을 던집니다.
+       너무 가까우면 자기도 휘말리므로 12m 보다 멀 때만 씁니다. */
+    if (bot.throws.frag > 0 && dist > 12 && dist < 34 && a.nadeT <= 0 && Math.random() < 0.02) {
+      a.nadeT = 9 + Math.random() * 8;
+      game.throwItem(bot, 'frag');
+      return;
+    }
+    // 체력이 깎였는데 적이 멀면 연막을 치고 빠집니다
+    if (bot.throws.smoke > 0 && bot.hp < 45 && dist > 14 && a.nadeT <= 0 && Math.random() < 0.03) {
+      a.nadeT = 12;
+      game.throwItem(bot, 'smoke');
+      return;
+    }
 
     // 조준선이 목표에 충분히 가까울 때만 발사
     const toE = Math.atan2(ex - bx, ez - bz);
@@ -5136,11 +5364,14 @@ const Game = {
     for (const v of (this.vehicles || [])) this.scene.remove(v.mesh);
     for (const a of (this.drops || [])) this.scene.remove(a.mesh);
     for (const g of (this.pings || [])) this.scene.remove(g.mesh);
+    for (const g of (this.nades || [])) this.scene.remove(g.mesh);
+    for (const g of (this.smokes || [])) this.scene.remove(g.mesh);
     if (this.plane) { this.scene.remove(this.plane.mesh); this.plane = null; }
 
     RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
     this.chars = []; this.loots = []; this.feed = []; this.botById = {};
     this.vehicles = []; this.drops = []; this.pings = [];
+    this.nades = []; this.smokes = [];
     this.dropTimer = CFG.DROP_FIRST;
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
@@ -5192,6 +5423,8 @@ const Game = {
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
       if (Math.random() < 0.28) b.wear('helmet', 1);
+      if (Math.random() < 0.45) b.throws.frag = 1 + Math.floor(Math.random() * 2);
+      if (Math.random() < 0.30) b.throws.smoke = 1;
       if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
@@ -5301,8 +5534,11 @@ const Game = {
         l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else if (roll < 0.87) {
         l = new Loot(x, z, 'helmet', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
-      } else if (roll < 0.94) {
+      } else if (roll < 0.90) {
         l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.96) {
+        const t = rnd() < 0.6 ? 'frag' : 'smoke';
+        l = new Loot(x, z, 'throw', t, 1 + Math.floor(rnd() * 2), 0, y);
       } else {
         l = new Loot(x, z, 'med', null, 1, 0, y);
       }
@@ -5365,6 +5601,7 @@ const Game = {
     this.updateZone(dt);
     this.updatePlane(dt);
     this.updatePings(dt);
+    this.updateThrown(dt);
 
     if (!this.player.dead) this.updatePlayer(dt, input);
 
@@ -5950,6 +6187,12 @@ const Game = {
       const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
+    for (const t of THROW_KEYS) {
+      if ((c.throws[t] || 0) <= 0) continue;
+      const l = new Loot(c.pos.x + (t === 'frag' ? 1.5 : -1.5), c.pos.z + 1.2, 'throw', t,
+                         c.throws[t], 0, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
     if (c.helmet) {
       const l = new Loot(c.pos.x + 1.1, c.pos.z - 1.4, 'helmet', null, 0, c.helmet, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
@@ -6018,6 +6261,20 @@ const Game = {
         return false;
       }
       if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
+    } else if (l.kind === 'throw') {
+      const have = ch.throws[l.gun] || 0, cap = ch.throwCap;
+      if (have >= cap) {
+        if (ch === this.player) this.pushFeed(THROWABLES[l.gun].name + ' 을 더 들 수 없습니다 (가방을 구하세요)');
+        return false;
+      }
+      const got = Math.min(l.amount, cap - have);
+      ch.throws[l.gun] = have + got;
+      l.amount -= got;
+      if (ch === this.player) this.pushFeed(THROWABLES[l.gun].name + ' +' + got + '개');
+      if (l.amount > 0) {                                // 남으면 그대로 바닥에 둡니다
+        if (ch === this.player) Sfx.pick();
+        return true;
+      }
     } else if (l.kind === 'vest' || l.kind === 'bag' || l.kind === 'helmet') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
@@ -6134,6 +6391,106 @@ const Game = {
     c.grounded = false;
     if (c === this.player) { Sfx.wind(1); this.pushFeed('낙하!'); }
     return true;
+  },
+
+  /* ---------- 투척 무기 ---------- */
+  /* 조준한 방향으로 던집니다 */
+  throwItem(ch, type) {
+    if (ch.dead || ch.flying || ch.climb) return false;
+    if ((ch.throws[type] || 0) <= 0) {
+      if (ch === this.player) this.pushFeed(THROWABLES[type].name + ' 이(가) 없습니다');
+      return false;
+    }
+    ch.throws[type]--;
+    let dx, dy, dz;
+    if (ch === this.player) {
+      const d = this.aimDir;
+      dx = d.x; dy = d.y; dz = d.z;
+    } else {
+      const t = ch.ai && ch.ai.target;
+      const tx = t ? t.pos.x : ch.pos.x + Math.sin(ch.yaw) * 20;
+      const tz = t ? t.pos.z : ch.pos.z + Math.cos(ch.yaw) * 20;
+      const l = Math.hypot(tx - ch.pos.x, tz - ch.pos.z) || 1;
+      dx = (tx - ch.pos.x) / l; dz = (tz - ch.pos.z) / l; dy = 0;
+    }
+    // 조금 위로 들어 올려 포물선을 그리게 합니다
+    const up = Math.min(0.85, Math.max(-0.4, dy + CFG.THROW_UP));
+    const flat = Math.sqrt(Math.max(0.02, 1 - up * up));
+    const hl = Math.hypot(dx, dz) || 1;
+    const sp = CFG.THROW_SPEED;
+    const ox = ch.pos.x + dx / hl * 0.5, oz = ch.pos.z + dz / hl * 0.5;
+    const oy = ch.pos.y + (ch.crouch ? 0.85 : 1.05);
+    const g = new Grenade(type, ox, oy, oz,
+                          dx / hl * flat * sp, up * sp, dz / hl * flat * sp, ch);
+    this.scene.add(g.mesh);
+    this.nades.push(g);
+    Sfx.swap();
+    if (ch === this.player) this.pushFeed(THROWABLES[type].name + ' 투척 (남은 ' + ch.throws[type] + '개)');
+    return true;
+  },
+
+  updateThrown(dt) {
+    for (let i = this.nades.length - 1; i >= 0; i--) {
+      const g = this.nades[i];
+      g.update(dt);
+      if (g.fuse <= 0) {
+        this.scene.remove(g.mesh);
+        this.nades.splice(i, 1);
+        if (g.type === 'frag') this.explode(g);
+        else this.makeSmoke(g.pos.x, g.pos.y, g.pos.z);
+      }
+    }
+    for (let i = this.smokes.length - 1; i >= 0; i--) {
+      const sm = this.smokes[i];
+      sm.update(dt);
+      if (sm.dead) { this.scene.remove(sm.mesh); this.smokes.splice(i, 1); }
+    }
+  },
+
+  /* 수류탄 폭발: 벽에 가려지지 않은 사람만 거리에 따라 피해를 봅니다 */
+  explode(g) {
+    const T = g.spec, cx = g.pos.x, cy = g.pos.y + 0.2, cz = g.pos.z;
+    for (const c of this.chars) {
+      if (c.dead) continue;
+      const hx = c.pos.x, hy = c.pos.y + 0.8, hz = c.pos.z;
+      const d = Math.hypot(hx - cx, hy - cy, hz - cz);
+      if (d > T.radius) continue;
+      if (!World.clear(cx, cy, cz, hx, hy, hz)) continue;      // 벽 뒤는 안전합니다
+      const k = 1 - d / T.radius;
+      const dmg = T.minDmg + (T.dmg - T.minDmg) * k * k;
+      this.damage(c, dmg, g.owner, false, false);
+    }
+    // 차량도 부숩니다
+    for (const v of this.vehicles) {
+      if (v.dead) continue;
+      const d = Math.hypot(v.pos.x - cx, v.pos.z - cz);
+      if (d < T.radius) v.hp -= (T.dmg * 1.6) * (1 - d / T.radius);
+    }
+    // 눈에 보이는 효과
+    for (let i = 0; i < 14; i++) {
+      this.puff(cx + (Math.random() - 0.5) * 2.6, cy + Math.random() * 2.2,
+                cz + (Math.random() - 0.5) * 2.6, i < 5 ? 0xffb057 : 0x6b6257);
+    }
+    this.muzzleFlash(cx, cy + 0.6, cz, false);
+    this.flashLight.intensity = 30;
+    this.flashT = 0.18;
+    const pd = this.player.pos.distanceTo(g.pos);
+    Sfx.blast(pd);
+    if (pd < 26) this.landDip = Math.min(0.5, (1 - pd / 26) * 0.5);
+  },
+
+  makeSmoke(x, y, z) {
+    const gy = World.groundY(x, z, y + 1);
+    const sm = new Smoke(x, Math.max(gy, y - 0.2), z);
+    this.scene.add(sm.mesh);
+    this.smokes.push(sm);
+    Sfx.smoke(this.player.pos.distanceTo(sm.pos));
+  },
+
+  /* 이 선분이 연막에 가려지는가 */
+  smoked(x1, y1, z1, x2, y2, z2) {
+    for (const sm of this.smokes) if (sm.blocks(x1, y1, z1, x2, y2, z2)) return true;
+    return false;
   },
 
   /* ---------- 지점 표시(핑) ---------- */
@@ -7526,7 +7883,7 @@ const UI = {
       'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug'];
+      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -7631,6 +7988,14 @@ const UI = {
       el.querySelector('b').textContent = lv ? 'Lv' + lv : '-';
       el.title = lv ? table[lv].name : '없음';
     };
+    // 투척 무기 개수
+    const thr = (el, n) => {
+      el.className = 'gearTag' + (n > 0 ? '' : ' off');
+      el.querySelector('b').textContent = n > 0 ? n : '-';
+    };
+    thr(this.el.fragTag, p.throws.frag);
+    thr(this.el.smokeTag, p.throws.smoke);
+
     tag(this.el.helmetTag, p.helmet, HELMETS);
     tag(this.el.vestTag, p.vest, VESTS);
     tag(this.el.bagTag, p.bag, BAGS);
@@ -7972,6 +8337,8 @@ const Input = {
         else this.jump = true;
       }
       if (c === 'KeyZ') Game.placePing();
+      if (c === 'KeyG') Game.throwItem(Game.player, 'frag');
+      if (c === 'KeyH') Game.throwItem(Game.player, 'smoke');
       if (c === 'KeyR') Game.player.startReload();
       if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
       if (c === 'KeyQ') Game.player.startHeal();

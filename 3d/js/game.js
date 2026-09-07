@@ -209,11 +209,14 @@ const Game = {
     for (const v of (this.vehicles || [])) this.scene.remove(v.mesh);
     for (const a of (this.drops || [])) this.scene.remove(a.mesh);
     for (const g of (this.pings || [])) this.scene.remove(g.mesh);
+    for (const g of (this.nades || [])) this.scene.remove(g.mesh);
+    for (const g of (this.smokes || [])) this.scene.remove(g.mesh);
     if (this.plane) { this.scene.remove(this.plane.mesh); this.plane = null; }
 
     RNG.begin(this.seed);                 // 여기서부터 지형·아이템은 시드 난수로
     this.chars = []; this.loots = []; this.feed = []; this.botById = {};
     this.vehicles = []; this.drops = []; this.pings = [];
+    this.nades = []; this.smokes = [];
     this.dropTimer = CFG.DROP_FIRST;
     this.time = 0; this.result = null; this.hitMarker = 0; this.damageDir = null;
     this.deathWait = 0; this.winWait = 0; this.landDip = 0;
@@ -265,6 +268,8 @@ const Game = {
       if (Math.random() < 0.3) b.giveGun(LOOT_GUNS[Math.floor(Math.random() * LOOT_GUNS.length)], 90);
       if (Math.random() < 0.30) b.wear('vest', 1);
       if (Math.random() < 0.28) b.wear('helmet', 1);
+      if (Math.random() < 0.45) b.throws.frag = 1 + Math.floor(Math.random() * 2);
+      if (Math.random() < 0.30) b.throws.smoke = 1;
       if (Math.random() < 0.25) b.wear('bag', 1);
       this.scene.add(b.mesh);
       this.chars.push(b);
@@ -374,8 +379,11 @@ const Game = {
         l = new Loot(x, z, 'vest', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
       } else if (roll < 0.87) {
         l = new Loot(x, z, 'helmet', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
-      } else if (roll < 0.94) {
+      } else if (roll < 0.90) {
         l = new Loot(x, z, 'bag', null, 0, GEAR_LEVELS[Math.floor(rnd() * GEAR_LEVELS.length)], y);
+      } else if (roll < 0.96) {
+        const t = rnd() < 0.6 ? 'frag' : 'smoke';
+        l = new Loot(x, z, 'throw', t, 1 + Math.floor(rnd() * 2), 0, y);
       } else {
         l = new Loot(x, z, 'med', null, 1, 0, y);
       }
@@ -438,6 +446,7 @@ const Game = {
     this.updateZone(dt);
     this.updatePlane(dt);
     this.updatePings(dt);
+    this.updateThrown(dt);
 
     if (!this.player.dead) this.updatePlayer(dt, input);
 
@@ -1023,6 +1032,12 @@ const Game = {
       const l = new Loot(c.pos.x + 0.4, c.pos.z - 1.0, 'vest', null, 0, c.vest, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
     }
+    for (const t of THROW_KEYS) {
+      if ((c.throws[t] || 0) <= 0) continue;
+      const l = new Loot(c.pos.x + (t === 'frag' ? 1.5 : -1.5), c.pos.z + 1.2, 'throw', t,
+                         c.throws[t], 0, c.pos.y);
+      this.scene.add(l.mesh); this.loots.push(l);
+    }
     if (c.helmet) {
       const l = new Loot(c.pos.x + 1.1, c.pos.z - 1.4, 'helmet', null, 0, c.helmet, c.pos.y);
       this.scene.add(l.mesh); this.loots.push(l);
@@ -1091,6 +1106,20 @@ const Game = {
         return false;
       }
       if (ch === this.player) this.pushFeed(CALIBERS[cal].short + ' +' + got + '발');
+    } else if (l.kind === 'throw') {
+      const have = ch.throws[l.gun] || 0, cap = ch.throwCap;
+      if (have >= cap) {
+        if (ch === this.player) this.pushFeed(THROWABLES[l.gun].name + ' 을 더 들 수 없습니다 (가방을 구하세요)');
+        return false;
+      }
+      const got = Math.min(l.amount, cap - have);
+      ch.throws[l.gun] = have + got;
+      l.amount -= got;
+      if (ch === this.player) this.pushFeed(THROWABLES[l.gun].name + ' +' + got + '개');
+      if (l.amount > 0) {                                // 남으면 그대로 바닥에 둡니다
+        if (ch === this.player) Sfx.pick();
+        return true;
+      }
     } else if (l.kind === 'vest' || l.kind === 'bag' || l.kind === 'helmet') {
       const old = ch.wear(l.kind, l.level);
       if (old < 0) {
@@ -1207,6 +1236,106 @@ const Game = {
     c.grounded = false;
     if (c === this.player) { Sfx.wind(1); this.pushFeed('낙하!'); }
     return true;
+  },
+
+  /* ---------- 투척 무기 ---------- */
+  /* 조준한 방향으로 던집니다 */
+  throwItem(ch, type) {
+    if (ch.dead || ch.flying || ch.climb) return false;
+    if ((ch.throws[type] || 0) <= 0) {
+      if (ch === this.player) this.pushFeed(THROWABLES[type].name + ' 이(가) 없습니다');
+      return false;
+    }
+    ch.throws[type]--;
+    let dx, dy, dz;
+    if (ch === this.player) {
+      const d = this.aimDir;
+      dx = d.x; dy = d.y; dz = d.z;
+    } else {
+      const t = ch.ai && ch.ai.target;
+      const tx = t ? t.pos.x : ch.pos.x + Math.sin(ch.yaw) * 20;
+      const tz = t ? t.pos.z : ch.pos.z + Math.cos(ch.yaw) * 20;
+      const l = Math.hypot(tx - ch.pos.x, tz - ch.pos.z) || 1;
+      dx = (tx - ch.pos.x) / l; dz = (tz - ch.pos.z) / l; dy = 0;
+    }
+    // 조금 위로 들어 올려 포물선을 그리게 합니다
+    const up = Math.min(0.85, Math.max(-0.4, dy + CFG.THROW_UP));
+    const flat = Math.sqrt(Math.max(0.02, 1 - up * up));
+    const hl = Math.hypot(dx, dz) || 1;
+    const sp = CFG.THROW_SPEED;
+    const ox = ch.pos.x + dx / hl * 0.5, oz = ch.pos.z + dz / hl * 0.5;
+    const oy = ch.pos.y + (ch.crouch ? 0.85 : 1.05);
+    const g = new Grenade(type, ox, oy, oz,
+                          dx / hl * flat * sp, up * sp, dz / hl * flat * sp, ch);
+    this.scene.add(g.mesh);
+    this.nades.push(g);
+    Sfx.swap();
+    if (ch === this.player) this.pushFeed(THROWABLES[type].name + ' 투척 (남은 ' + ch.throws[type] + '개)');
+    return true;
+  },
+
+  updateThrown(dt) {
+    for (let i = this.nades.length - 1; i >= 0; i--) {
+      const g = this.nades[i];
+      g.update(dt);
+      if (g.fuse <= 0) {
+        this.scene.remove(g.mesh);
+        this.nades.splice(i, 1);
+        if (g.type === 'frag') this.explode(g);
+        else this.makeSmoke(g.pos.x, g.pos.y, g.pos.z);
+      }
+    }
+    for (let i = this.smokes.length - 1; i >= 0; i--) {
+      const sm = this.smokes[i];
+      sm.update(dt);
+      if (sm.dead) { this.scene.remove(sm.mesh); this.smokes.splice(i, 1); }
+    }
+  },
+
+  /* 수류탄 폭발: 벽에 가려지지 않은 사람만 거리에 따라 피해를 봅니다 */
+  explode(g) {
+    const T = g.spec, cx = g.pos.x, cy = g.pos.y + 0.2, cz = g.pos.z;
+    for (const c of this.chars) {
+      if (c.dead) continue;
+      const hx = c.pos.x, hy = c.pos.y + 0.8, hz = c.pos.z;
+      const d = Math.hypot(hx - cx, hy - cy, hz - cz);
+      if (d > T.radius) continue;
+      if (!World.clear(cx, cy, cz, hx, hy, hz)) continue;      // 벽 뒤는 안전합니다
+      const k = 1 - d / T.radius;
+      const dmg = T.minDmg + (T.dmg - T.minDmg) * k * k;
+      this.damage(c, dmg, g.owner, false, false);
+    }
+    // 차량도 부숩니다
+    for (const v of this.vehicles) {
+      if (v.dead) continue;
+      const d = Math.hypot(v.pos.x - cx, v.pos.z - cz);
+      if (d < T.radius) v.hp -= (T.dmg * 1.6) * (1 - d / T.radius);
+    }
+    // 눈에 보이는 효과
+    for (let i = 0; i < 14; i++) {
+      this.puff(cx + (Math.random() - 0.5) * 2.6, cy + Math.random() * 2.2,
+                cz + (Math.random() - 0.5) * 2.6, i < 5 ? 0xffb057 : 0x6b6257);
+    }
+    this.muzzleFlash(cx, cy + 0.6, cz, false);
+    this.flashLight.intensity = 30;
+    this.flashT = 0.18;
+    const pd = this.player.pos.distanceTo(g.pos);
+    Sfx.blast(pd);
+    if (pd < 26) this.landDip = Math.min(0.5, (1 - pd / 26) * 0.5);
+  },
+
+  makeSmoke(x, y, z) {
+    const gy = World.groundY(x, z, y + 1);
+    const sm = new Smoke(x, Math.max(gy, y - 0.2), z);
+    this.scene.add(sm.mesh);
+    this.smokes.push(sm);
+    Sfx.smoke(this.player.pos.distanceTo(sm.pos));
+  },
+
+  /* 이 선분이 연막에 가려지는가 */
+  smoked(x1, y1, z1, x2, y2, z2) {
+    for (const sm of this.smokes) if (sm.blocks(x1, y1, z1, x2, y2, z2)) return true;
+    return false;
   },
 
   /* ---------- 지점 표시(핑) ---------- */

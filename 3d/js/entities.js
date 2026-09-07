@@ -226,6 +226,148 @@ const GunArt = {
    경기 시작에 섬을 가로질러 날아갑니다.
    모두 이 안에서 시작해 원하는 자리에서 뛰어내립니다.
    ============================================================ */
+/* 투척 무기 모양 (바닥에 떨어진 것과 날아가는 것이 같은 모양을 씁니다) */
+const ThrowArt = {
+  cache: {},
+  geo(type) {
+    if (!this.cache[type]) {
+      const B = Build, T = THROWABLES[type];
+      const dark = 0x2a2d33, metal = 0x6f7378;
+      const parts = type === 'frag' ? [
+        B.sphere(0.085, T.color, 0, 0, 0, 1, 1.18, 1, 12),        // 파인애플 몸통
+        B.box(0.155, 0.018, 0.155, 0x3a4136, 0, 0.028, 0),        // 홈
+        B.box(0.155, 0.018, 0.155, 0x3a4136, 0, -0.028, 0),
+        B.pillar(0.030, 0.034, 0.045, metal, 0, 0.115, 0),        // 뇌관
+        B.box(0.016, 0.075, 0.030, metal, 0.036, 0.098, 0, 0, 0, 0.22)  // 안전 손잡이
+      ] : [
+        B.pillar(0.062, 0.062, 0.215, T.color, 0, 0, 0),          // 원통
+        B.pillar(0.066, 0.066, 0.022, 0x8a9299, 0, 0.085, 0),
+        B.pillar(0.066, 0.066, 0.022, 0x8a9299, 0, -0.085, 0),
+        B.pillar(0.028, 0.032, 0.040, metal, 0, 0.128, 0),
+        B.box(0.014, 0.070, 0.028, metal, 0.032, 0.112, 0, 0, 0, 0.20)
+      ];
+      this.cache[type] = Build.merge(parts);
+    }
+    return this.cache[type];
+  }
+};
+
+/* 날아가는 투척 무기 */
+class Grenade {
+  constructor(type, x, y, z, vx, vy, vz, owner) {
+    this.type = type;
+    this.spec = THROWABLES[type];
+    this.pos = new THREE.Vector3(x, y, z);
+    this.vel = new THREE.Vector3(vx, vy, vz);
+    this.owner = owner;
+    this.fuse = this.spec.fuse;
+    this.spin = new THREE.Vector3(Math.random() * 8 - 4, Math.random() * 8 - 4, Math.random() * 8 - 4);
+    this.dead = false;
+    this.rest = 0;                       // 멈춰 있는 시간
+    this.mesh = new THREE.Mesh(ThrowArt.geo(type), Mats.vc({ roughness: 0.6, metalness: 0.2 }));
+    this.mesh.castShadow = true;
+    this.mesh.position.copy(this.pos);
+  }
+
+  /* 지형과 건물에 튕기며 굴러갑니다 */
+  update(dt) {
+    this.fuse -= dt;
+    this.vel.y -= CFG.GRAVITY * dt;
+    const r = 0.09;
+    // 한 프레임에 벽을 뚫지 않도록 잘게 나눠 옮깁니다
+    const step = Math.max(1, Math.ceil(this.vel.length() * dt / 0.25));
+    for (let i = 0; i < step; i++) {
+      const d = dt / step;
+      const nx = this.pos.x + this.vel.x * d;
+      const ny = this.pos.y + this.vel.y * d;
+      const nz = this.pos.z + this.vel.z * d;
+      const g = World.groundY(nx, nz, Math.max(this.pos.y, ny) + 0.4);
+      if (ny <= g + r) {                                  // 바닥에 닿음
+        this.pos.set(nx, g + r, nz);
+        this.vel.y = Math.abs(this.vel.y) * 0.32;
+        this.vel.x *= 0.62; this.vel.z *= 0.62;
+        if (this.vel.length() < 0.6) { this.vel.set(0, 0, 0); this.rest += d; }
+        continue;
+      }
+      // 옆으로 벽에 부딪히면 튕깁니다
+      if (World.blocked(nx, nz, r, ny, ny + 0.18, 0)) {
+        const bx = World.blocked(nx, this.pos.z, r, ny, ny + 0.18, 0);
+        const bz = World.blocked(this.pos.x, nz, r, ny, ny + 0.18, 0);
+        if (bx) this.vel.x *= -0.42;
+        if (bz) this.vel.z *= -0.42;
+        if (!bx && !bz) { this.vel.x *= -0.42; this.vel.z *= -0.42; }
+        this.pos.y = ny;
+        continue;
+      }
+      this.pos.set(nx, ny, nz);
+    }
+    this.mesh.position.copy(this.pos);
+    if (this.vel.lengthSq() > 0.04) {
+      this.mesh.rotation.x += this.spin.x * dt;
+      this.mesh.rotation.y += this.spin.y * dt;
+      this.mesh.rotation.z += this.spin.z * dt;
+    }
+  }
+}
+
+/* 연막: 반투명한 덩어리 여러 개로 이루어진 구름. 시야를 가립니다 */
+class Smoke {
+  constructor(x, y, z) {
+    this.pos = new THREE.Vector3(x, y, z);
+    this.r = 0;
+    this.maxR = THROWABLES.smoke.radius;
+    this.life = THROWABLES.smoke.life;
+    this.dead = false;
+    this.t = 0;
+    if (!Smoke._geo) Smoke._geo = new THREE.IcosahedronGeometry(1, 1);
+    const mat = new THREE.MeshLambertMaterial({
+      color: srgb(0xd6dde3), transparent: true, opacity: 0.0, depthWrite: false
+    });
+    this.mat = mat;
+    this.mesh = new THREE.Group();
+    this.blobs = [];
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(Smoke._geo, mat);
+      const a = Math.random() * Math.PI * 2, rr = Math.pow(Math.random(), 0.6);
+      this.blobs.push({ m, ox: Math.cos(a) * rr, oz: Math.sin(a) * rr,
+                        oy: 0.15 + Math.random() * 0.75, s: 0.42 + Math.random() * 0.42,
+                        ph: Math.random() * 6.28 });
+      this.mesh.add(m);
+    }
+    this.mesh.position.set(x, y, z);
+  }
+
+  update(dt) {
+    this.t += dt;
+    this.life -= dt;
+    if (this.life <= 0) { this.dead = true; return; }
+    // 처음 1.5초 동안 부풀고, 마지막 3초 동안 옅어집니다
+    this.r = this.maxR * Math.min(1, this.t / 1.5);
+    const fade = Math.min(1, this.t / 0.8) * Math.min(1, this.life / 3);
+    this.mat.opacity = 0.52 * fade;
+    for (const b of this.blobs) {
+      const drift = Math.sin(this.t * 0.7 + b.ph) * 0.25;
+      b.m.position.set(b.ox * this.r * 0.8 + drift, b.oy * this.r * 0.55 + this.t * 0.06,
+                       b.oz * this.r * 0.8 - drift);
+      b.m.scale.setScalar(b.s * this.r * 0.62);
+    }
+  }
+
+  /* 이 선분이 연막을 가로지르는가 (봇 시야 판정에 씁니다) */
+  blocks(x1, y1, z1, x2, y2, z2) {
+    if (this.r < 1) return false;
+    const cx = this.pos.x, cy = this.pos.y + this.r * 0.35, cz = this.pos.z;
+    const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    const len2 = dx * dx + dy * dy + dz * dz;
+    if (len2 < 1e-6) return false;
+    let t = ((cx - x1) * dx + (cy - y1) * dy + (cz - z1) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = x1 + dx * t, py = y1 + dy * t, pz = z1 + dz * t;
+    const rr = this.r * 0.85;
+    return (px - cx) ** 2 + (py - cy) ** 2 + (pz - cz) ** 2 < rr * rr;
+  }
+}
+
 /* 지점 표시(핑) 표식: 공중에 뜬 마름모 + 바닥 기둥 */
 const PingArt = {
   make() {
@@ -330,6 +472,7 @@ const LootArt = {
       else if (kind === 'scope') this.cache[key] = Build.merge(this.scopeItemParts(level));
       else if (kind === 'vest') this.cache[key] = Build.merge(this.vestParts(level));
       else if (kind === 'helmet') this.cache[key] = Build.merge(this.helmetParts(level));
+      else if (kind === 'throw') this.cache[key] = ThrowArt.geo(gun);
       else if (kind === 'bag') this.cache[key] = Build.merge(this.bagParts(level));
       else this.cache[key] = Build.merge(this.medParts());
     }
@@ -455,7 +598,8 @@ class Loot {
       : (kind === 'scope' ? SCOPES[this.level].color
       : (kind === 'vest' ? 0x9ecbff
       : (kind === 'bag' ? 0xc7a86b
-      : (kind === 'helmet' ? 0xd9e2ec : 0xff6b6b)))));
+      : (kind === 'helmet' ? 0xd9e2ec
+      : (kind === 'throw' ? THROWABLES[gun].tint : 0xff6b6b))))));
     this.color = color;
 
     this.mesh = new THREE.Group();
@@ -481,6 +625,7 @@ class Loot {
     if (this.kind === 'vest') return VESTS[this.level].name + ' (피해 -' + Math.round(VESTS[this.level].reduce * 100) + '%)';
     if (this.kind === 'bag') return BAGS[this.level].name + ' (구급상자 ' + BAGS[this.level].meds + '개)';
     if (this.kind === 'helmet') return HELMETS[this.level].name + ' (머리 피해 -' + Math.round(HELMETS[this.level].reduce * 100) + '%)';
+    if (this.kind === 'throw') return THROWABLES[this.gun].name + ' ' + this.amount + '개';
     return '구급상자';
   }
 
@@ -689,6 +834,7 @@ class Char3D {
     this.swap = 0;                 // 교체 중 남은 시간
     this.reserve = {};
     this.meds = isPlayer ? 1 : 1 + Math.floor(Math.random() * 2);
+    this.throws = { frag: 0, smoke: 0 };      // 지니고 있는 투척 무기
     this.vest = 0;                 // 방탄조끼 등급 (0 = 없음)
     this.helmet = 0;               // 헬멧 등급 (0 = 없음)
     this.bag = 0;                  // 가방 등급 (0 = 없음)
@@ -784,6 +930,7 @@ class Char3D {
 
   /* 가방이 좋을수록 구급상자와 예비 탄약을 더 챙길 수 있습니다 */
   get medCap() { return CFG.MAX_MEDS + (this.bag ? BAGS[this.bag].meds : 0); }
+  get throwCap() { return CFG.MAX_THROW + (this.bag ? BAGS[this.bag].throw : 0); }
   get ammoCap() { return CFG.BASE_AMMO_CAP + (this.bag ? BAGS[this.bag].ammo : 0); }
   /* 조끼가 막아 주는 피해 비율 (몸통) */
   get armor() { return this.vest ? VESTS[this.vest].reduce : 0; }
@@ -1469,7 +1616,8 @@ class Airdrop {
       { kind: 'vest', level: t.vest },
       { kind: 'helmet', level: t.helmet },
       { kind: 'bag', level: t.bag },
-      { kind: 'med', amount: t.meds }
+      { kind: 'med', amount: t.meds },
+      { kind: 'throw', gun: 'frag', amount: t.frag }
     ];
   }
 }

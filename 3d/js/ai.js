@@ -10,6 +10,7 @@ const AI = {
     a.think -= dt;
     a.strafeT -= dt;
     a.reaction -= dt;
+    a.nadeT = (a.nadeT || 0) - dt;
     if (a.strafeT <= 0) { a.strafe *= -1; a.strafeT = 0.8 + Math.random() * 1.8; }
 
     if (a.think <= 0) { this.think(bot, game); a.think = 0.10 + Math.random() * 0.12; }
@@ -112,6 +113,8 @@ const AI = {
       if (d > CFG.BOT_VISION || d > best) continue;
       // 시야각 밖(뒤쪽)은 조금 늦게 인지
       if (!World.clear(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
+      // 연막 너머는 보이지 않습니다
+      if (game.smoked(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       best = d; enemy = c;
     }
     if (enemy && enemy !== a.target) a.reaction = (1.3 - a.skill) * (0.25 + Math.random() * 0.35);
@@ -177,6 +180,7 @@ const AI = {
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
         if (l.kind === 'vest' && bot.vest >= l.level) continue;
         if (l.kind === 'helmet' && bot.helmet >= l.level) continue;
+        if (l.kind === 'throw' && (bot.throws[l.gun] || 0) >= bot.throwCap) continue;
         if (l.kind === 'bag' && bot.bag >= l.level) continue;
         if (l.kind === 'scope' && (!bot.gun || !GUNS[bot.gun].canScope ||
             (bot.scopes[bot.slot] || 0) >= l.level)) continue;
@@ -233,6 +237,20 @@ const AI = {
     const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
     const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
     if (!World.clear(bx, by, bz, ex, ey, ez)) return;
+
+    /* 알맞은 거리면 가끔 수류탄을 던집니다.
+       너무 가까우면 자기도 휘말리므로 12m 보다 멀 때만 씁니다. */
+    if (bot.throws.frag > 0 && dist > 12 && dist < 34 && a.nadeT <= 0 && Math.random() < 0.02) {
+      a.nadeT = 9 + Math.random() * 8;
+      game.throwItem(bot, 'frag');
+      return;
+    }
+    // 체력이 깎였는데 적이 멀면 연막을 치고 빠집니다
+    if (bot.throws.smoke > 0 && bot.hp < 45 && dist > 14 && a.nadeT <= 0 && Math.random() < 0.03) {
+      a.nadeT = 12;
+      game.throwItem(bot, 'smoke');
+      return;
+    }
 
     // 조준선이 목표에 충분히 가까울 때만 발사
     const toE = Math.atan2(ex - bx, ez - bz);
