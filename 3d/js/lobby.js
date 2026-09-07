@@ -74,34 +74,39 @@ const Lobby = {
     while (this.group.children.length) this.group.remove(this.group.children[0]);
 
     const skin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
-    const art = CharArt.get(skin);
-    const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
-    const mk = geo => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; return m; };
+    if (!CharModel.ready) return;                 // 모델을 아직 못 읽었으면 그리지 않습니다
 
-    const hips = new THREE.Group();
-    hips.position.y = 0.52;
-    hips.add(mk(art.torso));
-    this.group.add(hips);
+    this.figure = CharModel.make(skin);
+    this.group.add(this.figure);
 
-    const armR = new THREE.Group(); armR.position.set(-0.325, 0.60, 0);
-    const armL = new THREE.Group(); armL.position.set(0.325, 0.60, 0);
-    armR.add(mk(art.arm)); armL.add(mk(art.arm));
-    armR.rotation.set(-0.05, 0, -0.22);          // 팔을 자연스럽게 내린 자세
-    armL.rotation.set(-0.02, 0, 0.24);
-    hips.add(armR); hips.add(armL);
-    this.armR = armR; this.armL = armL; this.hipsRef = hips;
+    // 로비에서는 가만히 서 있는 동작만 재생합니다
+    this.mixer = new THREE.AnimationMixer(this.figure);
+    const idle = CharModel.clips.Idle;
+    if (idle) this.mixer.clipAction(idle).play();
 
-    for (const s of [-1, 1]) {
-      const leg = new THREE.Group();
-      leg.position.set(0.145 * s, 0.52, 0);
-      leg.rotation.set(s > 0 ? 0.05 : -0.03, 0, 0.03 * s);
-      leg.add(mk(art.thigh));
-      const knee = new THREE.Group();
-      knee.position.y = -0.26;
-      knee.rotation.x = -0.04;
-      knee.add(mk(art.shin));
-      leg.add(knee);
-      this.group.add(leg);
+    // 장착한 총을 손에 들려 줍니다
+    const hand = this.figure.getObjectByName('mixamorigRightHand')
+              || this.figure.getObjectByName('mixamorig:RightHand');
+    const gunKey = 'rifle';
+    if (hand) {
+      /* 뼈대가 센티미터 단위라 그대로 달면 총이 100분의 1 로 작아집니다.
+         배율을 되돌리는 그룹을 끼워 미터 단위를 그대로 씁니다. */
+      this.figure.updateMatrixWorld(true);
+      const sc = new THREE.Vector3();
+      hand.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
+      const k = 1 / (sc.x || 1);
+      const mount = new THREE.Group();
+      mount.scale.setScalar(k);
+      mount.position.set(0.02 * k, 0.04 * k, 0.02 * k);
+      mount.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+      hand.add(mount);
+
+      const g = new THREE.Mesh(GunArt.geo(gunKey, 0, Profile.data.equipped.gun),
+                               Mats.vc({ roughness: 0.55, metalness: 0.35 }));
+      g.castShadow = true;
+      g.scale.setScalar(0.82);
+      g.position.set(0, 0, 0.06);
+      mount.add(g);
     }
     this.group.rotation.y = 0.12;
   },
@@ -110,12 +115,7 @@ const Lobby = {
     if (!this.ready) return;
     this.spin += dt;
     // 숨쉬는 듯한 미세한 움직임과 아주 느린 시선 이동
-    if (this.hipsRef) {
-      this.hipsRef.position.y = 0.52 + Math.sin(this.spin * 1.4) * 0.012;
-      this.hipsRef.rotation.y = Math.sin(this.spin * 0.5) * 0.05;
-      if (this.armR) this.armR.rotation.x = -0.05 + Math.sin(this.spin * 1.4) * 0.05;
-      if (this.armL) this.armL.rotation.x = -0.02 + Math.sin(this.spin * 1.4 + 0.6) * 0.05;
-    }
+    if (this.mixer) this.mixer.update(dt);
     this.group.rotation.y = 0.12 + Math.sin(this.spin * 0.22) * 0.16;
     this.camera.position.x = Math.sin(this.spin * 0.16) * 0.12;
     this.camera.lookAt(0, 0.80, 0);

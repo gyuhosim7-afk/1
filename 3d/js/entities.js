@@ -226,6 +226,58 @@ const GunArt = {
    경기 시작에 섬을 가로질러 날아갑니다.
    모두 이 안에서 시작해 원하는 자리에서 뛰어내립니다.
    ============================================================ */
+/* ============================================================
+   캐릭터 모델 (glTF)
+   뼈대와 애니메이션이 들어 있는 파일 하나를 한 번만 읽고,
+   등장인물마다 뼈대를 복제해서 씁니다 (지오메트리와 텍스처는 공유).
+   ============================================================ */
+const CharModel = {
+  ready: false, src: null, clips: {}, error: null,
+
+  load(url) {
+    if (this._p) return this._p;
+    this._p = new Promise(resolve => {
+      new THREE.GLTFLoader().load(url, g => {
+        this.src = g.scene;
+        // 그림자를 지고, 멀리서도 사라지지 않게 합니다
+        this.src.traverse(o => {
+          if (!o.isMesh) return;
+          o.castShadow = true;
+          o.frustumCulled = false;
+        });
+        for (const c of g.animations) this.clips[c.name] = c;
+        this.ready = true;
+        resolve(true);
+      }, undefined, err => {
+        this.error = err && err.message ? err.message : '모델을 불러오지 못했습니다';
+        resolve(false);
+      });
+    });
+    return this._p;
+  },
+
+  /* 한 명분 복제. 스킨 색을 입혀 서로 구별되게 합니다.
+     원본 모델은 -Z 쪽을 보고 있는데(발끝으로 확인) 게임의 정면은 +Z 라서,
+     껍데기 그룹을 하나 씌워 반 바퀴 돌려 세웁니다.
+     바깥에서는 이 껍데기를 기울이기만 하면 되고, 뼈 찾기도 그대로 됩니다. */
+  make(outfit) {
+    const inner = THREE.SkeletonUtils.clone(this.src);
+    const tint = new THREE.Color(outfit && outfit.top ? outfit.top : 0xffffff).convertSRGBToLinear();
+    // 원본 텍스처는 그대로 두고 색만 곱합니다 (재질만 복제하므로 가볍습니다)
+    inner.traverse(o => {
+      if (!o.isMesh) return;
+      o.material = o.material.clone();
+      o.material.color.copy(tint);
+      o.castShadow = true;
+      o.frustumCulled = false;
+    });
+    inner.rotation.y = Math.PI;
+    const g = new THREE.Group();
+    g.add(inner);
+    return g;
+  }
+};
+
 /* 투척 무기 모양 (바닥에 떨어진 것과 날아가는 것이 같은 모양을 씁니다) */
 const ThrowArt = {
   cache: {},
@@ -820,11 +872,7 @@ class Char3D {
     this.speedSmooth = 0;
     this.aimBlend = 0;
     this.victory = 0;
-    this.pose = {
-      legLx: 0, legRx: 0, legLz: 0, legRz: 0, kneeLx: 0, kneeRx: 0,
-      armLx: 0, armLy: 0, armLz: 0, armRx: 0, armRy: 0, armRz: 0,
-      hipsX: 0, hipsZ: 0, bodyX: 0, bodyZ: 0, bodyY: 0, gunX: 0
-    };
+    this.pose = { bodyX: 0, bodyZ: 0, bodyY: 0 };   // 모델 전체 기울기
 
     this.guns = [null, null];      // 무기 두 칸
     this.mags = [0, 0];
@@ -858,51 +906,86 @@ class Char3D {
   }
 
   buildMesh(outfit) {
-    const art = CharArt.get(outfit);
-    const mat = Mats.vc({ roughness: 0.82, metalness: 0.02 });
-    const mesh = m => { const o = new THREE.Mesh(m, mat); o.castShadow = true; return o; };
-
     this.mesh = new THREE.Group();
-    this.body = new THREE.Group();          // 사망 연출용 회전축
-    this.hips = new THREE.Group();
-    this.hips.position.y = 0.52;              // 다리가 짧아진 만큼 골반도 낮게
+    this.outfit = outfit;
 
-    this.torso = mesh(art.torso);
-    this.hips.add(this.torso);
-
-    // 정면이 +Z 이므로 캐릭터의 오른쪽은 로컬 -X 입니다
-    this.armR = new THREE.Group(); this.armR.position.set(-0.395, 0.44, 0);
-    this.armL = new THREE.Group(); this.armL.position.set(0.395, 0.44, 0);
-    this.armL.add(mesh(art.arm)); this.armR.add(mesh(art.arm));
-    this.hips.add(this.armL); this.hips.add(this.armR);
-
-    // 총은 오른손 앞에 붙입니다
-    this.gunMount = new THREE.Group();
-    this.gunMount.position.set(0.03, -0.25, 0.15);
-    this.armR.add(this.gunMount);
-    this.gunMesh = null;
-
-    // 등에 메는 두 번째 무기
-    this.backMount = new THREE.Group();
-    this.backMount.position.set(0.06, 0.60, -0.32);
-    this.backMount.rotation.set(Math.PI / 2, 0.22, 0.55);
-    this.hips.add(this.backMount);
-    this.backMesh = null;
-
-    this.legL = new THREE.Group(); this.legL.position.set(-0.145, 0.52, 0);
-    this.legR = new THREE.Group(); this.legR.position.set(0.145, 0.52, 0);
-    this.kneeL = new THREE.Group(); this.kneeL.position.y = -0.26;
-    this.kneeR = new THREE.Group(); this.kneeR.position.y = -0.26;
-    this.legL.add(mesh(art.thigh)); this.legL.add(this.kneeL); this.kneeL.add(mesh(art.shin));
-    this.legR.add(mesh(art.thigh)); this.legR.add(this.kneeR); this.kneeR.add(mesh(art.shin));
-
-    this.body.add(this.hips); this.body.add(this.legL); this.body.add(this.legR);
+    // 모델과 뼈대
+    this.body = CharModel.make(outfit);        // 사망 연출용 회전축이기도 합니다
     this.mesh.add(this.body);
 
-    // 낙하산은 실제로 펼 때 만듭니다 (평소에는 메시를 두지 않습니다)
-    this.chute = { visible: false, rotation: { x: 0, y: 0, z: 0 } };
+    // 걷기·달리기·서기 세 동작을 속도에 따라 섞습니다
+    this.mixer = new THREE.AnimationMixer(this.body);
+    this.act = {};
+    for (const [key, name] of [['idle', 'Idle'], ['walk', 'Walk'], ['run', 'Run']]) {
+      const clip = CharModel.clips[name];
+      if (!clip) continue;
+      const a = this.mixer.clipAction(clip);
+      a.play(); a.setEffectiveWeight(key === 'idle' ? 1 : 0);
+      this.act[key] = a;
+    }
+    this.animT = 0;
 
+    /* 뼈에 물건을 답니다 (손에 총, 등에 예비 무기, 머리에 헬멧).
+       glTF 로더가 이름의 콜론을 지우므로 두 표기를 모두 찾아봅니다. */
+    const bone = n => this.body.getObjectByName('mixamorig' + n)
+                   || this.body.getObjectByName('mixamorig:' + n);
+    this.handR = bone('RightHand');
+    this.spine = bone('Spine2') || bone('Spine1') || this.body;
+    this.headBone = bone('Head') || this.spine;
+
+    /* 믹사모 뼈대는 센티미터 단위라 뼈의 월드 배율이 0.01 입니다.
+       미터로 만든 장비를 뼈에 그대로 달면 100분의 1 로 쪼그라들기 때문에,
+       배율을 되돌리는 그룹을 사이에 하나 끼워 넣습니다.
+       그러면 장비 쪽 좌표는 지금까지처럼 미터 단위로 쓸 수 있습니다. */
+    this.body.updateMatrixWorld(true);
+    const mount = (b, px, py, pz, rx, ry, rz) => {
+      const s = new THREE.Vector3();
+      b.matrixWorld.decompose(new THREE.Vector3(), new THREE.Quaternion(), s);
+      const k = 1 / (s.x || 1);               // 뼈 한 칸이 몇 미터인지의 역수
+      const g = new THREE.Group();
+      g.scale.setScalar(k);
+      g.position.set(px * k, py * k, pz * k); // 자리 값도 뼈 단위로 바꿔 줍니다
+      g.rotation.set(rx || 0, ry || 0, rz || 0);
+      b.add(g);
+      return g;
+    };
+
+    // 손뼈 기준으로 총을 쥐는 자세
+    this.gunMount = mount(this.handR || this.body, 0.02, 0.04, 0.02, -Math.PI / 2, 0, Math.PI / 2);
+    this.gunMesh = null;
+
+    this.backMount = mount(this.spine, 0.02, -0.14, -0.28, Math.PI / 2, 0.18, 1.15);
+    this.backMesh = null;
+
+    // 헬멧과 가방을 다는 자리 (역시 미터 단위)
+    this.headMount = mount(this.headBone, 0, 0, 0, 0, 0, 0);
+    this.gearMount = mount(this.spine, 0, 0, 0, 0, 0, 0);
+
+    this.chute = { visible: false, rotation: { x: 0, y: 0, z: 0 } };
     this.mesh.position.copy(this.pos);
+  }
+
+  /* 속도에 맞춰 서기 → 걷기 → 달리기 로 섞습니다 */
+  updateAnim(dt) {
+    if (!this.mixer) return;
+    const A = this.act;
+    if (!A.idle) { this.mixer.update(dt); return; }
+    const sp = this.speedSmooth;
+    let wIdle = 0, wWalk = 0, wRun = 0;
+    if (sp < 0.35) wIdle = 1;
+    else if (sp < CFG.WALK) {                       // 서기 ↔ 걷기
+      const k = (sp - 0.35) / (CFG.WALK - 0.35);
+      wIdle = 1 - k; wWalk = k;
+    } else {                                        // 걷기 ↔ 달리기
+      const k = Math.min(1, (sp - CFG.WALK) / (CFG.SPRINT - CFG.WALK));
+      wWalk = 1 - k; wRun = k;
+    }
+    const ease = (a, w) => { if (a) a.setEffectiveWeight(a.getEffectiveWeight() + (w - a.getEffectiveWeight()) * Math.min(1, dt * 10)); };
+    ease(A.idle, wIdle); ease(A.walk, wWalk); ease(A.run, wRun);
+    // 발이 미끄러지지 않도록 재생 속도를 이동 속도에 맞춥니다
+    if (A.walk) A.walk.setEffectiveTimeScale(Math.max(0.6, sp / CFG.WALK));
+    if (A.run) A.run.setEffectiveTimeScale(Math.max(0.7, sp / CFG.SPRINT));
+    this.mixer.update(dt);
   }
 
   /* 현재 든 무기 — 기존 코드가 그대로 쓰도록 접근자로 감쌉니다 */
@@ -962,53 +1045,42 @@ class Char3D {
   /* 조끼·가방·헬멧을 몸에 붙입니다 */
   refreshGear() {
     const B = Build, mat = Mats.vc({ roughness: 0.7, metalness: 0.05 });
-    if (this.vestMesh) { this.hips.remove(this.vestMesh); this.vestMesh = null; }
-    if (this.bagMesh) { this.hips.remove(this.bagMesh); this.bagMesh = null; }
-    if (this.helmetMesh) { this.hips.remove(this.helmetMesh); this.helmetMesh = null; }
+    /* 모델이 이미 방탄복을 입고 있으므로 조끼는 따로 그리지 않고,
+       헬멧은 머리뼈에 가방은 등뼈에 답니다. */
+    const drop = (m, parent) => { if (m && parent) parent.remove(m); };
+    drop(this.vestMesh, this.gearMount); this.vestMesh = null;
+    drop(this.bagMesh, this.gearMount); this.bagMesh = null;
+    drop(this.helmetMesh, this.headMount); this.helmetMesh = null;
+    if (!this.headMount) return;
     if (this.helmet) {
       const c = HELMETS[this.helmet].color, strap = 0x2a2d33;
       const parts = [
-        B.sphere(0.318, c, 0, 0.760, 0.0, 1.02, 0.60, 1.03, 18),        // 헬멧 껍데기 (몸이 곧 머리)
-        B.box(0.34, 0.045, 0.19, c, 0, 0.722, 0.225),                   // 챙
-        B.box(0.06, 0.13, 0.05, strap, -0.285, 0.645, 0.14),            // 턱끈
-        B.box(0.06, 0.13, 0.05, strap, 0.285, 0.645, 0.14)
+        B.sphere(0.128, c, 0, 0.130, 0.012, 1.04, 0.92, 1.06, 16),      // 헬멧 껍데기
+        B.box(0.19, 0.024, 0.085, c, 0, 0.098, 0.115),                  // 챙
+        B.box(0.030, 0.10, 0.028, strap, -0.108, 0.040, 0.030),         // 턱끈
+        B.box(0.030, 0.10, 0.028, strap, 0.108, 0.040, 0.030)
       ];
-      if (this.helmet >= 2) parts.push(B.box(0.10, 0.06, 0.12, strap, 0.275, 0.790, 0.02)); // 옆 부착물
+      if (this.helmet >= 2) parts.push(B.box(0.045, 0.038, 0.065, strap, 0.108, 0.140, 0.0));  // 옆 부착물
       if (this.helmet >= 3) {
-        parts.push(B.box(0.34, 0.05, 0.06, strap, 0, 0.868, 0.0));       // 윗면 레일
-        parts.push(B.box(0.08, 0.10, 0.08, 0x1f2227, 0, 0.828, 0.20));   // 앞쪽 야시경 거치대
+        parts.push(B.box(0.15, 0.028, 0.032, strap, 0, 0.218, 0.0));     // 윗면 레일
+        parts.push(B.box(0.045, 0.055, 0.045, 0x1f2227, 0, 0.190, 0.105)); // 앞쪽 야시경 거치대
       }
       this.helmetMesh = new THREE.Mesh(B.merge(parts), mat);
       this.helmetMesh.castShadow = true;
-      this.hips.add(this.helmetMesh);
-    }
-    if (this.vest) {
-      const c = VESTS[this.vest].color;
-      const parts = [
-        B.sphere(0.408, c, 0, 0.215, 0, 1.0, 0.72, 0.98, 16),         // 몸판 (배 둘레)
-        B.sphere(0.400, 0x2a2d33, 0, 0.075, 0, 1.02, 0.16, 1.0, 14),  // 아래 띠
-        B.box(0.10, 0.26, 0.05, 0x2a2d33, -0.15, 0.315, 0.33),        // 어깨 끈
-        B.box(0.10, 0.26, 0.05, 0x2a2d33, 0.15, 0.315, 0.33),
-        B.box(0.16, 0.11, 0.06, 0x2a2d33, 0, 0.185, 0.355)            // 탄창 주머니
-      ];
-      for (let i = 0; i < this.vest; i++) {
-        parts.push(B.box(0.045, 0.045, 0.02, 0xf0c453, -0.05 + i * 0.05, 0.290, 0.375));
-      }
-      this.vestMesh = new THREE.Mesh(B.merge(parts), mat);
-      this.vestMesh.castShadow = true;
-      this.hips.add(this.vestMesh);
+      this.headMount.add(this.helmetMesh);
     }
     if (this.bag) {
       const c = BAGS[this.bag].color;
-      const w = 0.34 + this.bag * 0.05, h = 0.34 + this.bag * 0.07, dz = 0.16 + this.bag * 0.035;
+      const w = 0.25 + this.bag * 0.030, h = 0.24 + this.bag * 0.040, dz = 0.09 + this.bag * 0.020;
+      const y0 = -0.19, z0 = -0.125;            // 척추뼈에서 등 한가운데에 붙입니다
       const parts = [
-        B.box(w, h, dz, c, 0, 0.30, -0.33 - dz / 2),
-        B.box(w * 0.86, h * 0.32, dz * 0.6, c, 0, 0.30 + h * 0.24, -0.33 - dz * 0.9),
-        B.box(w * 0.7, 0.05, 0.03, 0x2a2d33, 0, 0.26, -0.33 - dz - 0.01)
+        B.box(w, h, dz, c, 0, y0, z0 - dz / 2),
+        B.box(w * 0.86, h * 0.30, dz * 0.6, c, 0, y0 + h * 0.24, z0 - dz * 0.9),
+        B.box(w * 0.7, 0.04, 0.03, 0x2a2d33, 0, y0 - 0.03, z0 - dz - 0.01)
       ];
       this.bagMesh = new THREE.Mesh(B.merge(parts), mat);
       this.bagMesh.castShadow = true;
-      this.hips.add(this.bagMesh);
+      this.gearMount.add(this.bagMesh);
     }
   }
 
@@ -1115,62 +1187,39 @@ class Char3D {
     mesh.position.copy(this.pos);
     mesh.rotation.y = this.yaw;
 
-    // 속도와 조준 정도를 부드럽게
     this.speedSmooth += (this.speedNow - this.speedSmooth) * Math.min(1, dt * 9);
-    const run = Math.min(1, this.speedSmooth / CFG.SPRINT);
-    const mv = Math.min(1, this.speedSmooth / 1.8);   // 걷기 정도 (0~1, 부드럽게 변합니다)
-    const moving = mv > 0.35;
+    const b = this.body;
 
-    const t = this._t || (this._t = {});
-    let rate = 15;                                   // 기본 보간 속도
-    let swing = 0, swingAmp = 0, kneeL = 0, kneeR = 0, bob = 0;
+    /* 자세는 뼈대 애니메이션이 맡고, 여기서는 모델 전체를 기울이는 일만 합니다.
+       (쓰러짐·낙하·기어오르기는 따로 만든 동작이 없어 몸통을 기울여 표현합니다) */
+    const t = this._t || (this._t = { x: 0, y: 0, z: 0, rate: 12 });
 
-    if (this.dead) {                                  // 쓰러짐
+    if (this.dead) {                                  // 쓰러짐: 앞으로 넘어갑니다
       this.deadT = Math.min(1, this.deadT + dt * 2.2);
       const d = this.deadT * this.deadT * (3 - 2 * this.deadT);
-      t.bodyX = -1.48 * d; t.bodyZ = 0; t.bodyY = -0.12 * d;
-      t.hipsX = 0.2 * d; t.hipsZ = 0;
-      t.armLx = -0.4 * d; t.armLy = 0; t.armLz = 0.9 * d;
-      t.armRx = -0.4 * d; t.armRy = 0; t.armRz = -0.9 * d;
-      t.legLx = 0.35 * d; t.legRx = -0.2 * d; t.legLz = 0.1 * d; t.legRz = -0.1 * d;
-      t.kneeLx = -0.5 * d; t.kneeRx = -0.3 * d;
-      t.gunX = 0;
-      rate = 9;
+      t.x = 1.45 * d; t.z = -0.18 * d; t.y = -0.05 * d;
+      t.rate = 9;
+      if (this.mixer) this.mixer.timeScale = 1 - d;   // 쓰러지며 동작이 멎습니다
       this.chute.visible = false;
-    } else if (this.climb) {                          // 기어오르기
+    } else if (this.climb) {                          // 기어오르기: 몸을 세워 매달립니다
       const k = Math.min(1, this.climb.t / this.climb.dur);
-      const pull = Math.sin(Math.min(1, k * 1.35) * Math.PI * 0.5);   // 팔로 당기는 구간
-      t.armLx = -2.5 + pull * 1.1; t.armRx = -2.5 + pull * 1.1;
-      t.armLz = 0.35; t.armRz = -0.35; t.armLy = 0.15; t.armRy = -0.15;
-      t.legLx = -1.15 + pull * 1.0; t.legRx = -0.85 + pull * 0.8;
-      t.kneeLx = -1.5 + pull * 1.3; t.kneeRx = -1.2 + pull * 1.0;
-      t.legLz = 0.1; t.legRz = -0.1;
-      t.bodyX = -0.35 + pull * 0.35; t.bodyZ = 0;
-      t.bodyY = 0; t.hipsX = 0.2 - pull * 0.2; t.hipsZ = 0;
-      t.gunX = 0;
-      rate = 14;
+      const pull = Math.sin(Math.min(1, k * 1.35) * Math.PI * 0.5);
+      t.x = 0.55 - pull * 0.45; t.z = 0; t.y = 0;
+      t.rate = 12;
     } else if (this.flying) {                         // 낙하
       if (this.flying === 'chute' && !this.chuteMesh) {
         this.chuteMesh = new THREE.Mesh(ChuteArt.build(),
           Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
         this.chuteMesh.castShadow = true;
-        this.chuteMesh.position.y = 1.45;
+        this.chuteMesh.position.y = 2.6;
         this.mesh.add(this.chuteMesh);
         this.chute = this.chuteMesh;
       }
       this.chute.visible = this.flying === 'chute';
       const free = this.flying === 'freefall';
-      t.bodyX = free ? -1.15 : 0.14 + (this.chutePitch || 0) * 0.18;
-      t.bodyZ = free ? 0 : -this.chuteTilt * 0.5;
-      t.bodyY = free ? 0.55 : 0;
-      t.hipsX = 0; t.hipsZ = 0;
-      t.armLx = free ? -1.25 : -2.45; t.armLz = free ? 0.95 : 0.5; t.armLy = 0;
-      t.armRx = free ? -1.25 : -2.45; t.armRz = free ? -0.95 : -0.5; t.armRy = 0;
-      t.legLx = free ? 0.3 : 0.4; t.legRx = free ? 0.3 : 0.22;
-      t.legLz = free ? 0.32 : 0; t.legRz = free ? -0.32 : 0;
-      t.kneeLx = free ? -0.55 : -0.75; t.kneeRx = free ? -0.55 : -0.5;
-      t.gunX = 0;
-      rate = 7;
+      t.x = free ? 1.1 : -(0.16 + (this.chutePitch || 0) * 0.18);
+      t.z = free ? 0 : this.chuteTilt * 0.5;
+      t.y = 0; t.rate = 7;
       this.stepPhase += dt;
       if (!free) { this.chute.rotation.z = this.chuteTilt; this.chute.rotation.x = Math.sin(this.stepPhase * 0.6) * 0.04; }
     } else {
@@ -1180,96 +1229,32 @@ class Char3D {
         this.chute = { visible: false, rotation: { x: 0, y: 0, z: 0 } };
       }
       this.chute.visible = false;
-      const a = this.aimBlend;
-
-      if (this.victory > 0) {                         // 승리 세리머니
-        this.victory += dt;
-        const v = this.victory;
-        const hop = Math.max(0, Math.sin(v * 5.2));
-        const wave = Math.sin(v * 6.5);
-        t.bodyY = hop * 0.26;
-        t.bodyX = -0.06; t.bodyZ = Math.sin(v * 2.6) * 0.07;
-        t.hipsX = -0.12; t.hipsZ = Math.sin(v * 2.6) * 0.1;
-        t.armLx = -2.55 + wave * 0.25; t.armLz = 0.42 + wave * 0.12; t.armLy = 0.2;
-        t.armRx = -2.55 - wave * 0.25; t.armRz = -0.42 + wave * 0.12; t.armRy = -0.2;
-        t.legLx = -hop * 0.35; t.legRx = -hop * 0.35;
-        t.legLz = 0.08; t.legRz = -0.08;
-        t.kneeLx = -hop * 0.8; t.kneeRx = -hop * 0.8;
-        t.gunX = 0.5;
-        rate = 11;
-      } else {
-        // 걷기 주기: 빠를수록 빨라집니다
-        this.stepPhase += dt * (2.6 + run * 8.2) * (0.28 + 0.72 * mv);
-        swing = Math.sin(this.stepPhase);
-        const sw2 = Math.sin(this.stepPhase * 2);
-        swingAmp = (0.26 + run * 0.6) * (this.crouch ? 0.5 : 1) * (0.04 + 0.96 * mv);
-        kneeL = -Math.max(0, -swing) * (0.45 + run * 0.85) * (0.08 + 0.92 * mv);
-        kneeR = -Math.max(0, swing) * (0.45 + run * 0.85) * (0.08 + 0.92 * mv);
-        bob = Math.abs(sw2) * 0.035 * run * mv + Math.sin(this.stepPhase * 0.5) * 0.01 * (1 - mv);
-
-        const wantAim = this.gun ? (aiming ? 1 : 0.72) : 0;
-        this.aimBlend += (wantAim - this.aimBlend) * Math.min(1, dt * 7);
-        const aa = this.aimBlend;
-
-        t.legLx = this.crouch ? -0.75 : 0;
-        t.legRx = this.crouch ? -0.75 : 0;
-        t.legLz = 0; t.legRz = 0;
-        t.kneeLx = this.crouch ? -1.15 : 0;
-        t.kneeRx = this.crouch ? -1.15 : 0;
-        if (!this.grounded) {                          // 공중
-          t.legLx = -0.5; t.legRx = 0.28;
-          t.kneeLx = -0.85; t.kneeRx = -0.32;
-        }
-
-        t.armLx = -aa * (1.34 + (aiming ? 0.22 : 0));
-        t.armRx = -aa * (1.42 + (aiming ? 0.18 : 0)) - this.recoil * 0.35;
-        t.armLz = -aa * 0.62; t.armRz = aa * 0.16;
-        t.armLy = -aa * 0.34; t.armRy = aa * 0.10;
-
-        if (this.reloading > 0) {                      // 재장전: 왼손이 탄창으로
-          const r = Math.sin((1 - this.reloading / this.spec.reload) * Math.PI);
-          t.armLx -= r * 0.55; t.armLz += r * 0.35;
-        }
-        if (this.healing > 0) {                        // 치료: 두 손을 앞으로
-          t.armLx = -1.7; t.armLz = -0.5; t.armLy = 0;
-          t.armRx = -1.7; t.armRz = 0.5; t.armRy = 0;
-        }
-        if (this.swap > 0) {                           // 무기 교체: 총을 내렸다 올림
-          const s = Math.sin((1 - this.swap / CFG.SWAP_TIME) * Math.PI);
-          t.armRx += s * 0.9; t.armLx += s * 0.7;
-        }
-
-        const lean = run * 0.22 + (this.crouch ? 0.25 : 0);
-        t.hipsX = lean * 0.5;
-        t.hipsZ = 0;
-        t.bodyX = 0; t.bodyZ = 0;
-        t.bodyY = (this.crouch ? -0.20 : 0) + bob;
-        t.gunX = 0;
-        rate = 16;
-      }
+      const run = Math.min(1, this.speedSmooth / CFG.SPRINT);
+      // 달릴수록 앞으로, 앉으면 낮게
+      t.x = run * 0.14; t.z = 0;
+      t.y = this.crouch ? -0.34 : 0;
+      t.rate = 14;
+      if (this.mixer) this.mixer.timeScale = 1;
     }
 
-    // 목표 자세로 부드럽게 (프레임 수와 무관한 감속 보간)
+    // 목표 기울기로 부드럽게 (프레임 수와 무관한 감속 보간)
     const p = this.pose;
-    const k = 1 - Math.exp(-rate * Math.max(dt, 0.0001));
-    for (const key in t) p[key] += ((t[key] || 0) - p[key]) * k;
+    const k = 1 - Math.exp(-t.rate * Math.max(dt, 0.0001));
+    p.bodyX += (t.x - p.bodyX) * k;
+    p.bodyZ += (t.z - p.bodyZ) * k;
+    p.bodyY += (t.y - p.bodyY) * k;
+    b.rotation.set(p.bodyX, 0, p.bodyZ);
+    b.position.y = p.bodyY;
 
-    // 보간된 기본 자세 + 걷기 흔들림
-    this.legL.rotation.set(p.legLx + swing * swingAmp, 0, p.legLz);
-    this.legR.rotation.set(p.legRx - swing * swingAmp, 0, p.legRz);
-    this.kneeL.rotation.x = p.kneeLx + kneeL;
-    this.kneeR.rotation.x = p.kneeRx + kneeR;
+    // 뼈대 애니메이션 (낙하·쓰러짐 중에도 돌려 자세가 굳지 않게 합니다)
+    this.updateAnim(dt);
 
-    const armSwing = swing * swingAmp * 0.85 * (1 - this.aimBlend);
-    this.armL.rotation.set(p.armLx - armSwing, p.armLy, p.armLz);
-    this.armR.rotation.set(p.armRx + armSwing, p.armRy, p.armRz);
-
-    this.hips.rotation.set(p.hipsX, 0, p.hipsZ + swing * 0.04 * mv * (1 - this.aimBlend * 0.5));
-    this.body.rotation.set(p.bodyX, 0, p.bodyZ);
-    this.body.position.y = p.bodyY;
-
-    // 총구는 팔 회전을 상쇄해 늘 앞을 봅니다
-    this.gunMount.rotation.x = -this.armR.rotation.x - this.pitch * 0.8 - 0.06 + p.gunX;
+    // 조준 중에는 상체를 시선 쪽으로 살짝 틀어 줍니다
+    if (this.spine) {
+      const want = aiming ? -this.pitch * 0.55 : 0;
+      this._spineX = (this._spineX || 0) + (want - (this._spineX || 0)) * Math.min(1, dt * 8);
+      this.spine.rotation.x += this._spineX;
+    }
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
   }
 }

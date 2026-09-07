@@ -17,15 +17,15 @@ const CFG = {
   WALK: 4.4,
   SPRINT: 7.8,
   CROUCH: 2.2,
-  EYE: 1.12,            // 눈높이 (커비 체형)
+  EYE: 1.62,            // 눈높이 (사람 체형, 키 1.83m)
   BODY_R: 0.40,         // 몸통 반지름 (충돌)
-  BODY_H: 1.42,
+  BODY_H: 1.80,
   STEP_UP: 0.60,        // 걸어서 올라설 수 있는 턱 높이 (계단 한 칸 = 0.36)
   VAULT_MAX: 2.0,       // 매달려 기어오를 수 있는 최대 높이
   VAULT_TIME: 0.55,     // 기어오르는 데 걸리는 시간
 
   CAM_DIST: 4.6,        // 3인칭 카메라 거리
-  CAM_HEIGHT: 1.14,
+  CAM_HEIGHT: 1.52,
   CAM_SIDE: 0.72,       // 어깨 너머 오프셋
   ADS_DIST: 2.4,
   ADS_SIDE: 0.95,

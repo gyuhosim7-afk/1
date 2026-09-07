@@ -48,6 +48,8 @@ def build(src_rel, out_name):
     # (아티팩트는 옆 파일을 못 읽고, GitHub Pages 는 CDN 없이도 돌아가야 하기 때문입니다)
     VENDOR_CDN = {
         'vendor/three.min.js': 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+        'vendor/GLTFLoader.js': 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.js',
+        'vendor/SkeletonUtils.js': 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/utils/SkeletonUtils.js',
     }
     parts, external = [], []
     for src_attr in re.findall(r'<script src="([^"]+)"></script>', html):

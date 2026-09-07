@@ -599,6 +599,13 @@ const Input = {
 };
 
 const Main = {
+  /* 모델 위치는 스크립트가 실제로 불러와진 자리에서 찾습니다.
+     첫 화면(/)과 개발용(/3d/)에서 상대 경로가 다르기 때문입니다. */
+  get MODEL_URL() {
+    const tag = document.querySelector('script[src*="vendor/three.min.js"]');
+    const src = tag ? tag.getAttribute('src') : '';
+    return src.replace(/vendor\/three\.min\.js.*$/, '') + 'models/Soldier.glb';
+  },
   last: 0,
   init() {
     UI.init();
@@ -621,12 +628,23 @@ const Main = {
     UI.el.lobbyBtn.addEventListener('click', () => {
       Game.state = 'menu'; Net.leaveMatch(); UI.showMenu(); Lobby.tab('play');
     });
+    // 캐릭터 모델은 첫 화면을 띄우면서 곧바로 읽어 둡니다
+    CharModel.load(this.MODEL_URL).then(() => { if (Lobby.ready) Lobby.refresh(); });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
   },
 
   startGame() {
+    // 캐릭터 모델을 아직 못 읽었으면 다 읽고 시작합니다
+    if (!CharModel.ready) {
+      Game.pushFeed('캐릭터를 불러오는 중…');
+      CharModel.load(Main.MODEL_URL).then(ok => {
+        if (ok) this.startGame();
+        else alert('캐릭터 모델을 불러오지 못했습니다: ' + (CharModel.error || ''));
+      });
+      return;
+    }
     Sfx.init();
     try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;

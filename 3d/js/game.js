@@ -1012,13 +1012,13 @@ const Game = {
       const hy = oy + dy * t;
       /* 차에 타고 있으면 차체가 몸을 가려 줍니다.
          트럭은 창문 높이만, 뚜껑 없는 버기와 오토바이는 거의 다 드러납니다. */
-      let lo = c.pos.y, hi = c.pos.y + (c.crouch ? 1.10 : 1.42);
+      let lo = c.pos.y, hi = c.pos.y + (c.crouch ? 1.30 : 1.80);
       if (c.vehicle && c.vehicle.spec.win) {
         lo = c.pos.y + c.vehicle.spec.win[0];
         hi = c.pos.y + c.vehicle.spec.win[1];
       }
       if (hy < lo || hy > hi) continue;
-      const headY = c.pos.y + (c.crouch ? 0.92 : 1.10);   // 몸이 곧 머리라 위쪽 절반이 헤드샷
+      const headY = c.pos.y + (c.crouch ? 1.15 : 1.58);   // 목 위쪽이 헤드샷
       best = { t, char: c, head: hy > headY - 0.14 };
     }
     return best;
