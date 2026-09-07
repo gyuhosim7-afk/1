@@ -520,7 +520,7 @@ const Input = {
       if (c === 'KeyZ') Game.placePing();
       if (c === 'KeyG') Game.throwItem(Game.player, 'frag');
       if (c === 'KeyH') Game.throwItem(Game.player, 'smoke');
-      if (c === 'KeyR') Game.player.startReload();
+      if (c === 'KeyR' && Game.player.startReload()) Sfx.reload();
       if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
       if (c === 'KeyQ') Game.player.startHeal();
       if (c === 'Tab') UI.el.bigmap.classList.toggle('hidden');

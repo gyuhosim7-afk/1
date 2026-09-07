@@ -1011,7 +1011,6 @@ const CFG = {
   PING_LIFE: 34,          // 표시가 남아 있는 시간 (초)
   PING_MAX: 5,            // 동시에 남길 수 있는 표시 수
   PING_RANGE: 900,        // 표시를 찍을 수 있는 최대 거리
-  SLOTS: 2,               // 무기 칸 수
   SWAP_TIME: 0.45,        // 무기 교체 시간
 
   PICK_RANGE: 4.2,        // 발밑 줍기 반경
@@ -1074,10 +1073,7 @@ const THEME = {
   buildHue:    0.605,          // 기준 색상 (청보라)
   buildSpread: 0.17,           // 원래 색상에 따라 이만큼까지 벌어집니다
   buildSat:    0.30,           // 채도 상한 — 금속·콘크리트처럼 차분하게
-  buildLit:    0.52,           // 밝기 배율 (밤이라 낮게)
-  glass:       0x16232f,       // 꺼진 창
-  glassLit:    0x64e2d8,       // 불이 켜진 창
-  glassOn:     0.45            // 창에 불이 켜져 있을 확률
+  buildLit:    0.52            // 밝기 배율 (밤이라 낮게)
 };
 
 /* ============================================================
@@ -2530,53 +2526,62 @@ const Scenery = {
     const plan = [];
     const put = (kind, x, z, yaw) => plan.push({ kind, x, z, yaw });
 
+    /* 구조물이 서로 겹치면 벽과 벽 사이에 낄 자리가 생깁니다.
+       자리를 잡을 때 이미 놓인 것들과 반지름이 겹치지 않는지 봅니다. */
+    const RAD = { hab: 24, podRow: 20, pad: 10, depot: 9, container: 5,
+                  ruin: 12, rockPile: 7, mast: 5, haystack: 3 };
+    const fits = (kind, x, z) => {
+      const r = RAD[kind] || 5;
+      for (const b of plan) {
+        if (Math.hypot(b.x - x, b.z - z) < r + (RAD[b.kind] || 5)) return false;
+      }
+      return true;
+    };
+    /* 자리를 여러 번 뽑아 보고, 끝내 빈자리가 없으면 그냥 거릅니다.
+       억지로 끼워 넣느니 하나 덜 놓는 편이 낫습니다. */
+    const putFree = (kind, pick, tries) => {
+      for (let i = 0; i < (tries || 40); i++) {
+        const s = pick();
+        if (fits(kind, s.x, s.z)) { put(kind, s.x, s.z, s.yaw); return true; }
+      }
+      return false;
+    };
+
     /* 마을은 전부 기지 부품으로 짓습니다.
        거주동(캡슐 무리) · 창고동 · 착륙장 · 화물 더미가 섞여 골목을 이룹니다. */
     for (const t of towns) {
       const count = 5 + Math.floor(rnd() * 4);
       const placed = [];
       let bigOne = true;                          // 마을마다 큰 기지 한 곳
+      const ring = (lo, hi) => () => {
+        const ang = rnd() * Math.PI * 2, rad = t.r * (lo + rnd() * (hi - lo));
+        return { x: t.x + Math.cos(ang) * rad, z: t.z + Math.sin(ang) * rad, yaw: rnd() * Math.PI * 2 };
+      };
       for (let i = 0; i < count; i++) {
-        for (let a = 0; a < 50; a++) {
-          const ang = rnd() * Math.PI * 2, rad = rnd() * t.r;
-          const x = t.x + Math.cos(ang) * rad, z = t.z + Math.sin(ang) * rad;
-          if (placed.some(p => Math.hypot(p.x - x, p.z - z) < 40)) continue;
-          placed.push({ x, z });
-          const yaw = rnd() * Math.PI * 2;
-          if (bigOne) { bigOne = false; put('hab', x, z, yaw); break; }
-          put(rnd() < 0.55 ? 'podRow' : 'hab', x, z, yaw);
-          break;
-        }
+        const kind = bigOne ? 'hab' : (rnd() < 0.55 ? 'podRow' : 'hab');
+        if (putFree(kind, ring(0, 1))) bigOne = false;
       }
-      for (let i = 0; i < 8; i++) {
-        const ang = rnd() * Math.PI * 2, rad = t.r * (0.4 + rnd() * 0.7);
-        put('container', t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI);
-      }
-      for (let i = 0; i < 4; i++) {
-        const ang = rnd() * Math.PI * 2, rad = t.r * (0.5 + rnd() * 0.6);
-        put('depot', t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI * 2);
-      }
-      for (let i = 0; i < 2; i++) {
-        put('pad', t.x + (rnd() - 0.5) * t.r * 1.4, t.z + (rnd() - 0.5) * t.r * 1.4, rnd() * Math.PI * 2);
-      }
+      for (let i = 0; i < 8; i++) putFree('container', ring(0.4, 1.1));
+      for (let i = 0; i < 4; i++) putFree('depot', ring(0.5, 1.1));
+      for (let i = 0; i < 2; i++) putFree('pad', ring(0.3, 1.4));
     }
 
     // 벌판에 흩어진 작은 전초 기지
+    const wild = min => () => {
+      const sp = World.freeSpot(min);
+      return { x: sp.x, z: sp.z, yaw: rnd() * Math.PI * 2 };
+    };
     for (let i = 0; i < 34; i++) {
-      const sp = World.freeSpot(20);
-      const r = rnd(), yaw = rnd() * Math.PI * 2;
-      if (r < 0.30) put('podRow', sp.x, sp.z, yaw);
-      else if (r < 0.46) put('hab', sp.x, sp.z, yaw);
-      else if (r < 0.62) put('depot', sp.x, sp.z, yaw);
-      else if (r < 0.80) put('ruin', sp.x, sp.z, yaw);
-      else put('container', sp.x, sp.z, yaw);
+      const r = rnd();
+      putFree(r < 0.30 ? 'podRow' : r < 0.46 ? 'hab' : r < 0.62 ? 'depot'
+              : r < 0.80 ? 'ruin' : 'container', wild(20));
     }
 
     // 벌판을 채우는 지형지물
-    for (let i = 0; i < 8; i++) { const sp = World.freeSpot(12); put('pad', sp.x, sp.z, rnd() * Math.PI * 2); }
-    for (let i = 0; i < 5; i++) { const sp = World.freeSpot(14); put('mast', sp.x, sp.z, 0); }
-    for (let i = 0; i < 34; i++) { const sp = World.freeSpot(8); put('rockPile', sp.x, sp.z, 0); }
-    for (let i = 0; i < 26; i++) { const sp = World.freeSpot(4); put('haystack', sp.x, sp.z, 0); }
+    for (let i = 0; i < 8; i++) putFree('pad', wild(12));
+    for (let i = 0; i < 5; i++) putFree('mast', wild(14));
+    for (let i = 0; i < 34; i++) putFree('rockPile', wild(8));
+    for (let i = 0; i < 26; i++) putFree('haystack', wild(4));
     // 담장: 마을 언저리와 벌판에 길게 (뛰어넘는 재미)
     for (let i = 0; i < 40; i++) {
       const sp = World.freeSpot(6);
@@ -2742,75 +2747,11 @@ const Scenery = {
 
   /* 사방 벽. doors 에 적은 면은 가운데를 비워 출입구로 만듭니다.
      면 이름: 'front'(-z) 'back'(+z) 'left'(-x) 'right'(+x) */
-  walls(cx, cz, yaw, w, d, h, thick, base, color, doors, doorW) {
-    doors = doors || ['front'];
-    doorW = doorW || 2.2;
-    const wallRun = (lx, lz, len, along, hasDoor) => {
-      // along: 'x' 면 벽이 x 축으로 뻗고, 'z' 면 z 축으로 뻗습니다
-      if (!hasDoor) {
-        const [x, z] = this.local(cx, cz, yaw, lx, lz);
-        if (along === 'x') this.box(x, base + h / 2, z, len, h, thick, yaw, color);
-        else this.box(x, base + h / 2, z, thick, h, len, yaw, color);
-        return;
-      }
-      const seg = (len - doorW) / 2;
-      if (seg <= 0.2) return;
-      for (const s of [-1, 1]) {
-        const ox = along === 'x' ? s * (doorW / 2 + seg / 2) : 0;
-        const oz = along === 'x' ? 0 : s * (doorW / 2 + seg / 2);
-        const [x, z] = this.local(cx, cz, yaw, lx + ox, lz + oz);
-        if (along === 'x') this.box(x, base + h / 2, z, seg, h, thick, yaw, color);
-        else this.box(x, base + h / 2, z, thick, h, seg, yaw, color);
-      }
-      // 문 위 인방
-      const lintel = h - 2.35;
-      if (lintel > 0.25) {
-        const [x, z] = this.local(cx, cz, yaw, lx, lz);
-        if (along === 'x') this.box(x, base + h - lintel / 2, z, doorW, lintel, thick, yaw, color);
-        else this.box(x, base + h - lintel / 2, z, thick, lintel, doorW, yaw, color);
-      }
-    };
-    wallRun(0, -d / 2, w, 'x', doors.indexOf('front') >= 0);
-    wallRun(0,  d / 2, w, 'x', doors.indexOf('back') >= 0);
-    wallRun(-w / 2, 0, d, 'z', doors.indexOf('left') >= 0);
-    wallRun( w / 2, 0, d, 'z', doors.indexOf('right') >= 0);
-  },
-
-  /* 벽면 장식 (충돌 없음) */
   trim(cx, cz, yaw, lx, ly, lz, w, h, thick, color) {
     const [x, z] = this.local(cx, cz, yaw, lx, lz);
     this.boxDefs.push({ x, y: ly, z, sx: w, sy: h, sz: thick, yaw, color, solid: false });
   },
 
-  /* 좌우·뒷벽에 창문을 냅니다 (yOff 는 바닥에서 창 중심까지 높이) */
-  windows(cx, cz, yaw, w, d, h, base, count, yOff) {
-    /* 창은 일부에만 불이 켜집니다. 켜진 창은 스스로 빛나는 메시로 따로
-       그려서, 밤하늘 아래 마을이 멀리서도 눈에 들어오게 합니다. */
-    const pane = (x, y, z, sx, sy, sz) => {
-      const lit = rnd() < THEME.glassOn;
-      this.boxDefs.push({ x, y, z, sx, sy, sz, yaw, solid: false,
-        color: lit ? THEME.glassLit : THEME.glass, glow: lit, raw: true });
-    };
-    for (let i = 0; i < count; i++) {
-      const t = (i + 1) / (count + 1) - 0.5;
-      for (const side of [-1, 1]) {
-        const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.03), t * d * 0.8);
-        pane(x, base + yOff, z, 0.12, 1.0, 1.3);
-      }
-      const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.03);
-      pane(bx, base + yOff, bz, 1.3, 1.0, 0.12);
-    }
-  },
-
-  /* 바닥판. 윗면이 정확히 y 가 되도록 놓습니다 (그 위를 걸어 다닐 수 있습니다) */
-  slab(cx, cz, yaw, lx, lz, w, d, y, color, thick) {
-    thick = thick || 0.30;
-    const [x, z] = this.local(cx, cz, yaw, lx, lz);
-    this.box(x, y - thick / 2, z, w, thick, d, yaw, color);
-  },
-
-  /* 건물이 앉을 바닥 높이: 발자국 안에서 가장 높은 지형보다 살짝 위.
-     실내가 평평해야 계단 첫 칸이 걸음 높이 안에 들어옵니다. */
   padY(cx, cz, w, d, yaw) {
     let h = World.height(cx, cz);
     for (let i = -1; i <= 1; i++) {
@@ -2822,44 +2763,6 @@ const Scenery = {
     return h + 0.04;
   },
 
-  /* 1층 바닥판. 지형이 조금 기울어 있어도 실내는 평평해집니다. */
-  groundFloor(cx, cz, yaw, w, d, base, color) {
-    this.slab(cx, cz, yaw, 0, 0, w + 0.5, d + 0.5, base, color || 0x8d8577, 1.4);
-  },
-
-  /* 계단. 로컬 (lx,lz) 에서 시작해 dir(+1: +z, -1: -z) 방향으로 올라갑니다.
-     한 칸 높이를 0.42m 로 잡아 캐릭터가 걸어서 오를 수 있게 합니다. */
-  /* fillFrom 을 주면 계단 밑을 그 높이까지 막습니다.
-     계단 아래에 사람 키보다 조금 낮은 빈 공간이 생기면 그 안에 끼기 때문입니다. */
-  stairs(cx, cz, yaw, lx, lz, fromY, toY, width, dir, color, fillFrom) {
-    const rise = 0.36, run = 0.60;
-    const n = Math.max(1, Math.round((toY - fromY) / rise));
-    const step = (toY - fromY) / n;
-    // 계단 위치를 기록해 두면 봇이 위층으로 올라갈 때 길잡이로 쓸 수 있습니다
-    const b0 = this.local(cx, cz, yaw, lx, lz);
-    const b1 = this.local(cx, cz, yaw, lx, lz + dir * run * n);
-    this.stairSpots.push({ x0: b0[0], z0: b0[1], x1: b1[0], z1: b1[1], y0: fromY, y1: toY });
-    for (let i = 0; i < n; i++) {
-      const top = fromY + step * (i + 1);
-      const lzz = lz + dir * (run * (i + 0.5));
-      const [x, z] = this.local(cx, cz, yaw, lx, lzz);
-      // 각 단은 바닥까지 채워 옆에서 봐도 계단처럼 보입니다
-      this.box(x, (fromY + top) / 2, z, width, top - fromY, run, yaw, color, true, true);
-    }
-    if (fillFrom != null && fillFrom < fromY - 0.05) {
-      const [fx, fz] = this.local(cx, cz, yaw, lx, lz + dir * (run * n) / 2);
-      this.box(fx, (fillFrom + fromY) / 2, fz, width, fromY - fillFrom, run * n, yaw, color);
-    }
-    return { len: run * n };
-  },
-
-  /* 난간 (충돌 있음 — 2층에서 떨어지지 않도록) */
-  rail(cx, cz, yaw, lx, lz, w, d, y, color) {
-    const [x, z] = this.local(cx, cz, yaw, lx, lz);
-    this.box(x, y + 0.5, z, w, 1.0, d, yaw, color);
-  },
-
-  /* 실내 아이템 자리 */
   lootSpot(cx, cz, yaw, lx, lz, y) {
     const [x, z] = this.local(cx, cz, yaw, lx, lz);
     this.lootSpots.push({ x, y, z });
@@ -3024,16 +2927,23 @@ const Scenery = {
     const base = this.padY(cx, cz, 11, 11, yaw);
     const big = rnd() < 0.5;
     const name = big ? 'landingpad_large' : 'landingpad_small';
-    const s = big ? 4.4 : 4.8;
-    // 모델은 장식으로 두고, 딛고 올라설 판은 낮은 상자로 따로 깝니다
+    /* 한 번에 기어오를 수 있는 턱이 2m 이므로 그보다 낮게 잡습니다.
+       예전 배율(4.4)에서는 판이 2.2m 라 아무도 못 올라갔고, 그 위에 둔
+       아이템은 주울 수가 없었습니다. */
+    const s = big ? 3.2 : 3.6;
+    // 모델은 장식으로 두고, 딛고 올라설 판은 상자로 따로 깝니다
     this.prop(name, cx, base, cz, yaw, s, false);
     const b = SpaceKit.size(name, s);
-    if (b) this.box(cx, base + b.sy / 2, cz, b.sx * 0.86, b.sy, b.sz * 0.86, yaw, 0x6f7378);
+    // 팔각판이라 모서리만 살짝 줄여 보이는 넓이와 거의 같게 맞춥니다
+    if (b) this.box(cx, base + b.sy / 2, cz, b.sx * 0.95, b.sy, b.sz * 0.95, yaw, 0x6f7378);
     for (let i = 0; i < 4; i++) {
       const a = yaw + i * Math.PI / 2 + Math.PI / 4;
       const r = (b ? b.sx : 9) * 0.62;
       this.prop('lights', cx + Math.cos(a) * r, base, cz + Math.sin(a) * r, rnd() * 6.28, 2.4, false);
     }
+    // 올라가기 쉽도록 옆에 화물 한 칸
+    const [sx, sz] = this.local(cx, cz, yaw, (b ? b.sx : 9) * 0.5 + 1.2, 0);
+    this.prop(rnd() < 0.5 ? 'cargo_A' : 'cargo_B', sx, World.height(sx, sz), sz, rnd() * 6.28, 2.4);
     this.lootSpot(cx, cz, yaw, 0, 0, base + (b ? b.sy : 0.5) + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'pad', r: 6 });
   },
@@ -3148,9 +3058,8 @@ const Scenery = {
     const v = new THREE.Vector3(), sv = new THREE.Vector3();
     const col = new THREE.Color();
 
-    // 건물 상자 — 불 켜진 창은 스스로 빛나므로 따로 모읍니다
-    const solidDefs = this.boxDefs.filter(b => !b.glow);
-    const glowDefs = this.boxDefs.filter(b => b.glow);
+    // 남은 상자들 (담장, 착륙장 발판, 풍력 발전기 밑동)
+    const solidDefs = this.boxDefs;
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
     const boxMat = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0.02 });
     const boxMesh = new THREE.InstancedMesh(boxGeo, boxMat, solidDefs.length);
@@ -3180,10 +3089,15 @@ const Scenery = {
         if (!a) { a = []; byName.set(pr.name, a); }
         a.push(pr);
       }
+      /* 가로등만 스스로 빛나는 재질을 씁니다. 나머지는 아틀라스 하나를
+         공유하므로, 등 하나만 재질을 갈아 끼워도 드로우콜은 그대로입니다. */
+      const litMat = SpaceKit.mat.clone();
+      litMat.emissive = new THREE.Color(srgb(0x64e2d8));
+      litMat.emissiveIntensity = 0.55;
       for (const [name, list] of byName) {
         const geo = SpaceKit.geo[name];
         if (!geo) continue;
-        const im = new THREE.InstancedMesh(geo, SpaceKit.mat, list.length);
+        const im = new THREE.InstancedMesh(geo, name === 'lights' ? litMat : SpaceKit.mat, list.length);
         im.castShadow = true; im.receiveShadow = true;
         list.forEach((pr, i) => {
           e.set(0, -pr.yaw, 0, 'YXZ');
@@ -3196,22 +3110,6 @@ const Scenery = {
       }
     }
 
-    // 불이 켜진 창: 그림자를 지지 않고 스스로 빛납니다
-    if (glowDefs.length) {
-      const litMat = new THREE.MeshStandardMaterial({
-        color: 0x05070a, emissive: srgb(THEME.glassLit),
-        emissiveIntensity: 0.62, roughness: 0.4, metalness: 0
-      });
-      const litMesh = new THREE.InstancedMesh(boxGeo, litMat, glowDefs.length);
-      glowDefs.forEach((b, i) => {
-        e.set(b.tilt || 0, -b.yaw, 0, 'YXZ');
-        q.setFromEuler(e);
-        m.compose(v.set(b.x, b.y, b.z), q, sv.set(b.sx, b.sy, b.sz));
-        litMesh.setMatrixAt(i, m);
-      });
-      litMesh.instanceMatrix.needsUpdate = true;
-      scene.add(litMesh);
-    }
 
     // 나무 줄기
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, 6);
@@ -5927,7 +5825,7 @@ const Game = {
       if (p.canShoot()) {
         this.playerShoot();
         if (!p.spec.auto) input.fire = false;
-      } else if (p.gun && p.mag <= 0 && p.reloading <= 0) p.startReload();
+      } else if (p.gun && p.mag <= 0 && p.reloading <= 0) { if (p.startReload()) Sfx.reload(); }
       else if (!p.gun) input.fire = false;
     }
   },
@@ -8448,7 +8346,7 @@ const Input = {
       if (c === 'KeyZ') Game.placePing();
       if (c === 'KeyG') Game.throwItem(Game.player, 'frag');
       if (c === 'KeyH') Game.throwItem(Game.player, 'smoke');
-      if (c === 'KeyR') Game.player.startReload();
+      if (c === 'KeyR' && Game.player.startReload()) Sfx.reload();
       if (c === 'KeyF' || c === 'KeyE') Game.tryPickup();
       if (c === 'KeyQ') Game.player.startHeal();
       if (c === 'Tab') UI.el.bigmap.classList.toggle('hidden');

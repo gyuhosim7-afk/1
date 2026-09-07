@@ -728,7 +728,7 @@ const Game = {
       if (p.canShoot()) {
         this.playerShoot();
         if (!p.spec.auto) input.fire = false;
-      } else if (p.gun && p.mag <= 0 && p.reloading <= 0) p.startReload();
+      } else if (p.gun && p.mag <= 0 && p.reloading <= 0) { if (p.startReload()) Sfx.reload(); }
       else if (!p.gun) input.fire = false;
     }
   },
