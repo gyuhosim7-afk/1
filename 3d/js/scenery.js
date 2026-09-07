@@ -1,14 +1,62 @@
 /* ============================================================
+   우주 기지 부품 (KayKit Space Base Bits, CC0)
+   57 개 모델을 glb 한 개로 합쳐 두었습니다. 텍스처 아틀라스도 한 장뿐이라
+   재질을 공유하므로, 같은 모델끼리 InstancedMesh 로 묶으면 종류마다
+   드로우콜 하나면 됩니다.
+   ============================================================ */
+const SpaceKit = {
+  ready: false, error: null, mat: null,
+  geo: {},          // 이름 → 지오메트리
+  box: {},          // 이름 → { sx, sy, sz, minY }  (원래 크기, 배율 1 기준)
+
+  load(url) {
+    if (this._p) return this._p;
+    this._p = new Promise(resolve => {
+      new THREE.GLTFLoader().load(url, g => {
+        g.scene.traverse(o => {
+          if (!o.isMesh) return;
+          o.geometry.computeBoundingBox();
+          const b = o.geometry.boundingBox;
+          this.geo[o.name] = o.geometry;
+          this.box[o.name] = { sx: b.max.x - b.min.x, sy: b.max.y - b.min.y,
+                               sz: b.max.z - b.min.z, minY: b.min.y };
+          if (!this.mat) {
+            this.mat = o.material;
+            this.mat.roughness = 0.72;
+            this.mat.metalness = 0.06;
+          }
+        });
+        this.ready = true;
+        resolve(true);
+      }, undefined, err => {
+        this.error = err && err.message ? err.message : '기지 부품을 불러오지 못했습니다';
+        resolve(false);
+      });
+    });
+    return this._p;
+  },
+
+  /* 이 모델을 배율 s 로 놓았을 때의 크기 (충돌 상자를 맞추는 데 씁니다) */
+  size(name, s) {
+    const b = this.box[name];
+    if (!b) return null;
+    return { sx: b.sx * s, sy: b.sy * s, sz: b.sz * s, minY: b.minY * s };
+  }
+};
+
+/* ============================================================
    지형 메시, 물, 건물, 나무, 바위 배치
    모든 상자·나무는 InstancedMesh 로 묶어 드로우콜을 줄입니다.
    ============================================================ */
 const Scenery = {
   boxDefs: [],   // { x,y,z, sx,sy,sz, yaw, color, solid }
+  props: [],     // 기지 부품 { name, x, y, z, yaw, s }
   trees: [], rocks: [], bushes: [], grass: [],
   meshes: [],
 
   build(scene) {
     this.boxDefs = []; this.trees = []; this.rocks = []; this.bushes = []; this.grass = [];
+    this.props = [];
     this.lootSpots = []; this.stairSpots = [];
     World.resetColliders();
     World.buildings = [];
@@ -41,7 +89,8 @@ const Scenery = {
        그 위에 건물을 세웁니다. 실내 바닥이 울퉁불퉁하면 계단 첫 칸이
        걸음 높이를 넘어가 못 올라가는 자리가 생기기 때문입니다. */
     const FOOT = { warehouse: 17, apartment: 13, tower: 16, house: 10, shed: 6, container: 4,
-                   ruin: 9, waterTower: 6, rockPile: 0, mast: 0, haystack: 0, fence: 0 };
+                   ruin: 9, waterTower: 6, rockPile: 0, mast: 0, haystack: 0, fence: 0,
+                   depot: 7, pad: 9 };
     const plan = [];
     const put = (kind, x, z, yaw) => plan.push({ kind, x, z, yaw });
 
@@ -68,6 +117,12 @@ const Scenery = {
         const ang = rnd() * Math.PI * 2, rad = t.r * (0.4 + rnd() * 0.7);
         put('container', t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI);
       }
+      // 마을마다 착륙장과 기지 설비 몇 개 — 우주 전초 기지답게 보이도록
+      for (let i = 0; i < 3; i++) {
+        const ang = rnd() * Math.PI * 2, rad = t.r * (0.5 + rnd() * 0.6);
+        put('depot', t.x + Math.cos(ang) * rad, t.z + Math.sin(ang) * rad, rnd() * Math.PI * 2);
+      }
+      put('pad', t.x + (rnd() - 0.5) * t.r, t.z + (rnd() - 0.5) * t.r, rnd() * Math.PI * 2);
     }
 
     for (let i = 0; i < 30; i++) {
@@ -212,6 +267,25 @@ const Scenery = {
         top: y + sy / 2, bottom: y - sy / 2, ramp: !!ramp
       });
     }
+  },
+
+  /* 우주 기지 부품 하나를 놓습니다.
+     y 는 부품이 앉을 바닥 높이입니다. 충돌 상자는 모델의 실제 크기에서
+     그대로 뽑아 쓰므로, 보이는 것과 막히는 것이 어긋나지 않습니다.
+     solid 가 false 면 장식만 하고 지나갈 수 있습니다. */
+  prop(name, x, y, z, yaw, s, solid) {
+    const b = SpaceKit.size(name, s);
+    if (!b) return null;                       // 모델을 못 읽었으면 조용히 건너뜁니다
+    this.props.push({ name, x, y, z, yaw, s });
+    if (solid !== false) {
+      const cy = y + b.minY + b.sy / 2;
+      World.addBox({
+        x, y: cy, z, hx: b.sx / 2, hy: b.sy / 2, hz: b.sz / 2, yaw,
+        cos: Math.cos(yaw), sin: Math.sin(yaw),
+        top: cy + b.sy / 2, bottom: cy - b.sy / 2, ramp: false
+      });
+    }
+    return b;
   },
 
   /* 회전된 로컬 좌표를 월드로 */
@@ -405,6 +479,7 @@ const Scenery = {
     // 지붕
     this.box(cx, base + fh * 2 + 0.25, cz, w + 0.7, 0.5, d + 0.7, yaw, 0x8a5b47);
     this.trim(cx, cz, yaw, 0, base + fh * 2 + 0.6, 0, w + 0.8, 0.18, d + 0.8, 0x6d4638);
+    this.roofKit(cx, cz, yaw, w, d, base + fh * 2 + 0.7);
 
     // 기둥
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
@@ -554,6 +629,7 @@ const Scenery = {
       this.rail(cx, cz, yaw, 0, s * (d / 2 + 0.12), w + 0.7, 0.22, ry, steel);
     }
     this.trim(cx, cz, yaw, 0, ry - 0.28, 0, w + 0.9, 0.2, d + 0.9, 0x6f6a60);
+    this.roofKit(cx, cz, yaw, w, d, ry);
 
     for (let f = 0; f < floors; f++) {
       const y = base + fh * f + 0.05;
@@ -640,60 +716,101 @@ const Scenery = {
     World.buildings.push({ x: cx, z: cz, kind: 'watertower', r: 4 });
   },
 
-  /* 폐허: 높이가 제각각인 벽 조각들 */
+  /* 착륙선이 내려앉은 자리. 화물이 흩어져 있어 엄폐물이 됩니다. */
   ruin(cx, cz, yaw) {
     const base = this.padY(cx, cz, 12, 9, yaw);
-    const wall = 0xa89f92;
-    const segs = [[-5, -4, 6, 3.2], [4.5, -4, 4, 1.4], [-5.5, 3.5, 5, 2.4], [3, 4, 5, 1.1]];
-    for (const [lx, lz, len, h] of segs) {
-      const [x, z] = this.local(cx, cz, yaw, lx, lz);
-      const horiz = Math.abs(lz) > Math.abs(lx) || len > 4;
-      this.box(x, base + h / 2, z, horiz ? len : 0.4, h, horiz ? 0.4 : len, yaw, wall);
+    this.prop('lander_base', cx, base, cz, yaw, 6.5, false);
+    this.prop(rnd() < 0.5 ? 'lander_A' : 'lander_B', cx, base, cz, yaw, 6.5);
+    // 둘레에 화물과 바위를 흩뿌려 몸을 숨길 데를 만듭니다
+    for (let i = 0; i < 4; i++) {
+      const a = rnd() * Math.PI * 2, r = 6 + rnd() * 4;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      this.prop(rnd() < 0.5 ? 'cargo_A_stacked' : 'cargo_B_stacked',
+                x, World.height(x, z), z, rnd() * Math.PI * 2, 2.4);
     }
-    for (let i = 0; i < 3; i++) {
-      const a = rnd() * Math.PI * 2, r = 1 + rnd() * 4;
-      this.crateStack(cx, cz, yaw, Math.cos(a) * r, Math.sin(a) * r, base);
-    }
-    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 8, (rnd() - 0.5) * 6, base + 0.05);
+    for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 9, (rnd() - 0.5) * 9, base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'ruin', r: 7 });
   },
 
-  /* 송신탑: 멀리서도 보이는 이정표 */
-  mast(cx, cz) {
-    const base = World.height(cx, cz);
-    const steel = 0x8a8f96, red = 0xc23b32;
-    const H = 26;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      this.boxDefs.push({ x: cx + sx * 1.1, y: base + H / 2, z: cz + sz * 1.1,
-                          sx: 0.22, sy: H, sz: 0.22, yaw: 0, color: steel, solid: false,
-                          tilt: 0, ry: 0, rz: 0 });
+  /* 화물 창고동. 안에는 못 들어가지만 둘레가 좋은 엄폐물이 됩니다. */
+  depot(cx, cz, yaw) {
+    const base = this.padY(cx, cz, 8, 8, yaw);
+    const kinds = ['cargodepot_A', 'cargodepot_B', 'cargodepot_C', 'structure_low', 'structure_tall'];
+    const name = kinds[Math.floor(rnd() * kinds.length)];
+    this.prop(name, cx, base, cz, yaw, 4.2);
+    if (rnd() < 0.7) {
+      const [x, z] = this.local(cx, cz, yaw, 5.5, 2.0);
+      this.prop('solarpanel', x, World.height(x, z), z, yaw + Math.PI / 2, 4.0, false);
     }
-    this.box(cx, base + 1.4, cz, 2.8, 2.8, 2.8, 0, steel);             // 아랫부분만 충돌
-    for (let i = 1; i < 7; i++) {
-      const y = base + i * (H / 7);
-      this.trim(cx, cz, 0, 0, y, 0, 2.6, 0.16, 2.6, i % 2 ? steel : red);
-    }
-    this.trim(cx, cz, 0, 0, base + H + 0.5, 0, 0.5, 1.0, 0.5, red);
+    this.lootSpot(cx, cz, yaw, 5.4, -2.2, base + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'depot', r: 5 });
   },
 
-  /* 건초 더미: 딛고 올라설 수 있는 부드러운 엄폐물 */
+  /* 착륙장. 평평해서 위로 걸어 올라갈 수 있고, 둘레에 유도등이 켜집니다. */
+  pad(cx, cz, yaw) {
+    const base = this.padY(cx, cz, 11, 11, yaw);
+    const big = rnd() < 0.5;
+    const name = big ? 'landingpad_large' : 'landingpad_small';
+    const s = big ? 4.4 : 4.8;
+    // 모델은 장식으로 두고, 딛고 올라설 판은 낮은 상자로 따로 깝니다
+    this.prop(name, cx, base, cz, yaw, s, false);
+    const b = SpaceKit.size(name, s);
+    if (b) this.box(cx, base + b.sy / 2, cz, b.sx * 0.86, b.sy, b.sz * 0.86, yaw, 0x6f7378);
+    for (let i = 0; i < 4; i++) {
+      const a = yaw + i * Math.PI / 2 + Math.PI / 4;
+      const r = (b ? b.sx : 9) * 0.62;
+      this.prop('lights', cx + Math.cos(a) * r, base, cz + Math.sin(a) * r, rnd() * 6.28, 2.4, false);
+    }
+    this.lootSpot(cx, cz, yaw, 0, 0, base + (b ? b.sy : 0.5) + 0.05);
+    World.buildings.push({ x: cx, z: cz, kind: 'pad', r: 6 });
+  },
+
+  /* 평평한 옥상에 기지 설비를 얹습니다.
+     전부 장식이라 충돌은 건드리지 않고, 지금 있는 건물이 그대로
+     기지 건물처럼 보이게 합니다. */
+  roofKit(cx, cz, yaw, w, d, roofY) {
+    const kinds = ['roofmodule_solarpanels', 'roofmodule_cargo_A',
+                   'roofmodule_cargo_B', 'roofmodule_cargo_C', 'roofmodule_base'];
+    const n = 1 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const lx = (rnd() - 0.5) * Math.max(0, w - 5.5);
+      const lz = (rnd() - 0.5) * Math.max(0, d - 5.5);
+      const [x, z] = this.local(cx, cz, yaw, lx, lz);
+      this.prop(kinds[Math.floor(rnd() * kinds.length)], x, roofY, z,
+                Math.round(rnd() * 4) * Math.PI / 2, 3.4, false);
+    }
+    if (rnd() < 0.6) {
+      const [x, z] = this.local(cx, cz, yaw, w / 2 - 1.4, d / 2 - 1.4);
+      this.prop('lights', x, roofY, z, rnd() * Math.PI * 2, 2.2, false);
+    }
+  },
+
+  /* 풍력 발전기: 멀리서도 보이는 이정표 */
+  mast(cx, cz) {
+    const base = World.height(cx, cz);
+    const yaw = rnd() * Math.PI * 2;
+    // 기둥만 충돌시키고(가느다란 밑동), 날개는 지나갈 수 있게 둡니다
+    this.prop(rnd() < 0.5 ? 'windturbine_tall' : 'windturbine_low', cx, base, cz, yaw, 13, false);
+    this.box(cx, base + 1.6, cz, 1.7, 3.2, 1.7, yaw, 0x8a8f96);
+  },
+
+  /* 보급 팔레트: 딛고 올라설 수 있는 낮은 엄폐물 */
   haystack(cx, cz) {
     const base = World.height(cx, cz);
-    const hay = 0xc9a94e;
-    this.box(cx, base + 0.55, cz, 2.4, 1.1, 2.4, rnd() * 0.6, hay);
-    if (rnd() < 0.6) this.box(cx + 0.3, base + 1.6, cz - 0.2, 2.0, 1.0, 2.0, rnd() * 0.6, 0xbb9c46);
+    this.prop(rnd() < 0.5 ? 'cargo_A' : 'cargo_B', cx, base, cz, rnd() * Math.PI * 2, 2.3);
     if (rnd() < 0.4) this.lootSpot(cx, cz, 0, 1.8, 0, base + 0.05);
   },
 
+  /* 화물 더미. 기지 부품 모델을 쓰고 충돌 상자는 모델 크기에서 뽑습니다. */
   container(cx, cz, yaw) {
     const base = World.height(cx, cz);
-    const palette = [0xb2553f, 0x3f6b8a, 0x5a7a4a, 0xb08a3c, 0x8a8a8a];
-    const color = palette[Math.floor(rnd() * palette.length)];
-    this.box(cx, base + 1.3, cz, 6.2, 2.6, 2.5, yaw, color);
-    if (rnd() < 0.3) {
-      this.box(cx, base + 3.95, cz, 6.2, 2.6, 2.5, yaw + (rnd() - 0.5) * 0.2, color);
-    }
-    if (rnd() < 0.4) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 5, 2.2, base + 2.65);
+    const kinds = ['cargo_A_stacked', 'cargo_B_stacked', 'cargo_A_packed', 'cargo_B_packed',
+                   'containers_A', 'containers_B', 'containers_C', 'containers_D'];
+    const name = kinds[Math.floor(rnd() * kinds.length)];
+    const s = name.indexOf('containers') === 0 ? 6.0 : 3.4;   // 팔레트류는 납작해서 크게
+    const b = this.prop(name, cx, base, cz, yaw, s);
+    if (!b) return;
+    if (rnd() < 0.4) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 5, b.sz / 2 + 1.6, base + 0.05);
   },
   /* ---------- 자연물 ---------- */
   scatterNature(towns) {
@@ -724,6 +841,21 @@ const Scenery = {
       this.rocks.push({ x: s0.x, y: s0.y, z: s0.z, s, rot: rnd() * Math.PI * 2 });
       // 보이는 크기(가로 1.5s)에 맞춰 충돌 반지름을 잡아야 1인칭에서 바위에 파묻히지 않습니다
       World.addCyl({ x: s0.x, z: s0.z, r: 1.45 * s, top: s0.y + 1.4 * s, h: 3 * s });
+    }
+
+    /* 기지에서 쓰는 것과 같은 바위·시추기를 땅에도 흩뿌립니다.
+       땅과 건물이 같은 세계에서 온 것처럼 보이게 하는 마무리입니다. */
+    for (let i = 0; i < 260; i++) {
+      const sp = World.freeSpot(4);
+      const r = rnd();
+      const name = r < 0.34 ? 'rock_A' : r < 0.62 ? 'rock_B' : r < 0.86 ? 'rocks_A' : 'rocks_B';
+      const sc = (name === 'rocks_B' ? 2.6 : 4.2) * (0.7 + rnd() * 0.8);
+      this.prop(name, sp.x, sp.y, sp.z, rnd() * Math.PI * 2, sc, name === 'rocks_B');
+    }
+    // 채굴 시추기: 마을 바깥에 서 있는 이정표
+    for (let i = 0; i < 16; i++) {
+      const sp = World.freeSpot(12);
+      this.prop('drill_structure', sp.x, sp.y, sp.z, rnd() * Math.PI * 2, 7.5);
     }
 
     for (let i = 0; i < Math.round(3400 * density); i++) {
@@ -783,6 +915,31 @@ const Scenery = {
     boxMesh.instanceMatrix.needsUpdate = true;
     if (boxMesh.instanceColor) boxMesh.instanceColor.needsUpdate = true;
     scene.add(boxMesh);
+
+    /* 우주 기지 부품: 같은 모델끼리 묶어 종류마다 드로우콜 하나로 그립니다.
+       모델 배율이 제각각이라 회전 방향은 화면 상자와 같은 규칙(-yaw)을 씁니다. */
+    if (this.props.length && SpaceKit.ready) {
+      const byName = new Map();
+      for (const pr of this.props) {
+        let a = byName.get(pr.name);
+        if (!a) { a = []; byName.set(pr.name, a); }
+        a.push(pr);
+      }
+      for (const [name, list] of byName) {
+        const geo = SpaceKit.geo[name];
+        if (!geo) continue;
+        const im = new THREE.InstancedMesh(geo, SpaceKit.mat, list.length);
+        im.castShadow = true; im.receiveShadow = true;
+        list.forEach((pr, i) => {
+          e.set(0, -pr.yaw, 0, 'YXZ');
+          q.setFromEuler(e);
+          m.compose(v.set(pr.x, pr.y, pr.z), q, sv.set(pr.s, pr.s, pr.s));
+          im.setMatrixAt(i, m);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        scene.add(im);
+      }
+    }
 
     // 불이 켜진 창: 그림자를 지지 않고 스스로 빛납니다
     if (glowDefs.length) {
