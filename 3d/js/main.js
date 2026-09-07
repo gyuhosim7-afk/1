@@ -634,12 +634,28 @@ const Main = {
     UI.el.lobbyBtn.addEventListener('click', () => {
       Game.state = 'menu'; Net.leaveMatch(); UI.showMenu(); Lobby.tab('play');
     });
-    // 캐릭터와 기지 부품은 첫 화면을 띄우면서 곧바로 읽어 둡니다
-    CharModel.load(this.MODEL_URL).then(() => { if (Lobby.ready) Lobby.refresh(); });
-    SpaceKit.load(this.KIT_URL).then(() => Lobby.buildBackdrop());
+    /* 캐릭터와 기지 부품은 첫 화면을 띄우면서 곧바로 읽어 둡니다.
+       파일(file://)로 직접 열면 브라우저가 모델 읽기를 막습니다. 그때 로비가
+       빈 화면으로만 남으면 무엇이 잘못됐는지 알 수 없으므로 이유를 적어 줍니다. */
+    Promise.all([
+      CharModel.load(this.MODEL_URL).then(ok => { if (Lobby.ready) Lobby.refresh(); return ok; }),
+      SpaceKit.load(this.KIT_URL).then(ok => { Lobby.buildBackdrop(); return ok; })
+    ]).then(([a, b]) => { if (!a || !b) this.showAssetError(); });
     UI.showMenu();
     this.last = performance.now();
     requestAnimationFrame(t => this.loop(t));
+  },
+
+  /* 모델을 못 읽었을 때 로비에 이유를 적습니다 */
+  showAssetError() {
+    const el = document.getElementById('shareHint');
+    if (!el) return;
+    const local = location.protocol === 'file:';
+    el.innerHTML = '<b style="color:#ff8b7a">3D 모델을 불러오지 못했습니다.</b><br>' + (local
+      ? 'HTML 파일을 직접 열면 브라우저가 모델 읽기를 막습니다.<br>'
+        + '<b>python3 -m http.server</b> 로 띄우고 http://localhost:8000 으로 열거나,<br>'
+        + '올려 둔 주소로 접속해 주세요.'
+      : '새로고침해도 같으면 models/ 폴더가 함께 올라갔는지 확인해 주세요.');
   },
 
   startGame() {
