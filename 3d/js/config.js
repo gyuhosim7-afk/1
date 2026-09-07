@@ -131,39 +131,39 @@ const CALIBERS = {
    model 생김새(없으면 키와 같은 모양), drop 이 true 면 보급 상자에서만 나옵니다 */
 const GUNS = {
   /* ---------- 권총 ---------- */
-  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xc9d1d9 },
-  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xb0763f, model:'pistol' },
+  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xf2cc60 },
+  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xe0a24a, model:'pistol' },
 
   /* ---------- 기관단총 ---------- */
-  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
-  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
-  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0x8fd3f4, model:'smg' },
+  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0xe0a24a },
+  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xf2cc60, model:'smg' },
+  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0xf2cc60, model:'smg' },
 
   /* ---------- 산탄총 ---------- */
   shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
-  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xd98a3c, model:'shotgun' },
+  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xffa657, model:'shotgun' },
 
   /* ---------- 돌격소총 ---------- */
-  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x79c0ff },
-  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x9ecbff, model:'rifle' },
-  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0xc09553, model:'rifle' },
+  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x7ee787 },
+  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x7ee787, model:'rifle' },
+  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0x79c0ff, model:'rifle' },
 
   /* ---------- 지정사수총 ---------- */
-  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
-  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
-  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0xff9a5b, model:'dmr' },
+  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0x79c0ff },
+  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0x7ee787, model:'dmr' },
+  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0x79c0ff, model:'dmr' },
   /* VSS 는 소음기와 조준경이 총에 붙어 있습니다. 조준경을 따로 달 수 없는 대신
      처음부터 4배율로 보이고 총성이 훨씬 작게 들립니다. */
-  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0x9aa8b5, model:'vss' },
+  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0xf2cc60, model:'vss' },
 
   /* ---------- 저격총 ---------- */
-  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
+  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0x79c0ff, model:'sniper' },
 
   /* ---------- 보급 상자에서만 나오는 무기 ---------- */
   sniper:  { name:'저격총',     short:'AWM',    ammo:'300',  dmg:105, rpm:38,  mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018, range:500, recoil:0.070, auto:false, canScope:true, color:0xd2a8ff, drop:true },
-  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x6fbf73, drop:true, model:'lmg' },
-  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x8b6ad6, drop:true, model:'rifle' },
-  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0xff9d76, drop:true, model:'dmr' }
+  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x7ee787, drop:true, model:'lmg' },
+  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x79c0ff, drop:true, model:'rifle' },
+  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0x79c0ff, drop:true, model:'dmr' }
 };
 
 const GUN_KEYS = Object.keys(GUNS);
@@ -189,9 +189,9 @@ const SCOPE_LEVELS = [2, 2, 2, 4, 4, 8];
    방어구: 조끼는 받는 피해를 줄이고, 가방은 챙길 수 있는 양을 늘립니다.
    ============================================================ */
 const VESTS = {
-  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
-  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
-  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6e7883 },
+  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x99a3ae },
+  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3742 }
 };
 /* ============================================================
    투척 무기
@@ -207,14 +207,14 @@ const THROW_KEYS = Object.keys(THROWABLES);
 
 /* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
 const HELMETS = {
-  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
-  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x3f6b8a },
-  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
+  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6e7883 },
+  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x99a3ae },
+  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3742 }
 };
 const BAGS = {
-  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x6b5a3c },
-  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x4a5539 },
-  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2f3a2a }
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x5f6873 },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x8a939e },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2b323b }
 };
 /* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
 const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
@@ -287,13 +287,15 @@ const SKINS = {
 };
 
 /* 총기 스킨: 금속·손잡이 색을 바꿉니다 */
+/* metal = 선체(밝은 면), dark = 기계부(어두운 면), wood = 손잡이·개머리판 폴리머.
+   기지 부품이 흰 선체에 주황·청록 띠라서, 총도 같은 계열로 맞췄습니다. */
 const GUN_SKINS = {
-  stock:  { name: '기본',      rarity: 'common',    metal: 0x33383f, dark: 0x1f2227, wood: 0x7a5433 },
-  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa89170, dark: 0x6f6047, wood: 0x8a6a42 },
-  frost:  { name: '한파',      rarity: 'rare',      metal: 0xbecbd4, dark: 0x74838f, wood: 0x9fb0bb },
-  carbon: { name: '카본',      rarity: 'epic',      metal: 0x22262c, dark: 0x121417, wood: 0x2c3138 },
-  neon:   { name: '네온',      rarity: 'epic',      metal: 0x24304a, dark: 0x141a27, wood: 0x2b6cff },
-  golden: { name: '황금',      rarity: 'legendary', metal: 0xd9ad3d, dark: 0x8a6c1f, wood: 0xb08a2a }
+  stock:  { name: '기본',      rarity: 'common',    metal: 0x525b66, dark: 0x22262c, wood: 0x343a42 },
+  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa8946e, dark: 0x4b4234, wood: 0x5f5340 },
+  frost:  { name: '한파',      rarity: 'rare',      metal: 0xb9c8d4, dark: 0x4c5b68, wood: 0x6c7b88 },
+  carbon: { name: '카본',      rarity: 'epic',      metal: 0x3a4048, dark: 0x14171b, wood: 0x21262c },
+  neon:   { name: '네온',      rarity: 'epic',      metal: 0x2c3a58, dark: 0x121826, wood: 0x1d2740 },
+  golden: { name: '황금',      rarity: 'legendary', metal: 0xc8a63f, dark: 0x5c4614, wood: 0x74601f }
 };
 
 /* 상자와 확률 (합이 1 이 되도록 맞춰 두었습니다) */

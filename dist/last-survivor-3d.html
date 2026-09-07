@@ -1131,39 +1131,39 @@ const CALIBERS = {
    model 생김새(없으면 키와 같은 모양), drop 이 true 면 보급 상자에서만 나옵니다 */
 const GUNS = {
   /* ---------- 권총 ---------- */
-  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xc9d1d9 },
-  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xb0763f, model:'pistol' },
+  pistol:  { name:'권총',       short:'P92',    ammo:'9mm',  dmg:22, rpm:340,  mag:15, reload:1.4, spread:0.028, adsSpread:0.011, range:120, recoil:0.020, auto:false, canScope:false, color:0xf2cc60 },
+  revolver:{ name:'리볼버',     short:'R45',    ammo:'45',   dmg:52, rpm:130,  mag:6,  reload:2.3, spread:0.030, adsSpread:0.009, range:150, recoil:0.048, auto:false, canScope:true,  color:0xe0a24a, model:'pistol' },
 
   /* ---------- 기관단총 ---------- */
-  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0x7ee787 },
-  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xa5d6a7, model:'smg' },
-  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0x8fd3f4, model:'smg' },
+  smg:     { name:'기관단총',   short:'UMP45',  ammo:'45',   dmg:18, rpm:640,  mag:30, reload:2.0, spread:0.043, adsSpread:0.019, range:110, recoil:0.014, auto:true,  canScope:true,  color:0xe0a24a },
+  vector:  { name:'기관단총',   short:'벡터',   ammo:'9mm',  dmg:12, rpm:1100, mag:25, reload:2.0, spread:0.040, adsSpread:0.016, range:95,  recoil:0.010, auto:true,  canScope:true,  color:0xf2cc60, model:'smg' },
+  mp5k:    { name:'기관단총',   short:'MP5K',   ammo:'9mm',  dmg:15, rpm:900,  mag:30, reload:2.1, spread:0.036, adsSpread:0.013, range:115, recoil:0.009, auto:true,  canScope:true,  color:0xf2cc60, model:'smg' },
 
   /* ---------- 산탄총 ---------- */
   shotgun: { name:'산탄총',     short:'S686',   ammo:'12ga', dmg:13, rpm:110,  mag:8,  reload:2.6, spread:0.075, adsSpread:0.058, range:45,  recoil:0.055, auto:false, pellets:8, canScope:false, color:0xffa657 },
-  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xd98a3c, model:'shotgun' },
+  s12k:    { name:'자동산탄총', short:'S12K',   ammo:'12ga', dmg:10, rpm:300,  mag:5,  reload:2.4, spread:0.082, adsSpread:0.066, range:40,  recoil:0.045, auto:true,  pellets:7, canScope:true,  color:0xffa657, model:'shotgun' },
 
   /* ---------- 돌격소총 ---------- */
-  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x79c0ff },
-  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x9ecbff, model:'rifle' },
-  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0xc09553, model:'rifle' },
+  rifle:   { name:'돌격소총',   short:'M416',   ammo:'556',  dmg:26, rpm:660,  mag:30, reload:2.3, spread:0.034, adsSpread:0.010, range:230, recoil:0.017, auto:true,  canScope:true,  color:0x7ee787 },
+  scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x7ee787, model:'rifle' },
+  ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0x79c0ff, model:'rifle' },
 
   /* ---------- 지정사수총 ---------- */
-  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0xffd166 },
-  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0xe8c07d, model:'dmr' },
-  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0xff9a5b, model:'dmr' },
+  dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0x79c0ff },
+  mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0x7ee787, model:'dmr' },
+  slr:     { name:'지정사수총', short:'SLR',    ammo:'762',  dmg:56, rpm:230,  mag:10, reload:2.9, spread:0.028, adsSpread:0.006, range:380, recoil:0.046, auto:false, canScope:true,  color:0x79c0ff, model:'dmr' },
   /* VSS 는 소음기와 조준경이 총에 붙어 있습니다. 조준경을 따로 달 수 없는 대신
      처음부터 4배율로 보이고 총성이 훨씬 작게 들립니다. */
-  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0x9aa8b5, model:'vss' },
+  vss:     { name:'소음 저격총', short:'VSS',   ammo:'9mm',  dmg:41, rpm:400,  mag:20, reload:2.6, spread:0.030, adsSpread:0.008, range:200, recoil:0.018, auto:true,  canScope:false, builtScope:4, quiet:0.45, color:0xf2cc60, model:'vss' },
 
   /* ---------- 저격총 ---------- */
-  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0xa9834a, model:'sniper' },
+  kar98:   { name:'저격총',     short:'Kar98k', ammo:'762',  dmg:78, rpm:44,   mag:5,  reload:3.1, spread:0.022, adsSpread:0.0022, range:420, recoil:0.062, auto:false, canScope:true, color:0x79c0ff, model:'sniper' },
 
   /* ---------- 보급 상자에서만 나오는 무기 ---------- */
   sniper:  { name:'저격총',     short:'AWM',    ammo:'300',  dmg:105, rpm:38,  mag:5,  reload:3.4, spread:0.020, adsSpread:0.0018, range:500, recoil:0.070, auto:false, canScope:true, color:0xd2a8ff, drop:true },
-  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x6fbf73, drop:true, model:'lmg' },
-  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x8b6ad6, drop:true, model:'rifle' },
-  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0xff9d76, drop:true, model:'dmr' }
+  m249:    { name:'경기관총',   short:'M249',   ammo:'556',  dmg:26, rpm:750,  mag:100,reload:4.6, spread:0.048, adsSpread:0.016, range:250, recoil:0.016, auto:true,  canScope:true, color:0x7ee787, drop:true, model:'lmg' },
+  groza:   { name:'돌격소총',   short:'그로자', ammo:'762',  dmg:34, rpm:700,  mag:30, reload:2.7, spread:0.034, adsSpread:0.011, range:250, recoil:0.024, auto:true,  canScope:true, color:0x79c0ff, drop:true, model:'rifle' },
+  mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0x79c0ff, drop:true, model:'dmr' }
 };
 
 const GUN_KEYS = Object.keys(GUNS);
@@ -1189,9 +1189,9 @@ const SCOPE_LEVELS = [2, 2, 2, 4, 4, 8];
    방어구: 조끼는 받는 피해를 줄이고, 가방은 챙길 수 있는 양을 늘립니다.
    ============================================================ */
 const VESTS = {
-  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6b7280 },
-  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x3f6b8a },
-  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3c4c }
+  1: { name: '방탄조끼 Lv1', reduce: 0.15, color: 0x6e7883 },
+  2: { name: '방탄조끼 Lv2', reduce: 0.28, color: 0x99a3ae },
+  3: { name: '방탄조끼 Lv3', reduce: 0.40, color: 0x2f3742 }
 };
 /* ============================================================
    투척 무기
@@ -1207,14 +1207,14 @@ const THROW_KEYS = Object.keys(THROWABLES);
 
 /* 헬멧: 머리에 맞은 피해를 줄여 줍니다. 조끼가 못 막던 헤드샷을 여기서 막습니다 */
 const HELMETS = {
-  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6b7280 },
-  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x3f6b8a },
-  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3c4c }
+  1: { name: '헬멧 Lv1', reduce: 0.30, color: 0x6e7883 },
+  2: { name: '헬멧 Lv2', reduce: 0.45, color: 0x99a3ae },
+  3: { name: '헬멧 Lv3', reduce: 0.58, color: 0x2f3742 }
 };
 const BAGS = {
-  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x6b5a3c },
-  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x4a5539 },
-  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2f3a2a }
+  1: { name: '가방 Lv1', meds: 2, ammo: 120, throw: 1, color: 0x5f6873 },
+  2: { name: '가방 Lv2', meds: 4, ammo: 260, throw: 2, color: 0x8a939e },
+  3: { name: '가방 Lv3', meds: 6, ammo: 420, throw: 4, color: 0x2b323b }
 };
 /* 바닥에 흔하게 떨어지는 등급 (보급 상자에서는 3레벨이 나옵니다) */
 const GEAR_LEVELS = [1, 1, 1, 2, 2, 3];
@@ -1287,13 +1287,15 @@ const SKINS = {
 };
 
 /* 총기 스킨: 금속·손잡이 색을 바꿉니다 */
+/* metal = 선체(밝은 면), dark = 기계부(어두운 면), wood = 손잡이·개머리판 폴리머.
+   기지 부품이 흰 선체에 주황·청록 띠라서, 총도 같은 계열로 맞췄습니다. */
 const GUN_SKINS = {
-  stock:  { name: '기본',      rarity: 'common',    metal: 0x33383f, dark: 0x1f2227, wood: 0x7a5433 },
-  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa89170, dark: 0x6f6047, wood: 0x8a6a42 },
-  frost:  { name: '한파',      rarity: 'rare',      metal: 0xbecbd4, dark: 0x74838f, wood: 0x9fb0bb },
-  carbon: { name: '카본',      rarity: 'epic',      metal: 0x22262c, dark: 0x121417, wood: 0x2c3138 },
-  neon:   { name: '네온',      rarity: 'epic',      metal: 0x24304a, dark: 0x141a27, wood: 0x2b6cff },
-  golden: { name: '황금',      rarity: 'legendary', metal: 0xd9ad3d, dark: 0x8a6c1f, wood: 0xb08a2a }
+  stock:  { name: '기본',      rarity: 'common',    metal: 0x525b66, dark: 0x22262c, wood: 0x343a42 },
+  sand:   { name: '사막',      rarity: 'rare',      metal: 0xa8946e, dark: 0x4b4234, wood: 0x5f5340 },
+  frost:  { name: '한파',      rarity: 'rare',      metal: 0xb9c8d4, dark: 0x4c5b68, wood: 0x6c7b88 },
+  carbon: { name: '카본',      rarity: 'epic',      metal: 0x3a4048, dark: 0x14171b, wood: 0x21262c },
+  neon:   { name: '네온',      rarity: 'epic',      metal: 0x2c3a58, dark: 0x121826, wood: 0x1d2740 },
+  golden: { name: '황금',      rarity: 'legendary', metal: 0xc8a63f, dark: 0x5c4614, wood: 0x74601f }
 };
 
 /* 상자와 확률 (합이 1 이 되도록 맞춰 두었습니다) */
@@ -3371,90 +3373,127 @@ const GunArt = {
 
   parts(key, sk) {
     sk = sk || GUN_SKINS.stock;
-    const B = Build, M = sk.metal, D = sk.dark, W = sk.wood, O = this.OLIVE;
-    const A = GUNS[key].color;
-    // 같은 계열 총은 생김새를 나눠 씁니다 (색은 총마다 다릅니다)
+    const B = Build, M = sk.metal, D = sk.dark, P = sk.wood;
+    const A = GUNS[key].color;          // 강조색 = 쓰는 탄의 색
+    /* 총열 위에 얹는 레일. 어느 총이든 같은 규칙으로 붙여 한 벌처럼 보이게 합니다. */
+    const rail = (len, y, z) => [
+      B.box(0.026, 0.012, len, D, 0, y, z),
+      B.box(0.010, 0.020, len, D, -0.013, y + 0.010, z),
+      B.box(0.010, 0.020, len, D, 0.013, y + 0.010, z)
+    ];
+    // 방아쇠울 + 손잡이 (기울여 쥐는 각도까지 같게)
+    const grip = (x, y, z, h, tilt) => [
+      B.box(0.048, h, 0.075, P, x, y, z, tilt || 0.28),
+      B.box(0.052, 0.014, 0.085, D, x, y + h / 2 - 0.01, z + 0.012),
+      B.box(0.040, 0.030, 0.010, D, x, y + h / 2 + 0.012, z + 0.055)
+    ];
+
     switch (GUNS[key].model || key) {
       case 'pistol': return [
-        B.box(0.055, 0.085, 0.24, M, 0, 0.03, 0.04),
-        B.box(0.05, 0.05, 0.19, D, 0, -0.03, 0.02),
-        B.box(0.052, 0.135, 0.07, D, 0, -0.10, -0.055, 0.30),
-        B.tube(0.013, 0.04, D, 0, 0.03, 0.17),
-        B.box(0.058, 0.018, 0.10, A, 0, 0.076, 0.05)
+        B.box(0.048, 0.072, 0.235, M, 0, 0.030, 0.030),          // 슬라이드
+        B.box(0.036, 0.020, 0.245, D, 0, 0.068, 0.028),          // 슬라이드 홈
+        B.box(0.052, 0.060, 0.150, D, 0, -0.022, 0.000),         // 프레임
+        B.tube(0.011, 0.05, D, 0, 0.030, 0.170),                 // 총구
+        B.box(0.046, 0.115, 0.062, P, 0, -0.095, -0.048, 0.30),  // 손잡이
+        B.box(0.030, 0.020, 0.055, D, 0, -0.052, 0.036),         // 방아쇠울
+        B.box(0.014, 0.014, 0.014, D, 0, 0.072, 0.140),          // 가늠쇠
+        B.box(0.030, 0.014, 0.014, D, 0, 0.072, -0.070),         // 가늠자
+        B.box(0.030, 0.008, 0.095, A, 0, 0.058, 0.055)           // 탄 표시등
       ];
-      case 'smg': return [
-        B.box(0.07, 0.115, 0.30, M, 0, 0.02, 0.03),
-        B.tube(0.016, 0.17, D, 0, 0.03, 0.25),
-        B.box(0.045, 0.20, 0.075, D, 0, -0.12, 0.02, 0.10),
-        B.box(0.05, 0.125, 0.06, D, 0, -0.08, -0.10, 0.32),
-        B.tube(0.014, 0.20, D, 0.028, 0.02, -0.22),
-        B.tube(0.014, 0.20, D, -0.028, 0.02, -0.22),
-        B.box(0.052, 0.022, 0.24, A, 0, 0.085, 0.04)
-      ];
-      case 'shotgun': return [
-        B.tube(0.025, 0.60, M, 0, 0.055, 0.32),
-        B.tube(0.025, 0.60, M, 0, 0.005, 0.32),
-        B.box(0.085, 0.115, 0.17, M, 0, 0.015, -0.04),
-        B.box(0.075, 0.07, 0.22, W, 0, -0.01, 0.18),
-        B.box(0.065, 0.125, 0.30, W, 0, -0.05, -0.30, -0.10),
-        B.box(0.07, 0.14, 0.03, D, 0, -0.075, -0.45),
-        B.box(0.02, 0.02, 0.06, A, 0, 0.09, 0.60)
-      ];
-      case 'rifle': return [
-        B.box(0.075, 0.125, 0.40, M, 0, 0.02, 0.0),
-        B.box(0.07, 0.085, 0.28, D, 0, 0.02, 0.32),
-        B.tube(0.017, 0.28, M, 0, 0.02, 0.56),
-        B.tube(0.027, 0.06, D, 0, 0.02, 0.71),
-        B.box(0.05, 0.024, 0.34, A, 0, 0.09, 0.06),
-        B.box(0.045, 0.22, 0.085, D, 0, -0.14, 0.02, 0.14),
-        B.box(0.05, 0.14, 0.065, D, 0, -0.09, -0.15, 0.34),
-        B.box(0.058, 0.105, 0.26, D, 0, 0.0, -0.32),
-        B.box(0.05, 0.035, 0.17, A, 0, 0.07, -0.30)
-      ];
-      case 'dmr': return [
-        B.box(0.07, 0.12, 0.34, M, 0, 0.02, 0.02),
-        B.tube(0.018, 0.44, M, 0, 0.03, 0.42),
-        B.tube(0.026, 0.05, D, 0, 0.03, 0.66),
-        B.box(0.068, 0.13, 0.34, W, 0, -0.035, -0.30, -0.05),
-        B.box(0.07, 0.06, 0.22, W, 0, 0.045, 0.26),
-        B.box(0.05, 0.145, 0.09, D, 0, -0.10, 0.10, 0.12),
-        B.box(0.05, 0.022, 0.30, A, 0, 0.088, 0.02)
-      ];
-      case 'sniper': return [
-        B.box(0.08, 0.13, 0.42, O, 0, 0.02, 0.04),
-        B.tube(0.021, 0.58, M, 0, 0.03, 0.54),
-        B.box(0.055, 0.055, 0.10, D, 0, 0.03, 0.85),
-        B.box(0.075, 0.15, 0.42, O, 0, -0.02, -0.34, -0.04),
-        B.box(0.05, 0.12, 0.10, D, 0, -0.10, 0.06),
-        B.box(0.05, 0.024, 0.34, A, 0, 0.095, 0.06),
-        B.box(0.02, 0.16, 0.02, D, 0.05, -0.06, 0.60, 0, 0, -0.35),
-        B.box(0.02, 0.16, 0.02, D, -0.05, -0.06, 0.60, 0, 0, 0.35)
-      ];
-      case 'vss': return [
-        B.box(0.068, 0.115, 0.30, D, 0, 0.02, 0.0),
-        B.tube(0.036, 0.40, D, 0, 0.03, 0.36),              // 총열을 감싼 소음기
-        B.tube(0.042, 0.05, M, 0, 0.03, 0.58),
-        B.box(0.05, 0.14, 0.09, D, 0, -0.10, -0.02, 0.10),
-        B.box(0.062, 0.115, 0.26, W, 0, -0.01, -0.26),      // 나무 개머리판
-        B.box(0.05, 0.022, 0.24, A, 0, 0.085, 0.02),
-        // 붙박이 조준경
-        B.tube(0.034, 0.22, D, 0, 0.165, 0.05),
-        B.tube(0.042, 0.03, M, 0, 0.165, 0.16),
-        B.box(0.03, 0.06, 0.03, D, 0, 0.115, -0.02),
-        B.box(0.03, 0.06, 0.03, D, 0, 0.115, 0.13),
-        B.box(0.02, 0.016, 0.02, 0x7ee787, 0, 0.20, 0.05)
-      ];
-      case 'lmg': return [
-        B.box(0.085, 0.135, 0.46, M, 0, 0.02, 0.0),
-        B.tube(0.020, 0.40, M, 0, 0.03, 0.44),
-        B.tube(0.030, 0.07, D, 0, 0.03, 0.67),
-        B.box(0.115, 0.145, 0.20, O, 0, -0.03, 0.02),      // 탄통
-        B.box(0.05, 0.024, 0.40, A, 0, 0.10, 0.06),
-        B.box(0.048, 0.20, 0.085, D, 0, -0.13, -0.02, 0.12),
-        B.box(0.062, 0.115, 0.28, O, 0, 0.0, -0.34),
-        B.box(0.02, 0.18, 0.02, D, 0.05, -0.07, 0.52, 0, 0, -0.40),
-        B.box(0.02, 0.18, 0.02, D, -0.05, -0.07, 0.52, 0, 0, 0.40)
-      ];
+
+      case 'smg': return [].concat(
+        [B.box(0.062, 0.100, 0.235, M, 0, 0.020, 0.030),         // 몸통
+         B.box(0.070, 0.058, 0.140, M, 0, 0.008, 0.215),         // 총열 덮개
+         B.tube(0.015, 0.10, D, 0, 0.020, 0.320),
+         B.tube(0.024, 0.045, D, 0, 0.020, 0.385),               // 소염기
+         B.box(0.040, 0.150, 0.062, D, 0, -0.090, 0.055, 0.06),  // 탄창
+         B.box(0.030, 0.070, 0.050, D, -0.048, 0.010, -0.120, 0, 0, 0.35),
+         B.box(0.030, 0.070, 0.050, D, 0.048, 0.010, -0.120, 0, 0, -0.35),
+         B.box(0.026, 0.030, 0.150, D, 0, 0.005, -0.140),        // 접이식 개머리판
+         B.box(0.052, 0.014, 0.170, A, 0, 0.055, 0.045)],
+        grip(0, -0.080, -0.070, 0.115, 0.24), rail(0.22, 0.078, 0.05));
+
+      case 'shotgun': return [].concat(
+        [B.tube(0.024, 0.58, M, 0, 0.048, 0.310),                // 위 총열
+         B.tube(0.024, 0.58, M, 0, 0.002, 0.310),                // 아래 총열
+         B.box(0.062, 0.020, 0.560, D, 0, 0.025, 0.310),         // 총열 사이 리브
+         B.box(0.078, 0.105, 0.185, M, 0, 0.018, -0.030),        // 약실
+         B.box(0.070, 0.062, 0.210, P, 0, 0.000, 0.175),         // 총열 덮개
+         B.box(0.062, 0.115, 0.290, P, 0, -0.048, -0.290, -0.10),// 개머리판
+         B.box(0.066, 0.130, 0.028, D, 0, -0.072, -0.435),
+         B.box(0.018, 0.020, 0.045, A, 0, 0.078, 0.590),         // 가늠쇠
+         B.box(0.040, 0.010, 0.120, A, 0, 0.072, -0.030)],
+        grip(0, -0.062, -0.090, 0.075, 0.22));
+
+      case 'rifle': return [].concat(
+        [B.box(0.068, 0.110, 0.360, M, 0, 0.020, 0.010),         // 몸통
+         B.box(0.062, 0.078, 0.300, M, 0, 0.016, 0.330),         // 총열 덮개
+         B.box(0.014, 0.052, 0.290, D, -0.034, 0.016, 0.330),    // 덮개 옆 방열 홈
+         B.box(0.014, 0.052, 0.290, D, 0.034, 0.016, 0.330),
+         B.tube(0.016, 0.24, D, 0, 0.016, 0.580),
+         B.tube(0.026, 0.055, D, 0, 0.016, 0.715),               // 소염기
+         B.box(0.046, 0.190, 0.072, D, 0, -0.115, 0.030, 0.05),  // 탄창
+         B.box(0.030, 0.075, 0.055, A, 0, -0.185, 0.024, 0.05),  // 탄창 바닥 표시
+         B.box(0.054, 0.095, 0.230, P, 0, 0.000, -0.290),        // 개머리판
+         B.box(0.048, 0.030, 0.120, D, 0, 0.052, -0.250),
+         B.box(0.040, 0.010, 0.300, A, 0, 0.078, 0.060)],        // 몸통 표시등
+        grip(0, -0.105, -0.105, 0.135, 0.26), rail(0.34, 0.082, 0.14));
+
+      case 'dmr': return [].concat(
+        [B.box(0.064, 0.108, 0.330, M, 0, 0.020, 0.020),
+         B.box(0.058, 0.070, 0.280, M, 0, 0.022, 0.320),
+         B.tube(0.017, 0.36, D, 0, 0.022, 0.560),
+         B.tube(0.025, 0.050, D, 0, 0.022, 0.760),
+         B.box(0.046, 0.170, 0.070, D, 0, -0.105, 0.060, 0.05),
+         B.box(0.060, 0.105, 0.290, P, 0, -0.020, -0.290, -0.06), // 개머리판
+         B.box(0.056, 0.036, 0.130, D, 0, 0.048, -0.230),         // 볼받침
+         B.box(0.038, 0.010, 0.260, A, 0, 0.078, 0.060)],
+        grip(0, -0.095, -0.075, 0.125, 0.26), rail(0.30, 0.080, 0.13));
+
+      case 'sniper': return [].concat(
+        [B.box(0.072, 0.118, 0.400, M, 0, 0.020, 0.040),
+         B.tube(0.019, 0.52, D, 0, 0.024, 0.520),
+         B.tube(0.030, 0.070, D, 0, 0.024, 0.800),               // 총구 제동기
+         B.box(0.066, 0.130, 0.380, P, 0, -0.028, -0.310, -0.05),// 개머리판
+         B.box(0.060, 0.040, 0.150, D, 0, 0.052, -0.250),
+         B.box(0.044, 0.120, 0.062, D, 0, -0.090, 0.070, 0.04),
+         B.box(0.040, 0.010, 0.320, A, 0, 0.084, 0.070),
+         B.box(0.018, 0.150, 0.018, D, 0.042, -0.070, 0.560, 0, 0, -0.32),  // 양각대
+         B.box(0.018, 0.150, 0.018, D, -0.042, -0.070, 0.560, 0, 0, 0.32),
+         B.box(0.090, 0.014, 0.020, D, 0, -0.140, 0.560)],
+        grip(0, -0.100, -0.060, 0.130, 0.28), rail(0.36, 0.086, 0.16));
+
+      case 'vss': return [].concat(
+        [B.box(0.062, 0.104, 0.280, D, 0, 0.020, 0.000),
+         B.tube(0.034, 0.42, D, 0, 0.022, 0.350),                // 총열을 감싼 소음기
+         B.box(0.056, 0.012, 0.380, D, 0, 0.056, 0.350),         // 소음기 위 방열판
+         B.tube(0.040, 0.045, M, 0, 0.022, 0.575),
+         B.box(0.044, 0.150, 0.066, D, 0, -0.095, 0.030, 0.05),
+         B.box(0.056, 0.100, 0.240, P, 0, -0.010, -0.250),       // 골조 개머리판
+         B.box(0.048, 0.026, 0.110, D, 0, 0.044, -0.210),
+         B.box(0.036, 0.010, 0.200, A, 0, 0.076, 0.020),
+         // 붙박이 조준경
+         B.tube(0.030, 0.20, D, 0, 0.160, 0.040),
+         B.tube(0.038, 0.030, M, 0, 0.160, 0.150),
+         B.box(0.026, 0.055, 0.026, D, 0, 0.115, -0.030),
+         B.box(0.026, 0.055, 0.026, D, 0, 0.115, 0.120),
+         B.box(0.020, 0.016, 0.014, 0x64e2d8, 0, 0.160, -0.062)],
+        grip(0, -0.090, -0.080, 0.120, 0.26));
+
+      case 'lmg': return [].concat(
+        [B.box(0.078, 0.125, 0.420, M, 0, 0.020, 0.010),
+         B.tube(0.019, 0.36, D, 0, 0.024, 0.430),
+         B.box(0.052, 0.016, 0.300, D, 0, 0.058, 0.430),         // 총열 위 방열판
+         B.tube(0.029, 0.065, D, 0, 0.024, 0.630),
+         B.box(0.110, 0.135, 0.185, P, 0, -0.040, 0.020),        // 탄통
+         B.box(0.092, 0.020, 0.150, A, 0, -0.108, 0.020),        // 탄통 걸쇠
+         B.box(0.058, 0.100, 0.250, P, 0, 0.000, -0.330),        // 개머리판
+         B.box(0.050, 0.030, 0.130, D, 0, 0.052, -0.290),
+         B.box(0.040, 0.010, 0.340, A, 0, 0.090, 0.060),
+         B.box(0.018, 0.165, 0.018, D, 0.046, -0.075, 0.480, 0, 0, -0.36),
+         B.box(0.018, 0.165, 0.018, D, -0.046, -0.075, 0.480, 0, 0, 0.36)],
+        grip(0, -0.110, -0.120, 0.140, 0.26), rail(0.30, 0.090, 0.10));
+
       default: return [B.box(0.08, 0.1, 0.4, M, 0, 0, 0)];
     }
   }
@@ -3785,20 +3824,29 @@ const LootArt = {
 
   /* 바닥에 떨어진 조준경 */
   scopeItemParts(level) {
-    const B = Build, D = 0x25282e, M = 0x3d434b;
+    const B = Build, D = 0x24282e, M = 0x555d66;
     const tint = SCOPES[level].color;
-    if (level <= 2) return [
-      B.box(0.20, 0.20, 0.16, D, 0, 0.12, 0),
-      B.box(0.15, 0.15, 0.02, tint, 0, 0.12, 0.09),
-      B.box(0.13, 0.05, 0.13, M, 0, 0.01, 0)
+    if (level <= 2) return [                                   // 레드도트
+      B.tube(0.052, 0.135, D, 0, 0.150, 0),                    // 짧은 경통
+      B.tube(0.062, 0.022, M, 0, 0.150, 0.072),                // 앞 테두리
+      B.tube(0.044, 0.012, tint, 0, 0.150, 0.080),             // 렌즈
+      B.tube(0.058, 0.022, M, 0, 0.150, -0.072),               // 뒤 테두리
+      B.box(0.040, 0.042, 0.040, M, 0, 0.198, 0.010),          // 밝기 조절기
+      B.box(0.055, 0.070, 0.055, D, 0, 0.078, 0),              // 마운트
+      B.box(0.135, 0.030, 0.115, M, 0, 0.040, 0)               // 레일 받침
     ];
-    const len = level >= 8 ? 0.46 : 0.34;
+    const big = level >= 8;
+    const len = big ? 0.42 : 0.32, r = big ? 0.058 : 0.048;
     return [
-      B.tube(level >= 8 ? 0.075 : 0.06, len, D, 0, 0.13, 0),
-      B.tube(level >= 8 ? 0.095 : 0.08, 0.06, M, 0, 0.13, len / 2),
-      B.tube(0.055, 0.05, tint, 0, 0.13, -len / 2 - 0.01),
-      B.box(0.05, 0.09, 0.05, M, 0, 0.05, len * 0.2),
-      B.box(0.05, 0.09, 0.05, M, 0, 0.05, -len * 0.2)
+      B.tube(r, len, D, 0, 0.150, 0),                          // 경통
+      B.tube(r * 1.35, 0.075, M, 0, 0.150, len / 2 + 0.02),    // 대물 렌즈통
+      B.tube(r * 1.28, 0.014, tint, 0, 0.150, len / 2 + 0.058),// 렌즈
+      B.tube(r * 1.12, 0.050, M, 0, 0.150, -len / 2 - 0.02),   // 접안부
+      B.box(0.045, 0.050, 0.045, M, 0, 0.205, 0.020),          // 위 조절 손잡이
+      B.box(0.050, 0.045, 0.045, M, 0.052, 0.150, 0.020),      // 옆 조절 손잡이
+      B.box(0.052, 0.075, 0.050, D, 0, 0.078, len * 0.22),     // 마운트 링
+      B.box(0.052, 0.075, 0.050, D, 0, 0.078, -len * 0.22),
+      B.box(0.150, 0.030, 0.130, M, 0, 0.040, 0)               // 레일 받침
     ];
   },
 
@@ -3822,45 +3870,68 @@ const LootArt = {
 
   /* 바닥에 떨어진 헬멧 */
   helmetParts(level) {
-    const B = Build, c = HELMETS[level].color, strap = 0x2a2d33;
+    const B = Build, c = HELMETS[level].color, D = 0x24282e, M = 0x555d66;
+    const glow = level >= 3 ? 0x64e2d8 : 0x8fa3b5;
     const parts = [
-      B.sphere(0.19, c, 0, 0.20, 0, 1.0, 0.78, 1.05, 14),
-      B.box(0.22, 0.035, 0.13, c, 0, 0.155, 0.14),
-      B.box(0.30, 0.04, 0.30, strap, 0, 0.055, 0)
+      B.sphere(0.180, c, 0, 0.150, -0.020, 1.0, 0.62, 1.02, 16),   // 낮게 눌린 껍데기
+      B.box(0.235, 0.050, 0.115, c, 0, 0.150, 0.150),              // 앞으로 뻗은 챙
+      B.box(0.290, 0.045, 0.120, c, 0, 0.135, -0.140),             // 뒤 목가리개
+      B.box(0.060, 0.115, 0.105, D, -0.155, 0.118, -0.010),        // 귀덮개
+      B.box(0.060, 0.115, 0.105, D, 0.155, 0.118, -0.010),
+      B.box(0.195, 0.055, 0.045, glow, 0, 0.110, 0.180),           // 앞 바이저 (챙 아래로 보입니다)
+      B.box(0.205, 0.022, 0.050, D, 0, 0.142, 0.182),              // 바이저 위 테두리
+      B.box(0.32, 0.045, 0.32, D, 0, 0.048, 0)                     // 받침대
     ];
-    for (let i = 0; i < level; i++) {
-      parts.push(B.box(0.035, 0.035, 0.018, 0xf0c453, -0.04 + i * 0.04, 0.245, 0.145));
+    if (level >= 2) {                                              // 옆 레일
+      parts.push(B.box(0.022, 0.030, 0.140, M, -0.170, 0.180, 0.000));
+      parts.push(B.box(0.022, 0.030, 0.140, M, 0.170, 0.180, 0.000));
+    }
+    if (level >= 3) {                                              // 윗면 레일 + 야시경 거치대
+      parts.push(B.box(0.150, 0.030, 0.036, M, 0, 0.252, -0.020));
+      parts.push(B.box(0.062, 0.062, 0.062, D, 0, 0.205, 0.165));
     }
     return parts;
   },
 
   /* 바닥에 떨어진 방탄조끼 */
   vestParts(level) {
-    const B = Build, c = VESTS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
+    const B = Build, c = VESTS[level].color, D = 0x24282e, M = 0x555d66;
+    const glow = level >= 3 ? 0x64e2d8 : 0x8fa3b5;
     const parts = [
-      B.box(0.34, 0.40, 0.16, c, 0, 0.30, 0),              // 몸판
-      B.box(0.40, 0.13, 0.15, c, 0, 0.38, 0),              // 어깨 부분
-      B.box(0.09, 0.42, 0.03, strap, -0.12, 0.30, 0.09),   // 앞 끈
-      B.box(0.09, 0.42, 0.03, strap, 0.12, 0.30, 0.09),
-      B.box(0.36, 0.07, 0.03, strap, 0, 0.16, 0.09),
-      B.box(0.13, 0.10, 0.05, strap, 0, 0.30, 0.10)        // 탄창 주머니
+      B.box(0.300, 0.360, 0.075, c, 0, 0.320, 0.045),        // 앞판
+      B.box(0.300, 0.320, 0.055, D, 0, 0.320, -0.045),       // 뒤판
+      B.box(0.085, 0.300, 0.150, D, -0.190, 0.320, 0),       // 옆구리 띠
+      B.box(0.085, 0.300, 0.150, D, 0.190, 0.320, 0),
+      B.box(0.075, 0.090, 0.155, c, -0.150, 0.470, 0),       // 어깨
+      B.box(0.075, 0.090, 0.155, c, 0.150, 0.470, 0),
+      B.box(0.230, 0.020, 0.085, D, 0, 0.400, 0.050),        // 앞판 이음매
+      B.box(0.075, 0.095, 0.045, M, -0.085, 0.230, 0.075),   // 탄창 주머니
+      B.box(0.075, 0.095, 0.045, M, 0.085, 0.230, 0.075),
+      B.box(0.060, 0.030, 0.035, glow, 0, 0.455, 0.075)      // 가슴 표시등
     ];
-    for (let i = 0; i < level; i++) parts.push(B.box(0.05, 0.05, 0.02, tag, -0.12 + i * 0.06, 0.47, 0.085));
+    for (let i = 0; i < level; i++) {
+      parts.push(B.box(0.030, 0.030, 0.020, glow, -0.045 + i * 0.045, 0.150, 0.080));
+    }
     return parts;
   },
 
   /* 바닥에 떨어진 가방 */
   bagParts(level) {
-    const B = Build, c = BAGS[level].color, strap = 0x2a2d33, tag = 0xf0c453;
-    const w = 0.30 + level * 0.045, h = 0.30 + level * 0.06, dz = 0.20 + level * 0.03;
+    const B = Build, c = BAGS[level].color, D = 0x24282e, M = 0x555d66;
+    const glow = level >= 3 ? 0x64e2d8 : 0x8fa3b5;
+    const w = 0.26 + level * 0.022, h = 0.28 + level * 0.030, d = 0.15 + level * 0.018;
     const parts = [
-      B.box(w, h, dz, c, 0, h / 2 + 0.02, 0),
-      B.box(w * 0.9, h * 0.34, dz * 0.5, c, 0, h * 0.72, dz * 0.5),   // 위 주머니
-      B.box(0.07, h * 0.9, 0.04, strap, -w * 0.28, h / 2, -dz / 2 - 0.02),
-      B.box(0.07, h * 0.9, 0.04, strap, w * 0.28, h / 2, -dz / 2 - 0.02),
-      B.box(w * 0.75, 0.06, 0.03, strap, 0, h * 0.42, dz / 2 + 0.01)
+      B.box(w, h, d, c, 0, h / 2 + 0.03, 0),                       // 몸통
+      B.box(w * 0.94, h * 0.26, d * 1.06, D, 0, h * 0.88, 0),      // 윗덮개
+      B.box(w * 0.62, h * 0.30, d * 0.55, c, 0, h * 0.36, d * 0.72), // 앞주머니
+      B.box(w * 0.66, 0.022, 0.030, M, 0, h * 0.50, d * 0.99),     // 앞주머니 지퍼
+      B.box(0.055, h * 0.92, 0.045, D, -w * 0.30, h / 2 + 0.03, -d * 0.62), // 멜빵
+      B.box(0.055, h * 0.92, 0.045, D, w * 0.30, h / 2 + 0.03, -d * 0.62),
+      B.box(w * 0.30, 0.030, 0.035, glow, 0, h * 0.98, d * 0.42)   // 표시등
     ];
-    for (let i = 0; i < level; i++) parts.push(B.box(0.045, 0.045, 0.02, tag, -0.09 + i * 0.07, h + 0.01, dz / 2));
+    for (let i = 0; i < level; i++) {
+      parts.push(B.box(0.032, 0.032, 0.022, glow, -w * 0.26 + i * 0.048, h * 0.14, d * 0.56));
+    }
     return parts;
   },
 
@@ -4305,17 +4376,28 @@ class Char3D {
     drop(this.helmetMesh, this.headMount); this.helmetMesh = null;
     if (!this.headMount) return;
     if (this.helmet) {
-      const c = HELMETS[this.helmet].color, strap = 0x2a2d33;
+      /* 바닥에 떨어진 헬멧(LootArt.helmetParts)과 같은 생김새를 머리 크기로 줄인 것입니다.
+         한쪽만 고치면 주울 때와 썼을 때가 달라 보이므로 함께 손봐야 합니다. */
+      const c = HELMETS[this.helmet].color, strap = 0x24282e, M = 0x555d66;
+      const glow = this.helmet >= 3 ? 0x64e2d8 : 0x8fa3b5;
       const parts = [
-        B.sphere(0.128, c, 0, 0.130, 0.012, 1.04, 0.92, 1.06, 16),      // 헬멧 껍데기
-        B.box(0.19, 0.024, 0.085, c, 0, 0.098, 0.115),                  // 챙
-        B.box(0.030, 0.10, 0.028, strap, -0.108, 0.040, 0.030),         // 턱끈
-        B.box(0.030, 0.10, 0.028, strap, 0.108, 0.040, 0.030)
+        B.sphere(0.132, c, 0, 0.118, -0.010, 1.0, 0.66, 1.02, 16),      // 낮게 눌린 껍데기
+        B.box(0.172, 0.036, 0.082, c, 0, 0.116, 0.112),                 // 앞으로 뻗은 챙
+        B.box(0.210, 0.033, 0.086, c, 0, 0.104, -0.102),                // 뒤 목가리개
+        B.box(0.044, 0.084, 0.076, strap, -0.114, 0.090, -0.006),       // 귀덮개
+        B.box(0.044, 0.084, 0.076, strap, 0.114, 0.090, -0.006),
+        B.box(0.142, 0.040, 0.032, glow, 0, 0.084, 0.132),              // 앞 바이저
+        B.box(0.150, 0.016, 0.036, strap, 0, 0.108, 0.134),
+        B.box(0.028, 0.072, 0.026, strap, -0.104, 0.028, 0.028),        // 턱끈
+        B.box(0.028, 0.072, 0.026, strap, 0.104, 0.028, 0.028)
       ];
-      if (this.helmet >= 2) parts.push(B.box(0.045, 0.038, 0.065, strap, 0.108, 0.140, 0.0));  // 옆 부착물
+      if (this.helmet >= 2) {
+        parts.push(B.box(0.016, 0.022, 0.102, M, -0.126, 0.136, 0.000));  // 옆 레일
+        parts.push(B.box(0.016, 0.022, 0.102, M, 0.126, 0.136, 0.000));
+      }
       if (this.helmet >= 3) {
-        parts.push(B.box(0.15, 0.028, 0.032, strap, 0, 0.218, 0.0));     // 윗면 레일
-        parts.push(B.box(0.045, 0.055, 0.045, 0x1f2227, 0, 0.190, 0.105)); // 앞쪽 야시경 거치대
+        parts.push(B.box(0.110, 0.022, 0.028, M, 0, 0.196, -0.014));      // 윗면 레일
+        parts.push(B.box(0.046, 0.046, 0.046, 0x1f2227, 0, 0.158, 0.122));// 앞쪽 야시경 거치대
       }
       this.helmetMesh = new THREE.Mesh(B.merge(parts), mat);
       this.helmetMesh.castShadow = true;
@@ -4323,13 +4405,22 @@ class Char3D {
     }
     if (this.bag) {
       const c = BAGS[this.bag].color;
-      const w = 0.25 + this.bag * 0.030, h = 0.24 + this.bag * 0.040, dz = 0.09 + this.bag * 0.020;
+      /* 등에 붙는 것이라 뒤로 많이 튀어나오면 총·몸과 한 덩어리로 보입니다.
+         납작하게 만들고, 윗덮개를 밝게 해서 실루엣이 나뉘도록 했습니다. */
+      const w = 0.23 + this.bag * 0.022, h = 0.22 + this.bag * 0.030, dz = 0.075 + this.bag * 0.013;
       const y0 = -0.19, z0 = -0.125;            // 척추뼈에서 등 한가운데에 붙입니다
+      const D = 0x24282e, M = 0x8a939e;
+      const glow = this.bag >= 3 ? 0x64e2d8 : 0x8fa3b5;
       const parts = [
-        B.box(w, h, dz, c, 0, y0, z0 - dz / 2),
-        B.box(w * 0.86, h * 0.30, dz * 0.6, c, 0, y0 + h * 0.24, z0 - dz * 0.9),
-        B.box(w * 0.7, 0.04, 0.03, 0x2a2d33, 0, y0 - 0.03, z0 - dz - 0.01)
+        B.box(w, h, dz, c, 0, y0, z0 - dz / 2),                                // 몸통
+        B.box(w * 0.96, h * 0.22, dz * 1.10, M, 0, y0 + h * 0.39, z0 - dz / 2),// 윗덮개 (밝게)
+        B.box(w * 0.58, h * 0.26, dz * 0.42, D, 0, y0 - h * 0.12, z0 - dz * 1.06), // 뒷주머니
+        B.box(w * 0.62, 0.018, 0.022, M, 0, y0 - h * 0.02, z0 - dz * 1.24),    // 지퍼
+        B.box(w * 0.26, 0.022, 0.026, glow, 0, y0 + h * 0.47, z0 - dz * 1.02)  // 표시등
       ];
+      for (let i = 0; i < this.bag; i++) {
+        parts.push(B.box(0.022, 0.022, 0.016, glow, -w * 0.22 + i * 0.036, y0 - h * 0.38, z0 - dz * 1.2));
+      }
       this.bagMesh = new THREE.Mesh(B.merge(parts), mat);
       this.bagMesh.castShadow = true;
       this.gearMount.add(this.bagMesh);
