@@ -14,9 +14,14 @@ OUT = sys.argv[3]                       # .../3d/models/spacebits.glb
 buf = bytearray()
 views, accs, meshes, nodes = [], [], [], []
 
-def pad4(b):
+def pad4(b, fill=b'\0'):
+    """4바이트 경계로 채웁니다.
+
+    glTF 규격은 JSON 청크는 공백(0x20)으로, BIN 청크는 0 으로 채우라고
+    합니다. JSON 을 0 으로 채우면 파서가 'Extra data' 로 거부합니다.
+    (길이가 우연히 4의 배수면 넘어가서 눈치채기 어렵습니다.)"""
     while len(b) % 4:
-        b += b'\0'
+        b += fill
     return b
 
 def add_view(data, target=None):
@@ -30,8 +35,14 @@ def add_view(data, target=None):
     views.append(v)
     return len(views) - 1
 
+KEEP = set(sys.argv[4].split(',')) if len(sys.argv) > 4 else None
+
+skipped = []
 for path in sorted(glob.glob(os.path.join(SRC, '*.gltf'))):
     name = os.path.splitext(os.path.basename(path))[0]
+    if KEEP is not None and name not in KEEP:
+        skipped.append(name)          # 코드가 부르지 않는 모델은 넣지 않습니다
+        continue
     g = json.load(open(path))
     bin_path = os.path.join(SRC, g['buffers'][0]['uri'])
     raw = open(bin_path, 'rb').read()
@@ -77,11 +88,13 @@ doc = {
     'samplers': [{'magFilter': 9729, 'minFilter': 9987, 'wrapS': 10497, 'wrapT': 10497}]
 }
 
-js = pad4(json.dumps(doc, separators=(',', ':')).encode('utf-8'))
+js = pad4(json.dumps(doc, separators=(',', ':')).encode('utf-8'), b' ')
 bn = pad4(bytes(buf))
 glb = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(bn))
 glb += struct.pack('<II', len(js), 0x4E4F534A) + js
 glb += struct.pack('<II', len(bn), 0x004E4942) + bn
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 open(OUT, 'wb').write(glb)
-print('%s — 모델 %d개, %.0f KB' % (OUT, len(nodes), len(glb) / 1024))
+print('%s — 모델 %d개, %.0f KB%s'
+      % (OUT, len(nodes), len(glb) / 1024,
+         (' (뺀 모델 %d개)' % len(skipped)) if skipped else ''))
