@@ -263,15 +263,21 @@ const Scenery = {
 
   /* 좌우·뒷벽에 창문을 냅니다 (yOff 는 바닥에서 창 중심까지 높이) */
   windows(cx, cz, yaw, w, d, h, base, count, yOff) {
-    const glass = 0x38505e;
+    /* 창은 일부에만 불이 켜집니다. 켜진 창은 스스로 빛나는 메시로 따로
+       그려서, 밤하늘 아래 마을이 멀리서도 눈에 들어오게 합니다. */
+    const pane = (x, y, z, sx, sy, sz) => {
+      const lit = rnd() < THEME.glassOn;
+      this.boxDefs.push({ x, y, z, sx, sy, sz, yaw, solid: false,
+        color: lit ? THEME.glassLit : THEME.glass, glow: lit, raw: true });
+    };
     for (let i = 0; i < count; i++) {
       const t = (i + 1) / (count + 1) - 0.5;
       for (const side of [-1, 1]) {
         const [x, z] = this.local(cx, cz, yaw, side * (w / 2 + 0.03), t * d * 0.8);
-        this.boxDefs.push({ x, y: base + yOff, z, sx: 0.12, sy: 1.0, sz: 1.3, yaw, color: glass, solid: false });
+        pane(x, base + yOff, z, 0.12, 1.0, 1.3);
       }
       const [bx, bz] = this.local(cx, cz, yaw, t * w * 0.8, d / 2 + 0.03);
-      this.boxDefs.push({ x: bx, y: base + yOff, z: bz, sx: 1.3, sy: 1.0, sz: 0.12, yaw, color: glass, solid: false });
+      pane(bx, base + yOff, bz, 1.3, 1.0, 0.12);
     }
   },
 
@@ -735,17 +741,34 @@ const Scenery = {
   },
 
   /* ---------- 인스턴스 메시 생성 ---------- */
+  /* 건물 색을 외계 식민지 쪽으로 옮깁니다.
+     원래 배색(벽은 밝게, 지붕과 창틀은 어둡게)의 밝기 차이는 그대로 두고
+     색상만 좁은 청보라 띠 안으로 모으고 채도를 낮춰, 흙빛 시골 마을이
+     금속과 콘크리트로 지은 전초 기지처럼 보이게 합니다.
+     raw 가 붙은 상자(창유리 등)는 색을 그대로 씁니다. */
+  tint(hex, out) {
+    out.setHex(hex);
+    const q = { h: 0, s: 0, l: 0 };
+    out.getHSL(q);
+    out.setHSL((THEME.buildHue + q.h * THEME.buildSpread) % 1,
+               Math.min(THEME.buildSat, 0.08 + q.s * 0.5),
+               q.l * THEME.buildLit + 0.03);
+    return out;
+  },
+
   buildInstances(scene) {
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     const v = new THREE.Vector3(), sv = new THREE.Vector3();
     const col = new THREE.Color();
 
-    // 건물 상자
+    // 건물 상자 — 불 켜진 창은 스스로 빛나므로 따로 모읍니다
+    const solidDefs = this.boxDefs.filter(b => !b.glow);
+    const glowDefs = this.boxDefs.filter(b => b.glow);
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
     const boxMat = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0.02 });
-    const boxMesh = new THREE.InstancedMesh(boxGeo, boxMat, this.boxDefs.length);
+    const boxMesh = new THREE.InstancedMesh(boxGeo, boxMat, solidDefs.length);
     boxMesh.castShadow = true; boxMesh.receiveShadow = true;
-    this.boxDefs.forEach((b, i) => {
+    solidDefs.forEach((b, i) => {
       /* 화면 상자의 방향은 충돌 상자와 반드시 같아야 합니다.
          부품 자리는 local() 로 잡는데 그 회전이 three.js 의 Y 회전과 반대여서,
          여기서 부호를 맞춰 주지 않으면 '벽이 없는데 막히고 벽이 있는데 통과되는'
@@ -754,11 +777,29 @@ const Scenery = {
       q.setFromEuler(e);
       m.compose(v.set(b.x, b.y, b.z), q, sv.set(b.sx, b.sy, b.sz));
       boxMesh.setMatrixAt(i, m);
-      boxMesh.setColorAt(i, col.setHex(b.color).convertSRGBToLinear());
+      const c = b.raw ? col.setHex(b.color) : this.tint(b.color, col);
+      boxMesh.setColorAt(i, c.convertSRGBToLinear());
     });
     boxMesh.instanceMatrix.needsUpdate = true;
     if (boxMesh.instanceColor) boxMesh.instanceColor.needsUpdate = true;
     scene.add(boxMesh);
+
+    // 불이 켜진 창: 그림자를 지지 않고 스스로 빛납니다
+    if (glowDefs.length) {
+      const litMat = new THREE.MeshStandardMaterial({
+        color: 0x05070a, emissive: srgb(THEME.glassLit),
+        emissiveIntensity: 0.62, roughness: 0.4, metalness: 0
+      });
+      const litMesh = new THREE.InstancedMesh(boxGeo, litMat, glowDefs.length);
+      glowDefs.forEach((b, i) => {
+        e.set(b.tilt || 0, -b.yaw, 0, 'YXZ');
+        q.setFromEuler(e);
+        m.compose(v.set(b.x, b.y, b.z), q, sv.set(b.sx, b.sy, b.sz));
+        litMesh.setMatrixAt(i, m);
+      });
+      litMesh.instanceMatrix.needsUpdate = true;
+      scene.add(litMesh);
+    }
 
     // 나무 줄기
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, 6);
