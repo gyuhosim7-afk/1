@@ -1,89 +1,284 @@
+<!-- 이 파일은 tools/build-single.py 가 3d/index.html 에서 만들어 냅니다.
+     직접 고치지 마세요. 고칠 곳은 3d/index.html 입니다. -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>라스트 서바이버</title>
-<link rel="stylesheet" href="css/style.css">
+<title>라스트 서바이버 3D</title>
+<link rel="stylesheet" href="3d/css/style.css">
 </head>
 <body>
-<canvas id="game"></canvas>
+<canvas id="scene"></canvas>
 <div id="hurt"></div>
-<div id="crosshair"></div>
 
-<!-- HUD -->
 <div id="hud" class="hidden">
-  <div id="topbar">
-    <div class="stat"><span class="label">생존자</span><b id="alive">30</b></div>
-    <div class="stat"><span class="label">처치</span><b id="kills">0</b></div>
-    <div class="stat zone"><span class="label">자기장</span><b id="zoneText">--</b></div>
+  <canvas id="compass" width="520" height="26"></canvas>
+
+  <div id="topleft">
+    <div class="chip"><span>생존자</span><b id="alive">30</b></div>
+    <div class="chip"><span>처치</span><b id="kills">0</b></div>
+    <div class="chip zone"><span id="zoneLabel">다음 자기장</span><b id="zoneText">0:40</b></div>
   </div>
 
   <div id="feed"></div>
 
-  <div id="minimapWrap">
-    <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="cross"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="ring"></i><i class="dot"></i></div>
+  <div id="scope" class="hidden">
+    <div class="lens">
+      <i class="v"></i><i class="h"></i><i class="dot"></i>
+      <i class="m m1"></i><i class="m m2"></i><i class="m m3"></i>
+      <b class="zoom">4x</b>
+    </div>
   </div>
+  <div id="winBanner" class="hidden"><b>치킨 디너!</b><span>마지막까지 살아남았습니다</span></div>
+  <div id="alt" class="hidden"><b>0</b><span>m</span><em>자유낙하</em></div>
+  <div id="hitmark"><i></i><i></i></div>
+  <div id="dmgDir"><i></i></div>
 
   <div id="prompt" class="hidden"></div>
 
-  <div id="bottombar">
+  <div id="healBar" class="hidden"><span>치료 중</span><div class="track"><div id="healFill"></div></div></div>
+
+  <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><span class="tabhint">TAB 전체 지도</span></div>
+
+  <div id="bottom">
     <div id="hpWrap">
       <div id="hpBar"><div id="hp"></div></div>
       <span id="hpText">100</span>
+      <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
+      <div id="gear">
+        <span id="fragTag" class="gearTag off" title="수류탄 (G)"><i class="gi frag"></i><b>-</b></span>
+        <span id="smokeTag" class="gearTag off" title="연막탄 (H)"><i class="gi smoke"></i><b>-</b></span>
+        <span id="helmetTag" class="gearTag off"><i class="gi helmet"></i><b>-</b></span>
+        <span id="vestTag" class="gearTag off"><i class="gi vest"></i><b>-</b></span>
+        <span id="bagTag" class="gearTag off"><i class="gi bag"></i><b>-</b></span>
+      </div>
     </div>
-    <div id="gunbox">
-      <div id="weapon">맨손</div>
-      <div id="ammo">무기를 주우세요</div>
-    </div>
-    <div id="medbox"><span class="kit"></span><b id="meds">1</b></div>
   </div>
 
-  <div id="helpbar">
-    <span><kbd>WASD</kbd> 이동</span>
-    <span><kbd>Shift</kbd> 달리기</span>
-    <span><kbd>마우스</kbd> 조준·사격</span>
-    <span><kbd>F</kbd> 줍기</span>
-    <span><kbd>R</kbd> 재장전</span>
-    <span><kbd>Q</kbd> 치료</span>
-    <span><kbd>M</kbd> 소리</span>
+  <div id="speedo" class="hidden"><b>0</b><span>km/h</span><em>픽업트럭</em></div>
+
+  <div id="gunbox">
+    <div id="gunName">맨손</div>
+    <div id="ammo">무기를 찾으세요</div>
+    <div id="slots">
+      <span data-slot="0"><em>1</em><b>비어 있음</b></span>
+      <span data-slot="1"><em>2</em><b>비어 있음</b></span>
+    </div>
+  </div>
+
+  <pre id="debug" class="hidden"></pre>
+
+  <div id="keys">
+    <span><kbd>WASD</kbd> 이동</span><span><kbd>Shift</kbd> 질주</span><span><kbd>Space</kbd> 점프</span>
+    <span><kbd>C</kbd> 앉기·브레이크</span><span><kbd>우클릭</kbd> 정조준</span>
+    <span><kbd>F</kbd> 줍기·탑승·상자</span>
+    <span><kbd>R</kbd> 재장전</span><span><kbd>Q</kbd> 치료</span>
+    <span><kbd>G</kbd> 수류탄</span><span><kbd>H</kbd> 연막탄</span><span><kbd>Z</kbd> 지점 표시</span><span><kbd>Tab</kbd> 지도</span><span><kbd>P</kbd> 진단</span>
   </div>
 </div>
 
-<!-- 시작 화면 -->
-<div id="menu" class="overlay">
-  <div class="panel">
-    <h1>라스트 서바이버</h1>
-    <p class="sub">마지막 한 명이 될 때까지 살아남으세요</p>
-    <ul class="rules">
-      <li>맵에 흩어진 <b>무기·탄약·구급킷</b>을 주워 무장합니다.</li>
-      <li><b>자기장</b>이 계속 좁아지고, 밖에 있으면 피해를 입습니다.</li>
-      <li>AI 생존자들도 서로 싸웁니다. 마지막까지 남으면 승리입니다.</li>
-    </ul>
-    <label class="field">봇 수
-      <input id="botCount" type="number" min="4" max="59" value="29">
-    </label>
-    <button id="startBtn">게임 시작</button>
-    <p class="hint">WASD 이동 · 마우스 조준/사격 · F 줍기 · R 재장전 · Q 치료</p>
+<div id="bigmap" class="hidden"><canvas id="bigmapCanvas" width="760" height="760"></canvas></div>
+
+<div id="pause" class="overlay hidden">
+  <div class="pausePanel">
+    <h2>일시 정지</h2>
+    <div class="settings">
+      <label class="row">
+        <span>마우스 감도</span>
+        <input type="range" data-set="sens" min="0.2" max="4" step="0.05">
+        <b data-val="sens">1.00</b>
+      </label>
+      <label class="row">
+        <span>정조준 감도</span>
+        <input type="range" data-set="ads" min="0.2" max="1.5" step="0.05">
+        <b data-val="ads">0.65</b>
+      </label>
+      <label class="row">
+        <span>소리 크기</span>
+        <input type="range" data-set="vol" min="0" max="1" step="0.05">
+        <b data-val="vol">0.80</b>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="invert">
+        <span>Y축 반전</span>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="edge">
+        <span>화면 끝 회전 보조 (마우스 잠금이 안 될 때만 쓰세요 — 커서를 가장자리로 옮기면 그쪽으로 계속 돌아갑니다)</span>
+      </label>
+      <label class="row check">
+        <input type="checkbox" data-set="fpv">
+        <span>1인칭 시점 (V 키로도 전환)</span>
+      </label>
+    </div>
+    <button id="resumeBtn">계속하기</button>
+    <p class="small">화면을 클릭해도 이어서 진행합니다 · <kbd>O</kbd> 설정 열고 닫기</p>
+  </div>
+</div>
+<div id="lockHint" class="hidden">마우스 잠금을 쓸 수 없습니다 — 움직인 만큼만 시점이 돌아가며, 커서가 창 밖으로 나가면 멈춥니다</div>
+
+<div id="menu" class="overlay lobbyOverlay">
+  <div id="lobby">
+    <header class="navBar">
+      <div class="logo">라스트 <em>서바이버</em></div>
+      <nav class="tabs">
+        <button data-tab="play" class="on">플레이</button>
+        <button data-tab="skin">커스터마이징</button>
+        <button data-tab="crate">보상</button>
+        <button data-tab="friend">친구</button>
+        <button data-tab="stats">전적</button>
+      </nav>
+      <div class="account">
+        <span class="bpTag">BP</span><b id="bp">0</b>
+        <span class="nick" id="navNick">생존자</span>
+      </div>
+    </header>
+
+    <!-- 플레이: 화면 왼쪽 아래 설정과 시작 버튼 -->
+    <section class="panel playDock" id="tab-play">
+      <div class="dockGroup">
+        <span class="dockLabel">닉네임</span>
+        <input id="nickInput" type="text" maxlength="12" placeholder="생존자">
+      </div>
+      <div class="dockGroup">
+        <span class="dockLabel">모드</span>
+        <div class="dockRow"><b id="modeName">솔로</b><span>봇 <input id="botCount" type="number" min="0" max="59" value="29">명</span></div>
+        <div id="peerList" class="peerList">혼자 플레이 중</div>
+      </div>
+      <div class="dockGroup">
+        <span class="dockLabel">시점</span>
+        <div class="segmented">
+          <button data-view="tpp">3인칭</button>
+          <button data-view="fpp" class="on">1인칭</button>
+        </div>
+      </div>
+      <button id="startBtn" class="startBtn">시작</button>
+      <p class="dockHint" id="shareHint">이 페이지 링크를 공유하면 같은 섬에서 함께 플레이합니다.
+        친구와 따로 접속할 때는 <b>친구</b> 탭의 섬 코드를 쓰세요.<br>
+        WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>Z</kbd> 지점 표시 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점<br>
+        수송기에서 <kbd>Space</kbd> 로 낙하합니다</p>
+    </section>
+
+    <!-- 보상(상자) -->
+    <section class="panel sheet hidden" id="tab-crate">
+      <h2>보상 상자</h2>
+      <p class="sheetSub">매치에서 모은 BP 로 상자를 열어 스킨을 모으세요.</p>
+      <div id="crateList"></div>
+      <details class="rates" open>
+        <summary>획득 확률 안내</summary>
+        <div id="rateTable"></div>
+      </details>
+    </section>
+
+    <!-- 커스터마이징 -->
+    <section class="panel sheet hidden" id="tab-skin">
+      <h2>커스터마이징</h2>
+      <p class="sheetSub">장착한 스킨은 로비와 전장에 그대로 반영됩니다.</p>
+      <h3>캐릭터</h3>
+      <div id="skinGrid" class="grid"></div>
+      <h3>총기 도장</h3>
+      <div id="gunGrid" class="grid"></div>
+    </section>
+
+    <!-- 친구 · 계정 -->
+    <section class="panel sheet hidden" id="tab-friend">
+      <h2>친구 · 계정</h2>
+      <p class="sheetSub">계정은 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 같은 섬 코드로 함께 합니다.</p>
+
+      <h3>내 계정</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>닉네임</span>
+          <input id="acctName" type="text" maxlength="12" placeholder="생존자">
+        </div>
+        <div class="acctRow">
+          <span>내 친구 코드</span>
+          <input id="myCode" type="text" readonly>
+          <button class="mini" id="copyCode">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>저장 코드</span>
+          <input id="saveCode" type="text" readonly>
+          <button class="mini" id="copySave">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 불러오기</span>
+          <input id="loadCode" type="text" placeholder="다른 기기의 저장 코드를 붙여 넣으세요">
+          <button class="mini" id="doLoad">불러오기</button>
+        </div>
+        <p class="acctNote" id="acctNote"></p>
+      </div>
+
+      <h3>친구 목록</h3>
+      <div class="acctRow">
+        <input id="friendCode" type="text" maxlength="8" placeholder="친구 코드 (6자리)">
+        <input id="friendName" type="text" maxlength="12" placeholder="표시할 이름 (선택)">
+        <button class="mini" id="addFriend">친구 추가</button>
+      </div>
+      <div id="friendList" class="friendList"></div>
+
+      <h3>같은 섬에서 함께 하기</h3>
+      <div class="acctBox">
+        <div class="acctRow">
+          <span>섬 코드 만들기</span>
+          <input id="islandCode" type="text" readonly>
+          <button class="mini" id="newIsland">새로 만들기</button>
+          <button class="mini" id="copyIsland">복사</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 참가</span>
+          <input id="joinIsland" type="text" maxlength="8" placeholder="친구가 준 8자리 코드">
+          <button class="mini" id="doJoin">이 섬에서 시작</button>
+        </div>
+        <p class="acctNote">같은 코드로 시작하면 지형·건물·아이템·차량·자기장이 완전히 같은 섬이 됩니다.
+          같은 링크를 함께 열어 두면 서로의 캐릭터도 실시간으로 보입니다.</p>
+      </div>
+    </section>
+
+    <!-- 전적 -->
+    <section class="panel sheet hidden" id="tab-stats">
+      <h2>전적</h2>
+      <p class="sheetSub">지금까지의 기록입니다.</p>
+      <div id="statList"></div>
+    </section>
   </div>
 </div>
 
-<!-- 결과 화면 -->
+<div id="reveal" class="overlay hidden">
+  <div class="revealBox">
+    <div class="revealCard" id="revealCard"></div>
+    <p class="small">화면을 클릭하면 닫힙니다</p>
+  </div>
+</div>
+<div id="lobbyToast" class="hidden"></div>
+
 <div id="over" class="overlay hidden">
-  <div class="panel">
+  <div class="panel resultPanel">
     <h1 id="result">탈락</h1>
     <p class="sub" id="resultSub"></p>
     <div id="resultStats" class="stats"></div>
-    <button id="againBtn">다시 하기</button>
+    <div id="rewardBox"></div>
+    <div class="btnRow">
+      <button id="lobbyBtn" class="ghost">로비로</button>
+      <button id="againBtn">다시 하기</button>
+    </div>
   </div>
 </div>
 
-<script src="js/config.js"></script>
-<script src="js/utils.js"></script>
-<script src="js/world.js"></script>
-<script src="js/entities.js"></script>
-<script src="js/ai.js"></script>
-<script src="js/game.js"></script>
-<script src="js/main.js"></script>
+<script src="3d/vendor/three.min.js"></script>
+<script src="3d/js/config.js"></script>
+<script src="3d/js/sfx.js"></script>
+<script src="3d/js/profile.js"></script>
+<script src="3d/js/account.js"></script>
+<script src="3d/js/world.js"></script>
+<script src="3d/js/scenery.js"></script>
+<script src="3d/js/entities.js"></script>
+<script src="3d/js/ai.js"></script>
+<script src="3d/js/game.js"></script>
+<script src="3d/js/net.js"></script>
+<script src="3d/js/lobby.js"></script>
+<script src="3d/js/main.js"></script>
 </body>
 </html>

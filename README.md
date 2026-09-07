@@ -5,8 +5,8 @@
 
 | 버전 | 실행 파일 | 설명 |
 | --- | --- | --- |
-| 3D 3인칭 | `3d/index.html` | three.js 기반. 언덕과 마을이 있는 섬, 어깨 너머 시점 |
-| 2D 탑다운 | `index.html` | HTML5 Canvas 기반. 위에서 내려다보는 시점 |
+| 3D 3인칭 | `index.html` (원본 `3d/`) | three.js 기반. 언덕과 마을이 있는 섬, 어깨 너머 시점 |
+| 2D 탑다운 | `2d/index.html` | HTML5 Canvas 기반. 위에서 내려다보는 시점 |
 
 3D 버전이 최신이며, 2D 버전은 그대로 남겨 두었습니다.
 
@@ -99,7 +99,8 @@ HTML5 Canvas와 순수 자바스크립트로만 만든 탑다운 버전입니다
 
 ## 실행 방법
 
-가장 간단한 방법은 `index.html` 을 브라우저로 여는 것입니다. 설치나 빌드가 필요 없습니다.
+가장 간단한 방법은 `index.html`(3D) 을 브라우저로 여는 것입니다. 설치나 빌드가 필요 없습니다.
+2D 판은 `2d/index.html` 입니다.
 
 ```bash
 # 방법 1: 파일을 그대로 열기
@@ -159,7 +160,10 @@ GitHub Pages 로 공개하려면 저장소 Settings → Pages 에서 브랜치�
 ## 구조
 
 ```
-3d/index.html      3D 버전 화면 구성과 HUD
+index.html         첫 화면 = 3D 판 (tools/build-single.py 가 3d/index.html 에서 만들어 냅니다)
+3d/index.html      3D 버전 화면 구성과 HUD (여기를 고칩니다)
+3d/vendor/         three.js r128 (MIT) — CDN 없이도 돌아가도록 저장소에 넣어 두었습니다
+2d/                2D 탑다운 판 한 벌
 3d/css/style.css   3D HUD 스타일
 3d/js/config.js    무기, 자기장, 스킨, 상자 확률 등 데이터
 3d/js/profile.js   BP, 보유 아이템, 상자 뽑기, 전적
