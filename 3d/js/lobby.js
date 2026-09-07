@@ -20,7 +20,7 @@ const Lobby = {
       uniforms: { top: { value: new THREE.Color(THEME.skyTop) }, bottom: { value: new THREE.Color(THEME.skyBottom) } },
       vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY;' +
-        'void main(){ float t = smoothstep(-0.08, 0.5, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
+        'void main(){ float t = smoothstep(-0.18, 1.02, vY); t = t*t*(3.0-2.0*t); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
     }));
     this.scene.add(sky);
 

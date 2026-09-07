@@ -51,7 +51,7 @@ const Game = {
       },
       vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 bottom; uniform float horizon; varying float vY;' +
-        'void main(){ float t = smoothstep(-0.05, 0.55, vY - horizon*0.0); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
+        'void main(){ float t = smoothstep(-0.18, 1.02, vY - horizon*0.0); t = t*t*(3.0-2.0*t); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
     });
     this.skyDome = new THREE.Mesh(skyGeo, skyMat);
     this.scene.add(this.skyDome);
