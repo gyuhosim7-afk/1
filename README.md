@@ -1,5 +1,11 @@
 # 라스트 서바이버 (Last Survivor)
 
+**▶ 바로 하기 — https://gyuhosim7-afk.github.io/1/**
+
+이 주소를 친구에게 그대로 보내면 됩니다. 같은 링크를 연 사람끼리 같은 섬에서 함께
+플레이합니다. 새 판을 올리면 파일 이름에 붙는 판 딱지(`?v=커밋번호`)가 바뀌므로,
+친구들은 새로고침만 하면 최신판을 받아 갑니다.
+
 브라우저에서 바로 돌아가는 배틀로얄 게임입니다. 설치나 빌드 없이 HTML 파일만 열면
 실행됩니다. 두 가지 버전이 들어 있습니다.
 
@@ -123,8 +129,20 @@ python3 tools/build-single.py
 이 명령은 `dist/last-survivor.html`(2D)과 `dist/last-survivor-3d.html`(3D)을 함께 만듭니다.
 3D 단일 파일은 three.js 만 CDN 에서 불러오고 나머지는 파일 안에 들어 있습니다.
 
-GitHub Pages 로 공개하려면 저장소 Settings → Pages 에서 브랜치를 선택해 배포한 뒤
-`https://<사용자명>.github.io/<저장소명>/` 으로 접속하면 됩니다.
+### GitHub Pages
+
+이 저장소는 GitHub Pages 로 공개되어 있습니다 — https://gyuhosim7-afk.github.io/1/
+
+Settings → Pages 에서 브랜치를 골라 배포하는 방식(Deploy from a branch)이라, 브랜치에
+푸시하면 1~2 분 뒤 자동으로 새 판이 올라갑니다.
+
+`tools/build-single.py` 가 첫 화면을 만들 때 css·js·모델 주소 뒤에 커밋 번호를
+`?v=` 로 붙입니다. 이게 없으면 브라우저가 예전에 받아 둔 js 를 계속 써서, 새로 올려도
+남들 화면은 옛날 그대로이거나 새 html 에 옛 js 가 섞여 깨집니다. 딱지가 바뀌면 주소가
+달라지므로 반드시 새로 받아 갑니다.
+
+다만 `index.html` 자체는 GitHub Pages 가 10 분쯤 캐시합니다. 방금 올린 것을 바로
+확인하려면 `Ctrl+Shift+R`(맥은 `Cmd+Shift+R`) 로 한 번만 강제 새로고침하세요.
 
 ## 조작
 
