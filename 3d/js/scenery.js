@@ -131,8 +131,8 @@ const Scenery = {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
-    const cGrass = srgb(0x53713a), cGrass2 = srgb(0x6c8447);
-    const cRock = srgb(0x6d6a63), cSand = srgb(0xb9ac86), cRoad = srgb(0x8a7f6b);
+    const cGrass = srgb(THEME.ground1), cGrass2 = srgb(THEME.ground2);
+    const cRock = srgb(THEME.rock), cSand = srgb(THEME.sand), cRoad = srgb(THEME.road);
     const tmp = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
@@ -190,7 +190,7 @@ const Scenery = {
     const geo = new THREE.PlaneGeometry(World.size * 1.25, World.size * 1.25, 32, 32);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
-      color: srgb(0x2b5b76), transparent: true, opacity: 0.86,
+      color: srgb(THEME.water), transparent: true, opacity: 0.86,
       roughness: 0.12, metalness: 0.4, flatShading: true
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -763,7 +763,7 @@ const Scenery = {
     // 나무 줄기
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: srgb(0x5b4433), roughness: 1 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: srgb(THEME.trunk), roughness: 1 });
     const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, this.trees.length);
     trunkMesh.castShadow = true;
 
@@ -771,9 +771,9 @@ const Scenery = {
     const pines = this.trees.filter(t => t.pine), leafs = this.trees.filter(t => !t.pine);
     const B = Build;
     const pineGeo = B.merge([
-      B.cone(1.00, 2.30, 0x2c4d31, 0, 0.95, 0),
-      B.cone(0.78, 1.90, 0x35583a, 0, 1.95, 0),
-      B.cone(0.54, 1.55, 0x3d6442, 0, 2.85, 0)
+      B.cone(1.00, 2.30, THEME.pine[0], 0, 0.95, 0),
+      B.cone(0.78, 1.90, THEME.pine[1], 0, 1.95, 0),
+      B.cone(0.54, 1.55, THEME.pine[2], 0, 2.85, 0)
     ]);
     const foliageMat = Mats.vc({ roughness: 0.95, metalness: 0, flatShading: true });
     const pineMesh = new THREE.InstancedMesh(pineGeo, foliageMat, Math.max(1, pines.length));
@@ -781,9 +781,9 @@ const Scenery = {
 
     // 활엽수 잎: 덩어리 여러 개
     const leafGeo = B.merge([
-      B.ico(1.08, 0x47692f, 0, 0, 0),
-      B.ico(0.80, 0x51763a, 0.82, 0.30, 0.18),
-      B.ico(0.72, 0x3f5e2b, -0.70, 0.20, -0.32)
+      B.ico(1.08, THEME.leaf[0], 0, 0, 0),
+      B.ico(0.80, THEME.leaf[1], 0.82, 0.30, 0.18),
+      B.ico(0.72, THEME.leaf[2], -0.70, 0.20, -0.32)
     ]);
     const leafMesh = new THREE.InstancedMesh(leafGeo, foliageMat, Math.max(1, leafs.length));
     leafMesh.castShadow = true;

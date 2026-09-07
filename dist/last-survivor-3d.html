@@ -1038,6 +1038,37 @@ const CFG = {
 };
 
 /* ============================================================
+   화면 분위기 (색을 한 곳에 모아 둡니다)
+   외계 행성의 밤: 검보라 하늘에 별과 성운, 붉은 흙과 보랏빛 암반.
+   ============================================================ */
+const THEME = {
+  skyTop:    0x090a1a,        // 하늘 꼭대기 (거의 검은 남색)
+  skyBottom: 0x3b2440,        // 지평선 (먼지 낀 보라)
+  fog:       0x2b1f33,
+  background:0x0c0a1a,
+
+  starLight: 0xdbe6ff,        // 멀리 있는 항성 — 희고 차갑습니다
+  starPower: 1.45,
+  hemiSky:   0x5a4a86, hemiGround: 0x2e1c14, hemiPower: 0.60,
+  ambient:   0x6d5f80, ambientPower: 0.22,
+  fillColor: 0x7f6fb8, fillPower: 0.5,
+
+  ground1:   0x4a3021,        // 붉은 흙 (밤이라 어둡게)
+  ground2:   0x5c3e2a,
+  rock:      0x3a3444,        // 보랏빛 암반
+  sand:      0x6a5942,        // 물가
+  road:      0x433c4c,
+  water:     0x123f4a,        // 검은 청록
+
+  trunk:     0x3b3039,        // 외계 식생
+  pine:      [0x27404c, 0x2f4b58, 0x395a66],
+  leaf:      [0x3a2f54, 0x463b62, 0x322947],
+
+  nebula1:   'rgba(140,90,200,0.30)',   // 성운 두 겹
+  nebula2:   'rgba(70,150,190,0.22)'
+};
+
+/* ============================================================
    탄약 구경
    총마다 따로 탄을 세지 않고 구경별로 한 주머니를 씁니다.
    같은 구경을 쓰는 총끼리 탄약을 나눠 쓰게 되어,
@@ -2525,8 +2556,8 @@ const Scenery = {
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
-    const cGrass = srgb(0x53713a), cGrass2 = srgb(0x6c8447);
-    const cRock = srgb(0x6d6a63), cSand = srgb(0xb9ac86), cRoad = srgb(0x8a7f6b);
+    const cGrass = srgb(THEME.ground1), cGrass2 = srgb(THEME.ground2);
+    const cRock = srgb(THEME.rock), cSand = srgb(THEME.sand), cRoad = srgb(THEME.road);
     const tmp = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
@@ -2584,7 +2615,7 @@ const Scenery = {
     const geo = new THREE.PlaneGeometry(World.size * 1.25, World.size * 1.25, 32, 32);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
-      color: srgb(0x2b5b76), transparent: true, opacity: 0.86,
+      color: srgb(THEME.water), transparent: true, opacity: 0.86,
       roughness: 0.12, metalness: 0.4, flatShading: true
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -3157,7 +3188,7 @@ const Scenery = {
     // 나무 줄기
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, 6);
     trunkGeo.translate(0, 0.5, 0);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: srgb(0x5b4433), roughness: 1 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: srgb(THEME.trunk), roughness: 1 });
     const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, this.trees.length);
     trunkMesh.castShadow = true;
 
@@ -3165,9 +3196,9 @@ const Scenery = {
     const pines = this.trees.filter(t => t.pine), leafs = this.trees.filter(t => !t.pine);
     const B = Build;
     const pineGeo = B.merge([
-      B.cone(1.00, 2.30, 0x2c4d31, 0, 0.95, 0),
-      B.cone(0.78, 1.90, 0x35583a, 0, 1.95, 0),
-      B.cone(0.54, 1.55, 0x3d6442, 0, 2.85, 0)
+      B.cone(1.00, 2.30, THEME.pine[0], 0, 0.95, 0),
+      B.cone(0.78, 1.90, THEME.pine[1], 0, 1.95, 0),
+      B.cone(0.54, 1.55, THEME.pine[2], 0, 2.85, 0)
     ]);
     const foliageMat = Mats.vc({ roughness: 0.95, metalness: 0, flatShading: true });
     const pineMesh = new THREE.InstancedMesh(pineGeo, foliageMat, Math.max(1, pines.length));
@@ -3175,9 +3206,9 @@ const Scenery = {
 
     // 활엽수 잎: 덩어리 여러 개
     const leafGeo = B.merge([
-      B.ico(1.08, 0x47692f, 0, 0, 0),
-      B.ico(0.80, 0x51763a, 0.82, 0.30, 0.18),
-      B.ico(0.72, 0x3f5e2b, -0.70, 0.20, -0.32)
+      B.ico(1.08, THEME.leaf[0], 0, 0, 0),
+      B.ico(0.80, THEME.leaf[1], 0.82, 0.30, 0.18),
+      B.ico(0.72, THEME.leaf[2], -0.70, 0.20, -0.32)
     ]);
     const leafMesh = new THREE.InstancedMesh(leafGeo, foliageMat, Math.max(1, leafs.length));
     leafMesh.castShadow = true;
@@ -5190,8 +5221,8 @@ const Game = {
     this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(0xbcc9d2), CFG.FOG_NEAR, CFG.FOG_FAR);
-    this.scene.background = new THREE.Color(0xa9c1d8);
+    this.scene.fog = new THREE.Fog(srgb(THEME.fog), CFG.FOG_NEAR, CFG.FOG_FAR);
+    this.scene.background = new THREE.Color(THEME.background);
 
     this.camera = new THREE.PerspectiveCamera(CFG.FOV, window.innerWidth / window.innerHeight, 0.12, 1400);
 
@@ -5200,8 +5231,8 @@ const Game = {
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false,
       uniforms: {
-        top: { value: new THREE.Color(0x4d7fb5) },
-        bottom: { value: new THREE.Color(0xd9d3c2) },
+        top: { value: new THREE.Color(THEME.skyTop) },
+        bottom: { value: new THREE.Color(THEME.skyBottom) },
         horizon: { value: 0.16 }
       },
       vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
@@ -5212,7 +5243,7 @@ const Game = {
     this.scene.add(this.skyDome);
 
     // 조명: 낮은 오후 해 + 하늘빛 + 반대쪽에서 들어오는 옅은 반사광
-    this.sun = new THREE.DirectionalLight(0xfff0d6, 2.35);
+    this.sun = new THREE.DirectionalLight(THEME.starLight, THEME.starPower);
     this.sun.position.set(70, 90, 40);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1536, 1536);
@@ -5222,9 +5253,9 @@ const Game = {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
-    this.scene.add(new THREE.HemisphereLight(0x9dc2e8, 0x46502f, 0.52));
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.20));   // 건물 안이 너무 어둡지 않도록
-    this.fill = new THREE.DirectionalLight(0x9fc4ee, 0.55);   // 그림자 없는 보조광
+    this.scene.add(new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, THEME.hemiPower));
+    this.scene.add(new THREE.AmbientLight(THEME.ambient, THEME.ambientPower));  // 건물 안이 너무 어둡지 않도록
+    this.fill = new THREE.DirectionalLight(THEME.fillColor, THEME.fillPower);   // 그림자 없는 보조광
     this.fill.position.set(-60, 40, -70);
     this.scene.add(this.fill);
 
@@ -5235,57 +5266,119 @@ const Game = {
     window.addEventListener('resize', () => this.resize());
   },
 
-  /* 하늘: 해와 구름 */
+  /* 하늘: 별밭 · 항성 · 성운 · 지평선의 행성 */
   buildSky() {
     const sunDir = new THREE.Vector3(0.55, 0.62, 0.33).normalize();
     this.sunDir = sunDir;
 
-    // 해 (빛나는 원)
+    // --- 별밭: 하늘 돔 안쪽에 흩뿌립니다 ---
+    const N = 1400;
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    const c0 = new THREE.Color();
+    for (let i = 0; i < N; i++) {
+      // 위쪽에 더 많이 보이도록 y 를 살짝 올려 잡습니다
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2;
+      const y = Math.abs(u) * 0.9 + 0.04, r = Math.sqrt(Math.max(0, 1 - y * y));
+      const R = 820;
+      pos[i * 3] = Math.cos(a) * r * R;
+      pos[i * 3 + 1] = y * R;
+      pos[i * 3 + 2] = Math.sin(a) * r * R;
+      // 흰색에서 푸른빛·붉은빛까지 살짝 섞습니다
+      const t = Math.random();
+      c0.setHSL(t < 0.75 ? 0.58 : 0.06, t < 0.75 ? 0.25 : 0.45, 0.72 + Math.random() * 0.28);
+      col[i * 3] = c0.r; col[i * 3 + 1] = c0.g; col[i * 3 + 2] = c0.b;
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    this.stars = new THREE.Points(starGeo, new THREE.PointsMaterial({
+      size: 3.4, sizeAttenuation: false, vertexColors: true,
+      transparent: true, opacity: 0.95, depthWrite: false, fog: false
+    }));
+    this.stars.renderOrder = -3;
+    this.scene.add(this.stars);
+
+    // --- 항성: 멀고 작고 차갑습니다 ---
     const c = document.createElement('canvas');
     c.width = c.height = 128;
     const g2 = c.getContext('2d');
-    const grad = g2.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(255,255,245,1)');
-    grad.addColorStop(0.22, 'rgba(255,238,196,0.85)');
-    grad.addColorStop(0.55, 'rgba(255,220,160,0.22)');
-    grad.addColorStop(1, 'rgba(255,210,150,0)');
+    const grad = g2.createRadialGradient(64, 64, 2, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.14, 'rgba(214,232,255,0.95)');
+    grad.addColorStop(0.38, 'rgba(150,190,255,0.30)');
+    grad.addColorStop(1, 'rgba(110,150,255,0)');
     g2.fillStyle = grad; g2.fillRect(0, 0, 128, 128);
-    const sunTex = new THREE.CanvasTexture(c);
     this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: sunTex, transparent: true, depthWrite: false, depthTest: false, fog: false
+      map: new THREE.CanvasTexture(c), transparent: true,
+      depthWrite: false, depthTest: true, fog: false     // 언덕 뒤로 넘어가면 가려집니다
     }));
-    this.sunSprite.scale.setScalar(220);
-    this.sunSprite.renderOrder = -1;
+    this.sunSprite.scale.setScalar(120);
+    this.sunSprite.renderOrder = -2;
     this.scene.add(this.sunSprite);
 
-    // 구름: 부드러운 얼룩 텍스처를 큰 판에 깔고 천천히 흘려보냅니다
+    // --- 지평선에 걸린 큰 행성: 띠가 있는 가스 행성과 고리 ---
+    const pc = document.createElement('canvas');
+    pc.width = pc.height = 256;
+    const g4 = pc.getContext('2d');
+    g4.clearRect(0, 0, 256, 256);
+    g4.save();
+    g4.beginPath(); g4.arc(128, 128, 96, 0, Math.PI * 2); g4.clip();
+    const pg = g4.createLinearGradient(0, 32, 0, 224);
+    pg.addColorStop(0, '#c98f6a'); pg.addColorStop(0.35, '#a86b52');
+    pg.addColorStop(0.6, '#8d5748'); pg.addColorStop(1, '#5f3a38');
+    g4.fillStyle = pg; g4.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 9; i++) {                       // 가로 띠
+      const y = 40 + i * 20 + Math.random() * 6;
+      g4.fillStyle = 'rgba(255,220,190,' + (0.05 + Math.random() * 0.09).toFixed(2) + ')';
+      g4.fillRect(0, y, 256, 4 + Math.random() * 7);
+    }
+    // 어두운 쪽 그림자
+    const sh = g4.createRadialGradient(88, 100, 20, 128, 128, 108);
+    sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(4,2,12,0.82)');
+    g4.fillStyle = sh; g4.fillRect(0, 0, 256, 256);
+    g4.restore();
+    // 고리
+    g4.save();
+    g4.translate(128, 128); g4.rotate(-0.32); g4.scale(1, 0.22);
+    g4.strokeStyle = 'rgba(220,196,170,0.42)'; g4.lineWidth = 13;
+    g4.beginPath(); g4.arc(0, 0, 132, 0, Math.PI * 2); g4.stroke();
+    g4.strokeStyle = 'rgba(200,176,150,0.24)'; g4.lineWidth = 6;
+    g4.beginPath(); g4.arc(0, 0, 152, 0, Math.PI * 2); g4.stroke();
+    g4.restore();
+    this.planet = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(pc), transparent: true,
+      depthWrite: false, depthTest: true, fog: false     // 지형에 가려지도록
+    }));
+    this.planet.scale.setScalar(330);
+    this.planet.renderOrder = -2;
+    this.planetDir = new THREE.Vector3(-0.72, 0.13, -0.68).normalize();
+    this.scene.add(this.planet);
+
+    // --- 성운: 색이 섞인 옅은 띠가 아주 천천히 흐릅니다 ---
     const cc = document.createElement('canvas');
     cc.width = cc.height = 512;
     const g3 = cc.getContext('2d');
     g3.clearRect(0, 0, 512, 512);
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 70; i++) {
       const x = Math.random() * 512, y = Math.random() * 512;
-      const r = 26 + Math.random() * 70;
-      const blobs = 3 + Math.floor(Math.random() * 4);
-      for (let b = 0; b < blobs; b++) {
-        const gr = g3.createRadialGradient(x + (Math.random() - 0.5) * r, y + (Math.random() - 0.5) * r * 0.6, 2,
-                                           x, y, r);
-        gr.addColorStop(0, 'rgba(255,255,255,0.55)');
-        gr.addColorStop(1, 'rgba(255,255,255,0)');
-        g3.fillStyle = gr;
-        g3.beginPath(); g3.arc(x + (Math.random() - 0.5) * r, y + (Math.random() - 0.5) * r * 0.5, r, 0, Math.PI * 2); g3.fill();
-      }
+      const r = 40 + Math.random() * 110;
+      const gr = g3.createRadialGradient(x, y, 2, x, y, r);
+      gr.addColorStop(0, Math.random() < 0.55 ? THEME.nebula1 : THEME.nebula2);
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g3.fillStyle = gr;
+      g3.beginPath(); g3.arc(x, y, r, 0, Math.PI * 2); g3.fill();
     }
     const cloudTex = new THREE.CanvasTexture(cc);
     cloudTex.wrapS = cloudTex.wrapT = THREE.RepeatWrapping;
-    cloudTex.repeat.set(5, 5);
-    const cloudGeo = new THREE.PlaneGeometry(7000, 7000);
-    cloudGeo.rotateX(Math.PI / 2);
+    cloudTex.repeat.set(3, 2);
+    /* 판이 아니라 하늘 돔 안쪽에 입힙니다.
+       판으로 깔면 하늘 한가운데에 판의 모서리가 직선으로 드러납니다. */
+    const cloudGeo = new THREE.SphereGeometry(860, 32, 20);
     this.clouds = new THREE.Mesh(cloudGeo, new THREE.MeshBasicMaterial({
-      map: cloudTex, transparent: true, opacity: 0.5, depthWrite: false, fog: false, side: THREE.DoubleSide
+      map: cloudTex, transparent: true, opacity: 0.5, depthWrite: false,
+      fog: false, side: THREE.BackSide, blending: THREE.AdditiveBlending
     }));
-    this.clouds.position.y = 330;
-    this.clouds.renderOrder = -1;
+    this.clouds.renderOrder = -2;
     this.scene.add(this.clouds);
   },
 
@@ -5701,12 +5794,14 @@ const Game = {
     this.sun.target.updateMatrixWorld();
     this.skyDome.position.set(p.x, 0, p.z);
 
-    // 해와 구름은 카메라를 따라다닙니다
+    // 하늘에 있는 것들은 카메라를 따라다닙니다 (멀리 있는 것처럼 보이게)
     const cp = this.camera.position;
     this.sunSprite.position.set(cp.x + sd.x * 800, cp.y + sd.y * 800, cp.z + sd.z * 800);
-    this.clouds.position.set(cp.x, 330, cp.z);
-    this.clouds.material.map.offset.x = (this.time * 0.0016) % 1;
-    this.clouds.material.map.offset.y = (this.time * 0.0007) % 1;
+    this.stars.position.set(cp.x, cp.y, cp.z);
+    const pd = this.planetDir;
+    this.planet.position.set(cp.x + pd.x * 760, cp.y + pd.y * 760, cp.z + pd.z * 760);
+    this.clouds.position.set(cp.x, cp.y, cp.z);
+    this.clouds.material.map.offset.x = (this.time * 0.0004) % 1;   // 성운은 아주 천천히
 
     this.updateWater();
 
@@ -7062,11 +7157,12 @@ const Game = {
         const h = World.height(x, z);
         const k = (j * S + i) * 4;
         let r, gg, b;
-        if (h < World.waterY) { r = 42; gg = 78; b = 104; }
-        else if (h < World.waterY + 1.6) { r = 176; gg = 162; b = 124; }
+        // 지형 색과 같은 계열로 (초록 지도가 붉은 땅 위에 뜨면 따로 놉니다)
+        if (h < World.waterY) { r = 18; gg = 63; b = 74; }
+        else if (h < World.waterY + 1.6) { r = 139; gg = 116; b = 87; }
         else {
           const t = Math.max(0, Math.min(1, (h - 2) / 26));
-          r = 74 + t * 66; gg = 94 + t * 48; b = 56 + t * 44;
+          r = 92 + t * 22; gg = 62 + t * 24; b = 44 + t * 46;
           const shade = (World.height(x + 3, z) - h) * 12;
           r -= shade; gg -= shade; b -= shade;
         }
@@ -7389,7 +7485,7 @@ const Lobby = {
   initScene() {
     if (this.scene) return;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(0x2b3446), 14, 62);
+    this.scene.fog = new THREE.Fog(srgb(THEME.fog), 14, 62);
     this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
     this.camera.position.set(0, 0.95, 4.5);
     this.camera.lookAt(0, 0.80, 0);
@@ -7398,7 +7494,7 @@ const Lobby = {
     const skyGeo = new THREE.SphereGeometry(150, 24, 16);
     const sky = new THREE.Mesh(skyGeo, new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color(0x1d2942) }, bottom: { value: new THREE.Color(0xb08054) } },
+      uniforms: { top: { value: new THREE.Color(THEME.skyTop) }, bottom: { value: new THREE.Color(THEME.skyBottom) } },
       vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY;' +
         'void main(){ float t = smoothstep(-0.08, 0.5, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
@@ -7408,13 +7504,13 @@ const Lobby = {
     // 바닥
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(220, 220),
-      new THREE.MeshStandardMaterial({ color: srgb(0x4a5539), roughness: 1 }));
+      new THREE.MeshStandardMaterial({ color: srgb(THEME.ground1), roughness: 1 }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
     // 뒤쪽 실루엣 (나무와 폐허)
-    const dark = new THREE.MeshStandardMaterial({ color: srgb(0x232b33), roughness: 1 });
+    const dark = new THREE.MeshStandardMaterial({ color: srgb(THEME.trunk), roughness: 1 });
     for (let i = 0; i < 14; i++) {
       const ang = -Math.PI * 0.15 + (i / 13) * Math.PI * 1.3;
       const dist = 22 + Math.random() * 16;
@@ -7428,8 +7524,8 @@ const Lobby = {
     this.scene.add(ruin);
 
     // 조명: 따뜻한 역광 + 앞쪽 보조광
-    this.scene.add(new THREE.HemisphereLight(0xa8c0dc, 0x3a3a28, 1.0));
-    const key = new THREE.DirectionalLight(0xffe0b0, 2.4);
+    this.scene.add(new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, 0.95));
+    const key = new THREE.DirectionalLight(THEME.starLight, 2.3);
     key.position.set(2.6, 3.2, 3.4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -7437,10 +7533,10 @@ const Lobby = {
     key.shadow.camera.top = 4; key.shadow.camera.bottom = -2;
     key.shadow.camera.near = 0.5; key.shadow.camera.far = 20;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffb877, 2.2);
+    const rim = new THREE.DirectionalLight(0x9a7fe0, 2.0);   // 보랏빛 역광
     rim.position.set(-3.2, 2.4, -3.6);
     this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.0);   // 얼굴이 어둡지 않도록
+    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.05);  // 얼굴이 어둡지 않도록
     fill.position.set(0.4, 1.6, 5);
     this.scene.add(fill);
 

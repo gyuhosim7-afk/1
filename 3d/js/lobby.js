@@ -8,7 +8,7 @@ const Lobby = {
   initScene() {
     if (this.scene) return;
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(srgb(0x2b3446), 14, 62);
+    this.scene.fog = new THREE.Fog(srgb(THEME.fog), 14, 62);
     this.camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 200);
     this.camera.position.set(0, 0.95, 4.5);
     this.camera.lookAt(0, 0.80, 0);
@@ -17,7 +17,7 @@ const Lobby = {
     const skyGeo = new THREE.SphereGeometry(150, 24, 16);
     const sky = new THREE.Mesh(skyGeo, new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color(0x1d2942) }, bottom: { value: new THREE.Color(0xb08054) } },
+      uniforms: { top: { value: new THREE.Color(THEME.skyTop) }, bottom: { value: new THREE.Color(THEME.skyBottom) } },
       vertexShader: 'varying float vY; void main(){ vY = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY;' +
         'void main(){ float t = smoothstep(-0.08, 0.5, vY); gl_FragColor = vec4(mix(bottom, top, t), 1.0); }'
@@ -27,13 +27,13 @@ const Lobby = {
     // 바닥
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(220, 220),
-      new THREE.MeshStandardMaterial({ color: srgb(0x4a5539), roughness: 1 }));
+      new THREE.MeshStandardMaterial({ color: srgb(THEME.ground1), roughness: 1 }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
     // 뒤쪽 실루엣 (나무와 폐허)
-    const dark = new THREE.MeshStandardMaterial({ color: srgb(0x232b33), roughness: 1 });
+    const dark = new THREE.MeshStandardMaterial({ color: srgb(THEME.trunk), roughness: 1 });
     for (let i = 0; i < 14; i++) {
       const ang = -Math.PI * 0.15 + (i / 13) * Math.PI * 1.3;
       const dist = 22 + Math.random() * 16;
@@ -47,8 +47,8 @@ const Lobby = {
     this.scene.add(ruin);
 
     // 조명: 따뜻한 역광 + 앞쪽 보조광
-    this.scene.add(new THREE.HemisphereLight(0xa8c0dc, 0x3a3a28, 1.0));
-    const key = new THREE.DirectionalLight(0xffe0b0, 2.4);
+    this.scene.add(new THREE.HemisphereLight(THEME.hemiSky, THEME.hemiGround, 0.95));
+    const key = new THREE.DirectionalLight(THEME.starLight, 2.3);
     key.position.set(2.6, 3.2, 3.4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -56,10 +56,10 @@ const Lobby = {
     key.shadow.camera.top = 4; key.shadow.camera.bottom = -2;
     key.shadow.camera.near = 0.5; key.shadow.camera.far = 20;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffb877, 2.2);
+    const rim = new THREE.DirectionalLight(0x9a7fe0, 2.0);   // 보랏빛 역광
     rim.position.set(-3.2, 2.4, -3.6);
     this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.0);   // 얼굴이 어둡지 않도록
+    const fill = new THREE.DirectionalLight(0xbcd4f0, 1.05);  // 얼굴이 어둡지 않도록
     fill.position.set(0.4, 1.6, 5);
     this.scene.add(fill);
 
