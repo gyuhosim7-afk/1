@@ -4119,57 +4119,70 @@ const CharArt = {
   }
 };
 
-/* 낙하산: 돔 지붕 + 줄 */
+/* 낙하산: 램에어(사각) 캐노피 + 산줄
+   기하의 원점이 '멜빵이 어깨에 걸리는 자리' 입니다. 예전에는 원점이 캐노피
+   쪽이라 줄이 머리 위 허공에서 끊겨 보였습니다. 원점을 어깨에 두면 좌우로
+   기울일 때도 사람을 축으로 캐노피가 도는 자연스러운 움직임이 됩니다. */
 const ChuteArt = {
   geo: null,
   build() {
     if (this.geo) return this.geo;
-    const dome = new THREE.SphereGeometry(2.7, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.52);
-    dome.scale(1, 0.62, 1);
-    const nd = dome.index ? dome.toNonIndexed() : dome;
-    const pos = nd.attributes.position, nor = nd.attributes.normal;
-    const positions = [], normals = [], colors = [];
-    const a = new THREE.Color(0xe8552f).convertSRGBToLinear();
-    const b = new THREE.Color(0xf2f0e6).convertSRGBToLinear();
-    for (let i = 0; i < pos.count; i += 3) {
-      // 삼각형마다 방위각을 보고 색을 번갈아 칠합니다
-      let mx = 0, mz = 0;
-      for (let k = 0; k < 3; k++) { mx += pos.getX(i + k); mz += pos.getZ(i + k); }
-      const ang = Math.atan2(mz / 3, mx / 3);
-      const slice = Math.floor((ang + Math.PI) / (Math.PI * 2) * 8);
-      const c = slice % 2 ? a : b;
-      for (let k = 0; k < 3; k++) {
-        positions.push(pos.getX(i + k), pos.getY(i + k) + 3.1, pos.getZ(i + k));
-        normals.push(nor.getX(i + k), nor.getY(i + k), nor.getZ(i + k));
-        colors.push(c.r, c.g, c.b);
+    const B = Build;
+    const CELLS = 7;
+    const span = 5.4, chord = 2.4, thick = 0.40;
+    const H = 3.6;                      // 어깨에서 캐노피까지
+    const arc = 0.34;                   // 날개 끝이 아래로 처지는 정도
+    const top = 0xe6edf4, under = 0xbcc6d1, rib = 0x39424d;
+    const edge = 0x64e2d8, cord = 0x2c333c;
+    const parts = [];
+    const cw = span / CELLS;
+    const anchors = [];                 // 줄을 매달 자리
+
+    for (let i = 0; i < CELLS; i++) {
+      const t = (i - (CELLS - 1) / 2) / ((CELLS - 1) / 2);   // -1 … 1
+      const ang = t * arc;
+      const x = Math.sin(ang) * (span * 0.5);
+      const y = H - (1 - Math.cos(ang)) * (span * 0.5);
+      parts.push(B.box(cw * 0.92, thick, chord, top, x, y, 0, 0, 0, -ang));
+      // 아랫면을 조금 어둡게 해서 두께가 보이게 합니다
+      parts.push(B.box(cw * 0.92, thick * 0.22, chord * 0.96, under,
+                       x + Math.sin(-ang) * thick * 0.42, y - Math.cos(ang) * thick * 0.42, 0, 0, 0, -ang));
+      // 앞전: 위쪽은 청록 띠, 아래쪽은 바람이 들어오는 셀 입구(어둡게)
+      parts.push(B.box(cw * 0.92, thick * 0.34, 0.16, edge,
+                       x + Math.sin(-ang) * thick * 0.22, y + Math.cos(ang) * thick * 0.22,
+                       chord * 0.5, 0, 0, -ang));
+      parts.push(B.box(cw * 0.74, thick * 0.40, 0.13, 0x1b2027,
+                       x + Math.sin(-ang) * -thick * 0.16, y - Math.cos(ang) * thick * 0.16,
+                       chord * 0.5 + 0.02, 0, 0, -ang));
+      // 칸막이
+      if (i < CELLS - 1) {
+        const a2 = (t + 1 / ((CELLS - 1) / 2)) * arc;
+        parts.push(B.box(0.05, thick * 1.06, chord * 0.98, rib,
+                         (x + Math.sin(a2) * (span * 0.5)) / 2,
+                         (y + H - (1 - Math.cos(a2)) * (span * 0.5)) / 2, 0, 0, 0, -(ang + a2) / 2));
+      }
+      if (i === 0 || i === (CELLS - 1) / 2 || i === CELLS - 1) {
+        for (const cz of [chord * 0.30, -chord * 0.30]) {
+          anchors.push([x, y - Math.cos(ang) * thick * 0.5, cz]);
+        }
       }
     }
-    dome.dispose(); if (nd !== dome) nd.dispose();
 
-    // 줄: 어깨에서 지붕 가장자리로
-    const lineParts = [];
-    for (let i = 0; i < 8; i++) {
-      const ang = (i / 8) * Math.PI * 2;
-      const x = Math.cos(ang) * 1.35, z = Math.sin(ang) * 1.35;
-      lineParts.push(Build.box(0.045, 3.0, 0.045, 0xd8d4c8, x, 1.7, z,
-                               Math.atan2(z, 1.7) * 0.55, 0, -Math.atan2(x, 1.7) * 0.55));
+    /* 산줄: 어깨(원점)에서 캐노피 아래로.
+       상자의 국소 +Y 가 줄 방향을 향하도록 각을 풉니다 (Euler XYZ 기준). */
+    for (const [ax, ay, az] of anchors) {
+      const L = Math.hypot(ax, ay, az);
+      const d = [ax / L, ay / L, az / L];
+      const rz = -Math.asin(Math.max(-1, Math.min(1, d[0])));
+      const rx = Math.atan2(d[2], d[1]);
+      parts.push(B.box(0.035, L, 0.035, cord, ax / 2, ay / 2, az / 2, rx, 0, rz));
     }
-    const lines = Build.merge(lineParts);
-    const lp = lines.attributes.position, ln = lines.attributes.normal, lc = lines.attributes.color;
-    for (let i = 0; i < lp.count; i++) {
-      positions.push(lp.getX(i), lp.getY(i), lp.getZ(i));
-      normals.push(ln.getX(i), ln.getY(i), ln.getZ(i));
-      colors.push(lc.getX(i), lc.getY(i), lc.getZ(i));
-    }
-    lines.dispose();
+    // 어깨 멜빵
+    parts.push(B.box(0.30, 0.10, 0.16, cord, 0, 0.03, 0));
+    parts.push(B.box(0.09, 0.16, 0.10, rib, 0, 0.12, 0));
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    geo.computeBoundingSphere();
-    this.geo = geo;
-    return geo;
+    this.geo = B.merge(parts);
+    return this.geo;
   }
 };
 
@@ -4554,7 +4567,7 @@ class Char3D {
         this.chuteMesh = new THREE.Mesh(ChuteArt.build(),
           Mats.vc({ roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
         this.chuteMesh.castShadow = true;
-        this.chuteMesh.position.y = 2.6;
+        this.chuteMesh.position.y = 1.45;   // 어깨 높이 (기하 원점이 멜빵 자리입니다)
         this.mesh.add(this.chuteMesh);
         this.chute = this.chuteMesh;
       }
