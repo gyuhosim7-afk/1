@@ -446,6 +446,8 @@ const Input = {
   ax: 0, az: 0,
   mode: 'lock',              // lock: 마우스 잠금 / free: 잠금 없이 움직인 만큼만 회전
   locked: false, settingsOpen: false,
+  lockedEver: false,         // 한 번이라도 잠겼다면 이 브라우저는 잠금을 지원합니다
+  lockFails: 0,
   mouseX: 0, mouseY: 0, inside: false, edgeX: 0, edgeY: 0, edgeAt: 0,
 
   init(canvas) {
@@ -454,13 +456,27 @@ const Input = {
     canvas.addEventListener('click', () => {
       Sfx.init();
       try { window.focus(); } catch (e) { /* 무시 */ }
-      if (Game.state === 'playing' && this.mode === 'lock' && !this.locked) canvas.requestPointerLock();
+      // 잠금 없는 모드로 넘어가 있어도 다시 시도합니다. 성공하면 잠금 모드로 돌아옵니다.
+      if (Game.state === 'playing') this.requestLock();
     });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (!this.locked) { this.fire = false; this.ads = false; }
+      if (this.locked) {
+        this.lockedEver = true; this.lockFails = 0;
+        this.dx = this.dy = 0;                  // 다시 잡을 때 쌓인 값으로 화면이 튀지 않게
+        if (this.mode === 'free') {             // 잠금이 되는 브라우저였습니다 — 돌아갑니다
+          this.mode = 'lock';
+          UI.el.lockHint.classList.add('hidden');
+        }
+      } else { this.fire = false; this.ads = false; }
     });
-    document.addEventListener('pointerlockerror', () => this.fallbackToFree());
+    /* 탭을 옮겼다 돌아온 직후에는 브라우저가 잠금 요청을 잠깐 거절합니다.
+       한 번이라도 잠긴 적이 있으면 지원되는 브라우저이므로, 그 거절 때문에
+       조작 방식을 바꾸지 않습니다. 다음 클릭에 다시 시도하면 됩니다. */
+    document.addEventListener('pointerlockerror', () => {
+      if (this.lockedEver) return;
+      if (++this.lockFails >= 3) this.fallbackToFree();
+    });
 
     // 잠금 여부와 상관없이 '움직인 거리'만 반영합니다.
     // 마우스를 멈추면 시점도 곧바로 멈춥니다.
@@ -481,7 +497,13 @@ const Input = {
     window.addEventListener('mouseout', e => { if (!e.relatedTarget) leave(); });
     document.addEventListener('mouseleave', leave);
     window.addEventListener('mouseleave', leave);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); });
+    document.addEventListener('visibilitychange', () => {
+      leave();
+      /* 다른 창을 보다 돌아오면 눌려 있던 것으로 남은 키와 사격 상태를 지웁니다.
+         (탭을 옮기는 사이 keyup 이 오지 않아 계속 달리거나 쏘는 일이 생깁니다) */
+      this.keys = {}; this.fire = false; this.ads = false;
+      this.dx = this.dy = 0;
+    });
     window.addEventListener('mouseover', () => { this.inside = true; });
     window.addEventListener('mousedown', e => {
       if (Game.state !== 'playing') return;
@@ -552,9 +574,19 @@ const Input = {
     if (this.settingsOpen) {
       this.fire = false; this.ads = false;
       if (this.locked) document.exitPointerLock();
-    } else if (this.mode === 'lock' && Game.state === 'playing' && !this.locked) {
-      this.canvas.requestPointerLock();
+    } else if (Game.state === 'playing') {
+      this.requestLock();          // 설정을 닫으면 다시 잠급니다 (거절되면 다음 클릭에)
     }
+  },
+
+  /* 마우스 잠금을 요청합니다. 거절은 조용히 넘기고 다음 클릭에 다시 시도합니다.
+     (크롬은 잠금이 풀린 직후 잠깐 동안 새 요청을 거절합니다) */
+  requestLock() {
+    if (this.locked || !this.canvas || !this.canvas.requestPointerLock) return;
+    try {
+      const r = this.canvas.requestPointerLock();
+      if (r && r.catch) r.catch(() => { /* 다음 클릭에 다시 */ });
+    } catch (e) { /* 무시 */ }
   },
 
   /* 마우스 잠금을 쓸 수 없는 브라우저에서는 잠금 없이 그대로 진행합니다 */
@@ -695,9 +727,9 @@ const Main = {
     UI.showGame();
     Game.start(n, opts || {});
     if (Input.mode === 'lock') {
-      Game.renderer.domElement.requestPointerLock();
-      // 잠금이 조용히 무시되는 브라우저에서는 대체 조작으로 넘어갑니다
-      setTimeout(() => { if (!Input.locked) Input.fallbackToFree(); }, 900);
+      Input.requestLock();
+      // 잠금이 조용히 무시되는 브라우저에서만 대체 조작으로 넘어갑니다
+      setTimeout(() => { if (!Input.locked && !Input.lockedEver) Input.fallbackToFree(); }, 1200);
     }
   },
 
@@ -720,8 +752,13 @@ const Main = {
     if (Game.state === 'playing') {
       // 마우스 잠금이 풀렸다고 게임을 영영 멈추지 않습니다.
       // 잠깐 기다렸다가 잠금 없이 그대로 이어서 진행합니다.
+      /* 잠금이 풀렸을 때 잠금 없는 모드로 넘길지 판단합니다.
+         한 번이라도 잠긴 적이 있거나(= 지원되는 브라우저) 지금 탭이 숨겨져
+         있으면 넘기지 않습니다. 예전에는 다른 탭에 1.2초만 있다 와도 조작이
+         잠금 없는 모드로 영구히 바뀌어, 커서가 남고 화면이 저절로 돌았습니다. */
       if (Input.mode === 'lock' && !Input.locked) {
-        if (!this.unlockAt) this.unlockAt = performance.now();
+        if (document.hidden || Input.lockedEver) this.unlockAt = 0;
+        else if (!this.unlockAt) this.unlockAt = performance.now();
         else if (performance.now() - this.unlockAt > 1200) Input.fallbackToFree();
       } else this.unlockAt = 0;
 
