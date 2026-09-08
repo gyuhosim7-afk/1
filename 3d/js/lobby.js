@@ -196,11 +196,24 @@ const Lobby = {
       authState: document.getElementById('authState'),
       authAction: document.getElementById('authAction'),
       authNote: document.getElementById('authNote'),
+      partyBox: document.getElementById('partyBox'),
+      partyNote: document.getElementById('partyNote'),
+      partyAddRow: document.getElementById('partyAddRow'),
+      partyCode: document.getElementById('partyCode'),
+      partyAdd: document.getElementById('partyAdd'),
+      partyFriends: document.getElementById('partyFriends'),
+      partyInvites: document.getElementById('partyInvites'),
+      partyRoomRow: document.getElementById('partyRoomRow'),
+      partyRoom: document.getElementById('partyRoom'),
+      partyLeave: document.getElementById('partyLeave'),
+      partyJoin: document.getElementById('partyJoin'),
+      partyDoJoin: document.getElementById('partyDoJoin'),
       joinIsland: document.getElementById('joinIsland'),
       navNick: document.getElementById('navNick')
     };
     this.bindAccount();
     this.bindAuth();
+    this.bindParty();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
@@ -326,6 +339,82 @@ const Lobby = {
     if (e.authNote && Auth.error) e.authNote.textContent = Auth.error;
   },
 
+  /* 친구·방 상태를 화면에 그립니다 */
+  renderParty() {
+    const e = this.el;
+    if (!e || !e.partyBox) return;
+    const on = typeof Party !== 'undefined' && Party.on;
+    // 로그인하지 않았으면 안내만 남기고 조작은 감춥니다
+    for (const k of ['partyAddRow', 'partyRoomRow']) if (e[k]) e[k].classList.toggle('hidden', !on);
+    if (e.partyNote) {
+      e.partyNote.textContent = on
+        ? (Party.room ? '방 ' + Party.room + ' — 함께: ' + Party.members.map(m => m.name).join(', ')
+                      : '친구를 초대하면 방이 만들어집니다. 같은 방 사람끼리 한 판에서 만납니다.')
+        : (Auth && Auth.enabled ? '구글로 로그인하면 친구를 등록하고 함께 플레이할 수 있습니다.'
+                                : '이 판에서는 함께 하기 기능이 꺼져 있습니다.');
+    }
+    if (!on) { if (e.partyFriends) e.partyFriends.innerHTML = ''; if (e.partyInvites) e.partyInvites.innerHTML = ''; return; }
+
+    if (e.partyRoom) e.partyRoom.value = Party.room || '';
+    if (e.partyLeave) e.partyLeave.classList.toggle('hidden', !Party.room);
+
+    e.partyFriends.innerHTML = Party.friends.length
+      ? Party.friends.map(f =>
+          '<div class="frow"><span class="dot' + (f.online ? ' on' : '') + '"></span>' +
+          '<b>' + this.esc(f.name) + '</b><span class="fcode">' + this.esc(f.code) + '</span>' +
+          '<button class="mini" data-invite="' + f.uid + '">초대</button>' +
+          '<button class="mini" data-unfriend="' + f.uid + '">삭제</button></div>').join('')
+      : '<p class="acctNote">아직 친구가 없습니다. 위에 친구 코드를 넣어 추가하세요.</p>';
+
+    e.partyInvites.innerHTML = Party.invites.map(v =>
+      '<div class="frow"><b>' + this.esc(v.name || '친구') + '</b>' +
+      '<span class="fcode">초대함</span>' +
+      '<button class="mini" data-accept="' + this.esc(v.room) + '">참가</button></div>').join('');
+  },
+
+  esc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+
+  bindParty() {
+    const e = this.el;
+    if (!e || !e.partyBox) return;
+    if (e.partyAdd) e.partyAdd.addEventListener('click', async () => {
+      const r = await Party.addFriend(e.partyCode.value);
+      this.toast(r.ok ? (r.name + ' 을(를) 친구로 추가했습니다') : r.why);
+      if (r.ok) e.partyCode.value = '';
+    });
+    if (e.partyDoJoin) e.partyDoJoin.addEventListener('click', async () => {
+      const r = await Party.joinRoom(e.partyJoin.value);
+      this.toast(r.ok ? ('방 ' + r.code + ' 에 들어갔습니다') : r.why);
+    });
+    if (e.partyLeave) e.partyLeave.addEventListener('click', () => {
+      Party.leaveRoom(); this.toast('방에서 나왔습니다');
+    });
+    if (e.partyCopy) e.partyCopy.addEventListener('click', () => {
+      if (!e.partyRoom.value) return;
+      navigator.clipboard && navigator.clipboard.writeText(e.partyRoom.value)
+        .then(() => this.toast('방 코드 복사됨')).catch(() => {});
+    });
+    // 목록 안의 단추들은 한 곳에서 받습니다 (다시 그려도 연결이 살아 있습니다)
+    e.partyBox.addEventListener('click', async ev => {
+      const b = ev.target.closest && ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.invite) {
+        const r = await Party.invite(b.dataset.invite);
+        this.toast(r.ok ? '초대를 보냈습니다' : r.why);
+      } else if (b.dataset.unfriend) {
+        await Party.removeFriend(b.dataset.unfriend);
+        this.toast('친구를 삭제했습니다');
+      } else if (b.dataset.accept) {
+        const r = await Party.joinRoom(b.dataset.accept);
+        this.toast(r.ok ? ('방 ' + r.code + ' 에 들어갔습니다') : r.why);
+      }
+    });
+    this.renderParty();
+  },
+
   bindAuth() {
     const e = this.el;
     if (!e || !e.authBtn) return;
@@ -395,7 +484,7 @@ const Lobby = {
   tab(name) {
     this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
-    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); this.renderAccount(); }
+    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); this.renderAccount(); this.renderParty(); }
   },
 
   buildCrates() {

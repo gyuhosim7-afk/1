@@ -711,6 +711,19 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 .acctNote.bad { color: #ff8a80; }
 
 .friendList { display: flex; flex-direction: column; gap: 6px; }
+/* 함께 하기 목록의 한 줄 */
+.frow {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line);
+}
+.frow b { font-weight: 600; }
+.frow .fcode { font-size: 11px; color: var(--muted); letter-spacing: .06em; margin-right: auto; }
+.frow .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,.22); flex: none;
+}
+.frow .dot.on { background: var(--accent); box-shadow: 0 0 8px rgba(100,226,216,.8); }
+.frow .mini { flex: none; }
 .friendRow {
   display: flex; align-items: center; gap: 10px;
   background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
@@ -957,7 +970,30 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
         <p class="acctNote" id="acctNote"></p>
       </div>
 
-      <h3>친구 목록</h3>
+      <h3>친구와 함께 하기</h3>
+      <div class="acctBox" id="partyBox">
+        <p class="acctNote" id="partyNote">로그인하면 친구를 등록하고 같은 판에서 함께 플레이할 수 있습니다.</p>
+        <div class="acctRow" id="partyAddRow">
+          <span>친구 코드로 추가</span>
+          <input id="partyCode" type="text" maxlength="8" placeholder="친구의 6자리 코드">
+          <button class="mini" id="partyAdd">추가</button>
+        </div>
+        <div id="partyFriends" class="friendList"></div>
+        <div id="partyInvites" class="friendList"></div>
+        <div class="acctRow" id="partyRoomRow">
+          <span>방 코드</span>
+          <input id="partyRoom" type="text" readonly placeholder="아직 방이 없습니다">
+          <button class="mini" id="partyCopy">복사</button>
+          <button class="mini" id="partyLeave">나가기</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 참가</span>
+          <input id="partyJoin" type="text" maxlength="6" placeholder="친구가 준 5자리 방 코드">
+          <button class="mini" id="partyDoJoin">참가</button>
+        </div>
+      </div>
+
+      <h3>이 기기에만 저장되는 친구 목록</h3>
       <div class="acctRow">
         <input id="friendCode" type="text" maxlength="8" placeholder="친구 코드 (6자리)">
         <input id="friendName" type="text" maxlength="12" placeholder="표시할 이름 (선택)">
@@ -2132,10 +2168,13 @@ const Auth = {
       this._db = dbMod.getFirestore(this._app);
       this._m = { auth: authMod, db: dbMod };
       this.ready = true;
+      // 로그인하면 친구 기능도 함께 켭니다
+      if (typeof Party !== 'undefined') { /* onAuthStateChanged 에서 시작합니다 */ }
 
       authMod.onAuthStateChanged(this._auth, u => {
         this.user = u ? { uid: u.uid, name: u.displayName || '', photo: u.photoURL || '' } : null;
-        if (u) this.pull();
+        if (u) { this.pull(); if (typeof Party !== 'undefined') Party.start(); }
+        else if (typeof Party !== 'undefined') Party.stop();
         this.onChange();
       });
       return true;
@@ -2232,6 +2271,396 @@ const Auth = {
     };
     if (now) send(); else this._saveT = setTimeout(send, 1500);
   }
+};
+
+/* ============================================================
+   친구와 함께 하기
+
+   왜 이렇게 나눴는가
+   - Firestore 로 위치를 실시간 전송하면 무료 한도가 금방 바닥납니다.
+     초당 18회 × 사람 수 만큼 쓰기가 발생하는데 무료는 하루 2만 건입니다.
+   - 그래서 Firestore 는 '드물게 바뀌는 것' 만 맡습니다.
+     친구 목록, 접속 상태, 초대, 그리고 브라우저끼리 서로를 찾게 해 주는
+     연결 주선(시그널링) 뿐입니다.
+   - 실제 위치·사격은 브라우저끼리 직접 주고받습니다(WebRTC). 서버를
+     거치지 않으므로 아무리 보내도 요금이 들지 않고 지연도 훨씬 짧습니다.
+
+   RTCRoom 은 net.js 가 기대하는 것과 똑같은 모양
+   (presence / emit / on / onPeers)을 갖췄습니다. 그래서 게임 로직은
+   그대로 두고 통신 방식만 갈아 끼울 수 있습니다.
+   ============================================================ */
+
+/* ---------- 브라우저끼리 직접 연결하는 방 ---------- */
+const RTCRoom = {
+  ICE: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }],
+
+  code: null, me: null, host: null,
+  conns: {},            // uid -> { pc, ch, open }
+  state: {},            // uid -> { name, presence }
+  handlers: {},
+  peersCb: null, gone: null,
+  mine: {},             // 내가 마지막으로 보낸 presence
+  _stop: [],
+
+  get joined() { return !!this.code; },
+
+  /* ---------- net.js 가 쓰는 네 가지 ---------- */
+  presence(patch) {
+    Object.assign(this.mine, patch);
+    this.bcast({ t: 'p', d: patch });
+    this.state[this.me] = this.state[this.me] || {};
+    Object.assign(this.state[this.me].presence = this.state[this.me].presence || {}, patch);
+    this.firePeers();
+    return Promise.resolve();
+  },
+  emit(topic, data) {
+    this.bcast({ t: 'e', k: topic, d: data });
+    return Promise.resolve();
+  },
+  on(topic, fn) { (this.handlers[topic] = this.handlers[topic] || []).push(fn); },
+  onPeers(cb, gone) { this.peersCb = cb; this.gone = gone; this.firePeers(); },
+
+  /* ---------- 안쪽 ---------- */
+  peerList() {
+    return Object.keys(this.state).map(uid => ({
+      peer: uid, kind: 'viewer',
+      isMe: uid === this.me, sameTab: uid === this.me,
+      name: this.state[uid].name || '',
+      presence: this.state[uid].presence || {}
+    }));
+  },
+
+  firePeers(left) {
+    if (this.peersCb) this.peersCb({ peers: this.peerList(), left: left || [] });
+  },
+
+  bcast(obj) {
+    const s = JSON.stringify(obj);
+    for (const uid in this.conns) {
+      const c = this.conns[uid];
+      if (c.ch && c.ch.readyState === 'open') {
+        try { c.ch.send(s); } catch (e) { /* 끊긴 상대는 무시 */ }
+      }
+    }
+  },
+
+  recv(uid, raw) {
+    let m; try { m = JSON.parse(raw); } catch (e) { return; }
+    if (m.t === 'p') {
+      const st = this.state[uid] = this.state[uid] || {};
+      st.presence = Object.assign(st.presence || {}, m.d);
+      this.firePeers();
+    } else if (m.t === 'e') {
+      for (const fn of (this.handlers[m.k] || [])) {
+        try { fn({ data: m.d, peer: uid, isMe: false, sameTab: false }); } catch (e) { /* 계속 */ }
+      }
+    }
+  },
+
+  /* 한 상대와의 연결을 엽니다.
+     둘 중 uid 가 작은 쪽이 먼저 말을 거는 것으로 정해, 양쪽이 동시에
+     제안해서 꼬이는 일을 막습니다. */
+  link(uid, sig) {
+    if (this.conns[uid]) return this.conns[uid];
+    const pc = new RTCPeerConnection({ iceServers: this.ICE });
+    const c = this.conns[uid] = { pc, ch: null };
+    const polite = this.me < uid;          // 내가 먼저 제안하는 쪽인가
+
+    pc.onicecandidate = e => { if (e.candidate) sig.send(uid, { ice: e.candidate.toJSON() }); };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.drop(uid);
+    };
+    const wire = ch => {
+      c.ch = ch;
+      ch.onmessage = e => this.recv(uid, e.data);
+      ch.onopen = () => {
+        this.state[uid] = this.state[uid] || {};
+        if (Object.keys(this.mine).length) ch.send(JSON.stringify({ t: 'p', d: this.mine }));
+        this.firePeers();
+      };
+      ch.onclose = () => this.drop(uid);
+    };
+    if (polite) {
+      wire(pc.createDataChannel('game', { ordered: true }));
+      pc.createOffer().then(o => pc.setLocalDescription(o))
+        .then(() => sig.send(uid, { sdp: pc.localDescription.toJSON() }))
+        .catch(() => {});
+    } else {
+      pc.ondatachannel = e => wire(e.channel);
+    }
+    return c;
+  },
+
+  async onSignal(uid, msg, sig) {
+    const c = this.link(uid, sig);
+    try {
+      if (msg.sdp) {
+        await c.pc.setRemoteDescription(msg.sdp);
+        if (msg.sdp.type === 'offer') {
+          await c.pc.setLocalDescription(await c.pc.createAnswer());
+          sig.send(uid, { sdp: c.pc.localDescription.toJSON() });
+        }
+      } else if (msg.ice) {
+        await c.pc.addIceCandidate(msg.ice);
+      }
+    } catch (e) { /* 늦게 도착한 신호는 버립니다 */ }
+  },
+
+  drop(uid) {
+    const c = this.conns[uid];
+    if (!c) return;
+    try { c.pc.close(); } catch (e) { /* 무시 */ }
+    delete this.conns[uid];
+    delete this.state[uid];
+    this.firePeers([{ peer: uid }]);
+  },
+
+  leave() {
+    for (const uid in this.conns) { try { this.conns[uid].pc.close(); } catch (e) { /* 무시 */ } }
+    for (const fn of this._stop) { try { fn(); } catch (e) { /* 무시 */ } }
+    this._stop = [];
+    this.conns = {}; this.state = {}; this.mine = {};
+    this.code = null; this.host = null;
+    this.firePeers();
+  }
+};
+
+/* ============================================================
+   친구와 초대 (Firestore)
+   여기서 다루는 것은 드물게 바뀌는 것뿐입니다 — 친구 목록, 접속 상태,
+   초대, 그리고 브라우저끼리 서로를 찾게 해 주는 신호. 실제 게임 통신은
+   위의 RTCRoom 이 브라우저끼리 직접 처리합니다.
+   ============================================================ */
+const Party = {
+  ready: false,
+  friends: [],          // [{ uid, name, code, online }]
+  invites: [],          // [{ from, name, room }]
+  room: null,           // 지금 들어가 있는 방 코드
+  isHost: false,
+  members: [],          // [{ uid, name }]
+  error: null,
+  _stop: [], _beat: 0, _seen: {},
+
+  get on() { return this.ready && typeof Auth !== 'undefined' && Auth.signedIn; },
+  get db() { return Auth._db; },
+  get F() { return Auth._m.db; },
+
+  /* 로그인 직후에 부릅니다 */
+  async start() {
+    if (typeof Auth === 'undefined' || !Auth.ready || !Auth.signedIn) return false;
+    try {
+      const F = this.F, uid = Auth.user.uid;
+      // 남들이 나를 찾을 수 있도록 공개 정보를 올립니다 (이름·친구 코드·접속 시각)
+      await F.setDoc(F.doc(this.db, 'profiles', uid), {
+        name: Profile.nickname(), code: Account.data.id, at: Date.now()
+      }, { merge: true });
+
+      // 나에게 온 초대를 지켜봅니다
+      this._stop.push(F.onSnapshot(F.collection(this.db, 'invites', uid, 'from'), snap => {
+        this.invites = snap.docs.map(d => Object.assign({ from: d.id }, d.data()))
+          .filter(v => Date.now() - (v.at || 0) < 120000);   // 2분 지난 초대는 버립니다
+        this.render();
+      }, () => { /* 권한 오류는 조용히 */ }));
+
+      this.ready = true;
+      await this.loadFriends();
+      this.beat();
+      this.render();
+      return true;
+    } catch (e) {
+      this.error = '친구 기능을 시작하지 못했습니다';
+      return false;
+    }
+  },
+
+  stop() {
+    for (const f of this._stop) { try { f(); } catch (e) { /* 무시 */ } }
+    this._stop = [];
+    clearInterval(this._beat);
+    this.ready = false; this.friends = []; this.invites = [];
+    this.leaveRoom();
+  },
+
+  /* 살아 있다는 표시. 30초마다 시각만 갱신합니다 (쓰기가 적어야 합니다) */
+  beat() {
+    clearInterval(this._beat);
+    const tick = async () => {
+      if (!this.on) return;
+      try {
+        const F = this.F;
+        await F.setDoc(F.doc(this.db, 'profiles', Auth.user.uid),
+                       { name: Profile.nickname(), code: Account.data.id, at: Date.now() },
+                       { merge: true });
+      } catch (e) { /* 무시 */ }
+      this.loadFriends();
+    };
+    this._beat = setInterval(tick, 30000);
+  },
+
+  /* 내 친구 목록을 읽고 각자의 접속 상태를 확인합니다 */
+  async loadFriends() {
+    if (!this.on) return;
+    try {
+      const F = this.F;
+      const mine = await F.getDoc(F.doc(this.db, 'players', Auth.user.uid));
+      const ids = ((mine.exists() && mine.data().friends) || []).slice(0, 50);
+      const out = [];
+      for (const uid of ids) {
+        const p = await F.getDoc(F.doc(this.db, 'profiles', uid));
+        if (!p.exists()) continue;
+        const d = p.data();
+        out.push({ uid, name: d.name || '생존자', code: d.code || '',
+                   online: Date.now() - (d.at || 0) < 90000 });
+      }
+      this.friends = out;
+      this.render();
+    } catch (e) { /* 무시 */ }
+  },
+
+  /* 친구 코드로 찾아 목록에 넣습니다 */
+  async addFriend(code) {
+    if (!this.on) return { ok: false, why: '먼저 로그인해 주세요' };
+    code = String(code || '').trim().toUpperCase();
+    if (code.length < 4) return { ok: false, why: '친구 코드를 확인해 주세요' };
+    if (code === Account.data.id) return { ok: false, why: '본인 코드입니다' };
+    try {
+      const F = this.F;
+      const q = F.query(F.collection(this.db, 'profiles'), F.where('code', '==', code));
+      const found = await F.getDocs(q);
+      if (found.empty) return { ok: false, why: '그 코드를 쓰는 사람이 없습니다' };
+      const doc0 = found.docs[0];
+      if (doc0.id === Auth.user.uid) return { ok: false, why: '본인 코드입니다' };
+      await F.setDoc(F.doc(this.db, 'players', Auth.user.uid),
+                     { friends: F.arrayUnion(doc0.id) }, { merge: true });
+      await this.loadFriends();
+      return { ok: true, name: (doc0.data() || {}).name || '생존자' };
+    } catch (e) {
+      return { ok: false, why: '친구를 찾지 못했습니다' };
+    }
+  },
+
+  async removeFriend(uid) {
+    if (!this.on) return;
+    try {
+      const F = this.F;
+      await F.setDoc(F.doc(this.db, 'players', Auth.user.uid),
+                     { friends: F.arrayRemove(uid) }, { merge: true });
+      await this.loadFriends();
+    } catch (e) { /* 무시 */ }
+  },
+
+  /* ---------- 방 ---------- */
+  newCode() {
+    const B = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = ''; for (let i = 0; i < 5; i++) s += B[(Math.random() * B.length) | 0];
+    return s;
+  },
+
+  /* 방을 열고 친구를 부릅니다 */
+  async invite(uid) {
+    if (!this.on) return { ok: false, why: '먼저 로그인해 주세요' };
+    try {
+      const F = this.F;
+      if (!this.room) { const r = await this.openRoom(); if (!r.ok) return r; }
+      await F.setDoc(F.doc(this.db, 'invites', uid, 'from', Auth.user.uid),
+                     { name: Profile.nickname(), room: this.room, at: Date.now() });
+      return { ok: true };
+    } catch (e) { return { ok: false, why: '초대를 보내지 못했습니다' }; }
+  },
+
+  async openRoom() {
+    try {
+      const F = this.F, code = this.newCode(), uid = Auth.user.uid;
+      await F.setDoc(F.doc(this.db, 'rooms', code), {
+        host: uid, at: Date.now(),
+        members: { [uid]: { name: Profile.nickname(), at: Date.now() } }
+      });
+      this.isHost = true;
+      this.joinLive(code);
+      return { ok: true, code };
+    } catch (e) { return { ok: false, why: '방을 만들지 못했습니다' }; }
+  },
+
+  async joinRoom(code) {
+    if (!this.on) return { ok: false, why: '먼저 로그인해 주세요' };
+    code = String(code || '').trim().toUpperCase();
+    try {
+      const F = this.F, uid = Auth.user.uid;
+      const ref = F.doc(this.db, 'rooms', code);
+      const snap = await F.getDoc(ref);
+      if (!snap.exists()) return { ok: false, why: '그런 방이 없습니다' };
+      await F.setDoc(ref, { members: { [uid]: { name: Profile.nickname(), at: Date.now() } } },
+                     { merge: true });
+      this.isHost = (snap.data().host === uid);
+      this.joinLive(code);
+      // 받은 초대는 지웁니다
+      try { await F.deleteDoc(F.doc(this.db, 'invites', uid, 'from', snap.data().host)); } catch (e) { /* 무시 */ }
+      return { ok: true, code };
+    } catch (e) { return { ok: false, why: '방에 들어가지 못했습니다' }; }
+  },
+
+  /* 방을 지켜보며 새 사람이 오면 브라우저끼리 직접 연결합니다 */
+  joinLive(code) {
+    const F = this.F, uid = Auth.user.uid;
+    this.room = code;
+    RTCRoom.code = code; RTCRoom.me = uid;
+    RTCRoom.state[uid] = { name: Profile.nickname(), presence: {} };
+
+    // 나에게 온 연결 신호
+    const sigCol = F.collection(this.db, 'rooms', code, 'sig');
+    const sig = {
+      send: (to, msg) => {
+        F.addDoc(sigCol, { from: uid, to, msg: JSON.stringify(msg), at: Date.now() })
+          .catch(() => {});
+      }
+    };
+    this._stop.push(F.onSnapshot(F.query(sigCol, F.where('to', '==', uid)), snap => {
+      snap.docChanges().forEach(ch => {
+        if (ch.type !== 'added') return;
+        const d = ch.doc.data();
+        if (this._seen[ch.doc.id]) return;
+        this._seen[ch.doc.id] = 1;
+        let msg; try { msg = JSON.parse(d.msg); } catch (e) { return; }
+        RTCRoom.onSignal(d.from, msg, sig);
+        F.deleteDoc(ch.doc.ref).catch(() => {});     // 쓴 신호는 지워 둡니다
+      });
+    }, () => { /* 무시 */ }));
+
+    // 방 인원 변화
+    this._stop.push(F.onSnapshot(F.doc(this.db, 'rooms', code), snap => {
+      if (!snap.exists()) { this.leaveRoom(); return; }
+      const d = snap.data() || {}, mem = d.members || {};
+      this.isHost = d.host === uid;
+      this.members = Object.keys(mem).map(k => ({ uid: k, name: (mem[k] || {}).name || '생존자' }));
+      for (const k of Object.keys(mem)) {
+        if (k === uid) continue;
+        RTCRoom.state[k] = RTCRoom.state[k] || { name: mem[k].name, presence: {} };
+        RTCRoom.link(k, sig);          // 이미 연결돼 있으면 아무 일도 하지 않습니다
+      }
+      RTCRoom.firePeers();
+      this.render();
+    }, () => { /* 무시 */ }));
+
+    if (typeof Net !== 'undefined') Net.useRTC();
+    this.render();
+  },
+
+  async leaveRoom() {
+    const code = this.room;
+    this.room = null; this.members = []; this.isHost = false;
+    RTCRoom.leave();
+    if (typeof Net !== 'undefined') Net.dropRTC();
+    if (!code || !this.on) { this.render(); return; }
+    try {
+      const F = this.F;
+      // 중첩 필드를 지울 때는 점 표기로 updateDoc 을 쓰는 것이 정확합니다
+      await F.updateDoc(F.doc(this.db, 'rooms', code),
+                        { ['members.' + Auth.user.uid]: F.deleteField() });
+    } catch (e) { /* 무시 */ }
+    this.render();
+  },
+
+  render() { if (typeof Lobby !== 'undefined' && Lobby.renderParty) Lobby.renderParty(); }
 };
 
 /* ============================================================
@@ -7500,19 +7929,34 @@ const Net = {
     let room = null;
     try { room = await window.claude.use('room'); } catch (e) { room = null; }
     if (!room) return false;
+    this.attach(room);
+    return true;
+  },
 
+  /* 통신 방식을 갈아 끼웁니다. presence / emit / on / onPeers 만 갖추면
+     어떤 것이든 됩니다 — 아티팩트의 room 이든, 브라우저끼리 직접 잇는
+     WebRTC 방이든 게임 로직은 달라지지 않습니다. */
+  attach(room) {
     this.room = room;
     this.ready = true;
-
     room.onPeers(change => this.onPeers(change), () => { this.ready = false; });
     room.on('start', m => this.onStart(m));
     room.on('shot', m => this.onShot(m));
     room.on('hit', m => this.onHit(m));
     room.on('pick', m => this.onPick(m));
     room.on('died', m => this.onDied(m));
-
     this.push({ mode: 'lobby', name: Profile.nickname(), skin: Profile.data.equipped.skin });
-    return true;
+  },
+
+  /* 친구 방에 들어갔을 때 (Party 가 부릅니다) */
+  useRTC() {
+    if (this.room === RTCRoom) return;
+    RTCRoom.handlers = {};
+    this.attach(RTCRoom);
+  },
+  dropRTC() {
+    if (this.room !== RTCRoom) return;
+    this.room = null; this.ready = false; this.players = {}; this.lobbyPeers = [];
   },
 
   push(patch) { if (this.online) this.room.presence(patch).catch(() => {}); },
@@ -7921,11 +8365,24 @@ const Lobby = {
       authState: document.getElementById('authState'),
       authAction: document.getElementById('authAction'),
       authNote: document.getElementById('authNote'),
+      partyBox: document.getElementById('partyBox'),
+      partyNote: document.getElementById('partyNote'),
+      partyAddRow: document.getElementById('partyAddRow'),
+      partyCode: document.getElementById('partyCode'),
+      partyAdd: document.getElementById('partyAdd'),
+      partyFriends: document.getElementById('partyFriends'),
+      partyInvites: document.getElementById('partyInvites'),
+      partyRoomRow: document.getElementById('partyRoomRow'),
+      partyRoom: document.getElementById('partyRoom'),
+      partyLeave: document.getElementById('partyLeave'),
+      partyJoin: document.getElementById('partyJoin'),
+      partyDoJoin: document.getElementById('partyDoJoin'),
       joinIsland: document.getElementById('joinIsland'),
       navNick: document.getElementById('navNick')
     };
     this.bindAccount();
     this.bindAuth();
+    this.bindParty();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
@@ -8051,6 +8508,82 @@ const Lobby = {
     if (e.authNote && Auth.error) e.authNote.textContent = Auth.error;
   },
 
+  /* 친구·방 상태를 화면에 그립니다 */
+  renderParty() {
+    const e = this.el;
+    if (!e || !e.partyBox) return;
+    const on = typeof Party !== 'undefined' && Party.on;
+    // 로그인하지 않았으면 안내만 남기고 조작은 감춥니다
+    for (const k of ['partyAddRow', 'partyRoomRow']) if (e[k]) e[k].classList.toggle('hidden', !on);
+    if (e.partyNote) {
+      e.partyNote.textContent = on
+        ? (Party.room ? '방 ' + Party.room + ' — 함께: ' + Party.members.map(m => m.name).join(', ')
+                      : '친구를 초대하면 방이 만들어집니다. 같은 방 사람끼리 한 판에서 만납니다.')
+        : (Auth && Auth.enabled ? '구글로 로그인하면 친구를 등록하고 함께 플레이할 수 있습니다.'
+                                : '이 판에서는 함께 하기 기능이 꺼져 있습니다.');
+    }
+    if (!on) { if (e.partyFriends) e.partyFriends.innerHTML = ''; if (e.partyInvites) e.partyInvites.innerHTML = ''; return; }
+
+    if (e.partyRoom) e.partyRoom.value = Party.room || '';
+    if (e.partyLeave) e.partyLeave.classList.toggle('hidden', !Party.room);
+
+    e.partyFriends.innerHTML = Party.friends.length
+      ? Party.friends.map(f =>
+          '<div class="frow"><span class="dot' + (f.online ? ' on' : '') + '"></span>' +
+          '<b>' + this.esc(f.name) + '</b><span class="fcode">' + this.esc(f.code) + '</span>' +
+          '<button class="mini" data-invite="' + f.uid + '">초대</button>' +
+          '<button class="mini" data-unfriend="' + f.uid + '">삭제</button></div>').join('')
+      : '<p class="acctNote">아직 친구가 없습니다. 위에 친구 코드를 넣어 추가하세요.</p>';
+
+    e.partyInvites.innerHTML = Party.invites.map(v =>
+      '<div class="frow"><b>' + this.esc(v.name || '친구') + '</b>' +
+      '<span class="fcode">초대함</span>' +
+      '<button class="mini" data-accept="' + this.esc(v.room) + '">참가</button></div>').join('');
+  },
+
+  esc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g,
+      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+
+  bindParty() {
+    const e = this.el;
+    if (!e || !e.partyBox) return;
+    if (e.partyAdd) e.partyAdd.addEventListener('click', async () => {
+      const r = await Party.addFriend(e.partyCode.value);
+      this.toast(r.ok ? (r.name + ' 을(를) 친구로 추가했습니다') : r.why);
+      if (r.ok) e.partyCode.value = '';
+    });
+    if (e.partyDoJoin) e.partyDoJoin.addEventListener('click', async () => {
+      const r = await Party.joinRoom(e.partyJoin.value);
+      this.toast(r.ok ? ('방 ' + r.code + ' 에 들어갔습니다') : r.why);
+    });
+    if (e.partyLeave) e.partyLeave.addEventListener('click', () => {
+      Party.leaveRoom(); this.toast('방에서 나왔습니다');
+    });
+    if (e.partyCopy) e.partyCopy.addEventListener('click', () => {
+      if (!e.partyRoom.value) return;
+      navigator.clipboard && navigator.clipboard.writeText(e.partyRoom.value)
+        .then(() => this.toast('방 코드 복사됨')).catch(() => {});
+    });
+    // 목록 안의 단추들은 한 곳에서 받습니다 (다시 그려도 연결이 살아 있습니다)
+    e.partyBox.addEventListener('click', async ev => {
+      const b = ev.target.closest && ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.invite) {
+        const r = await Party.invite(b.dataset.invite);
+        this.toast(r.ok ? '초대를 보냈습니다' : r.why);
+      } else if (b.dataset.unfriend) {
+        await Party.removeFriend(b.dataset.unfriend);
+        this.toast('친구를 삭제했습니다');
+      } else if (b.dataset.accept) {
+        const r = await Party.joinRoom(b.dataset.accept);
+        this.toast(r.ok ? ('방 ' + r.code + ' 에 들어갔습니다') : r.why);
+      }
+    });
+    this.renderParty();
+  },
+
   bindAuth() {
     const e = this.el;
     if (!e || !e.authBtn) return;
@@ -8120,7 +8653,7 @@ const Lobby = {
   tab(name) {
     this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
-    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); this.renderAccount(); }
+    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); this.renderAccount(); this.renderParty(); }
   },
 
   buildCrates() {

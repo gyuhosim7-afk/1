@@ -172,8 +172,31 @@ Firebase 가 맡습니다. 무료 요금제로 충분합니다.
    rules_version = '2';
    service cloud.firestore {
      match /databases/{database}/documents {
+
+       // 내 게임 기록(BP·스킨·전적·친구 목록) — 본인만
        match /players/{uid} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+
+       // 공개 프로필(이름·친구 코드·접속 시각) — 친구 코드로 찾을 수 있어야
+       // 하므로 로그인한 사람은 읽을 수 있고, 쓰기는 본인만 합니다.
+       match /profiles/{uid} {
+         allow read: if request.auth != null;
+         allow write: if request.auth != null && request.auth.uid == uid;
+       }
+
+       // 받은 초대 — 받는 사람만 읽고 지우며, 보내는 사람만 씁니다
+       match /invites/{uid}/from/{other} {
+         allow read, delete: if request.auth != null && request.auth.uid == uid;
+         allow create, update: if request.auth != null && request.auth.uid == other;
+       }
+
+       // 함께 하기 방과 연결 신호 — 로그인한 사람끼리
+       match /rooms/{code} {
+         allow read, write: if request.auth != null;
+       }
+       match /rooms/{code}/sig/{id} {
+         allow read, write: if request.auth != null;
        }
      }
    }
@@ -204,6 +227,28 @@ Firebase 가 맡습니다. 무료 요금제로 충분합니다.
 까지만 알려 주고 데이터를 저장할 곳을 주지 않습니다. Firebase 에 네이버 계정을
 연결하려면 토큰을 바꿔 주는 서버가 따로 필요한데, 정적 호스팅에서는 돌릴 수
 없습니다. 서버를 두게 되면 그때 붙일 수 있습니다.
+
+### 친구와 함께 하기 (구글 로그인 필요)
+
+로그인하면 **친구 탭**에서 친구 코드로 친구를 등록하고, 초대해서 같은 판에서
+함께 플레이할 수 있습니다.
+
+통신을 두 갈래로 나눴습니다.
+
+- **Firestore** — 친구 목록, 접속 상태, 초대, 그리고 브라우저끼리 서로를 찾게
+  해 주는 연결 신호. 드물게 바뀌는 것만 다룹니다.
+- **WebRTC** — 실제 위치·사격. 브라우저끼리 직접 주고받습니다.
+
+위치까지 Firestore 로 보내면 초당 18회 × 사람 수 만큼 쓰기가 생겨 무료 한도
+(하루 2만 건)가 15분이면 바닥납니다. 브라우저끼리 직접 잇는 쪽은 아무리 보내도
+요금이 들지 않고 지연도 짧습니다.
+
+쓰는 법: 친구 탭 → 친구 코드로 추가 → 친구 옆 **초대** → 상대가 **참가** →
+둘 다 **시작** 을 누르면 같은 섬에서 만납니다.
+
+집이 서로 다른 네트워크에 있으면 드물게 연결이 안 될 수 있습니다. 공개 STUN
+서버로 대부분 뚫리지만, 회사망처럼 막힌 곳에서는 중계 서버(TURN)가 필요한데
+그건 유료라 넣지 않았습니다.
 
 ### GitHub Pages
 
@@ -272,6 +317,7 @@ index.html            첫 화면 = 3D 판 (tools/build-single.py 가 만들어 �
 3d/js/profile.js      BP, 보유 아이템, 상자 뽑기, 전적
 3d/js/account.js      기기 계정·친구·섬 코드
 3d/js/auth.js         구글 로그인과 클라우드 저장 (설정이 없으면 게스트로 동작)
+3d/js/party.js        친구·초대와 브라우저끼리 직접 잇는 통신(WebRTC)
 3d/js/firebase-config.js  구글 로그인 설정 (비워 두면 로그인 기능이 꺼집니다)
 3d/js/lobby.js        로비 화면과 캐릭터 미리보기
 3d/js/net.js          함께 하기 (아티팩트 전용 실시간 동기화)

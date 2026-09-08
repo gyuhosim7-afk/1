@@ -6,9 +6,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>라스트 서바이버 3D</title>
-<link rel="stylesheet" href="3d/css/font-body.css?v=98571e22">
-<link rel="stylesheet" href="3d/css/font-display.css?v=98571e22">
-<link rel="stylesheet" href="3d/css/style.css?v=98571e22">
+<link rel="stylesheet" href="3d/css/font-body.css?v=01d81946">
+<link rel="stylesheet" href="3d/css/font-display.css?v=01d81946">
+<link rel="stylesheet" href="3d/css/style.css?v=01d81946">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -224,7 +224,30 @@
         <p class="acctNote" id="acctNote"></p>
       </div>
 
-      <h3>친구 목록</h3>
+      <h3>친구와 함께 하기</h3>
+      <div class="acctBox" id="partyBox">
+        <p class="acctNote" id="partyNote">로그인하면 친구를 등록하고 같은 판에서 함께 플레이할 수 있습니다.</p>
+        <div class="acctRow" id="partyAddRow">
+          <span>친구 코드로 추가</span>
+          <input id="partyCode" type="text" maxlength="8" placeholder="친구의 6자리 코드">
+          <button class="mini" id="partyAdd">추가</button>
+        </div>
+        <div id="partyFriends" class="friendList"></div>
+        <div id="partyInvites" class="friendList"></div>
+        <div class="acctRow" id="partyRoomRow">
+          <span>방 코드</span>
+          <input id="partyRoom" type="text" readonly placeholder="아직 방이 없습니다">
+          <button class="mini" id="partyCopy">복사</button>
+          <button class="mini" id="partyLeave">나가기</button>
+        </div>
+        <div class="acctRow">
+          <span>코드로 참가</span>
+          <input id="partyJoin" type="text" maxlength="6" placeholder="친구가 준 5자리 방 코드">
+          <button class="mini" id="partyDoJoin">참가</button>
+        </div>
+      </div>
+
+      <h3>이 기기에만 저장되는 친구 목록</h3>
       <div class="acctRow">
         <input id="friendCode" type="text" maxlength="8" placeholder="친구 코드 (6자리)">
         <input id="friendName" type="text" maxlength="12" placeholder="표시할 이름 (선택)">
@@ -280,23 +303,24 @@
   </div>
 </div>
 
-<script>window.ASSET_VER='98571e22';</script>
-<script src="3d/vendor/three.min.js?v=98571e22"></script>
-<script src="3d/vendor/GLTFLoader.js?v=98571e22"></script>
-<script src="3d/vendor/SkeletonUtils.js?v=98571e22"></script>
-<script src="3d/js/config.js?v=98571e22"></script>
-<script src="3d/js/sfx.js?v=98571e22"></script>
-<script src="3d/js/profile.js?v=98571e22"></script>
-<script src="3d/js/firebase-config.js?v=98571e22"></script>
-<script src="3d/js/account.js?v=98571e22"></script>
-<script src="3d/js/auth.js?v=98571e22"></script>
-<script src="3d/js/world.js?v=98571e22"></script>
-<script src="3d/js/scenery.js?v=98571e22"></script>
-<script src="3d/js/entities.js?v=98571e22"></script>
-<script src="3d/js/ai.js?v=98571e22"></script>
-<script src="3d/js/game.js?v=98571e22"></script>
-<script src="3d/js/net.js?v=98571e22"></script>
-<script src="3d/js/lobby.js?v=98571e22"></script>
-<script src="3d/js/main.js?v=98571e22"></script>
+<script>window.ASSET_VER='01d81946';</script>
+<script src="3d/vendor/three.min.js?v=01d81946"></script>
+<script src="3d/vendor/GLTFLoader.js?v=01d81946"></script>
+<script src="3d/vendor/SkeletonUtils.js?v=01d81946"></script>
+<script src="3d/js/config.js?v=01d81946"></script>
+<script src="3d/js/sfx.js?v=01d81946"></script>
+<script src="3d/js/profile.js?v=01d81946"></script>
+<script src="3d/js/firebase-config.js?v=01d81946"></script>
+<script src="3d/js/account.js?v=01d81946"></script>
+<script src="3d/js/auth.js?v=01d81946"></script>
+<script src="3d/js/party.js?v=01d81946"></script>
+<script src="3d/js/world.js?v=01d81946"></script>
+<script src="3d/js/scenery.js?v=01d81946"></script>
+<script src="3d/js/entities.js?v=01d81946"></script>
+<script src="3d/js/ai.js?v=01d81946"></script>
+<script src="3d/js/game.js?v=01d81946"></script>
+<script src="3d/js/net.js?v=01d81946"></script>
+<script src="3d/js/lobby.js?v=01d81946"></script>
+<script src="3d/js/main.js?v=01d81946"></script>
 </body>
 </html>

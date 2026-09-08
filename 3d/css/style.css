@@ -702,6 +702,19 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 .acctNote.bad { color: #ff8a80; }
 
 .friendList { display: flex; flex-direction: column; gap: 6px; }
+/* 함께 하기 목록의 한 줄 */
+.frow {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--line);
+}
+.frow b { font-weight: 600; }
+.frow .fcode { font-size: 11px; color: var(--muted); letter-spacing: .06em; margin-right: auto; }
+.frow .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(255,255,255,.22); flex: none;
+}
+.frow .dot.on { background: var(--accent); box-shadow: 0 0 8px rgba(100,226,216,.8); }
+.frow .mini { flex: none; }
 .friendRow {
   display: flex; align-items: center; gap: 10px;
   background: rgba(255, 255, 255, .04); border: 1px solid var(--line);

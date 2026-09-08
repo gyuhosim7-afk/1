@@ -39,10 +39,13 @@ const Auth = {
       this._db = dbMod.getFirestore(this._app);
       this._m = { auth: authMod, db: dbMod };
       this.ready = true;
+      // 로그인하면 친구 기능도 함께 켭니다
+      if (typeof Party !== 'undefined') { /* onAuthStateChanged 에서 시작합니다 */ }
 
       authMod.onAuthStateChanged(this._auth, u => {
         this.user = u ? { uid: u.uid, name: u.displayName || '', photo: u.photoURL || '' } : null;
-        if (u) this.pull();
+        if (u) { this.pull(); if (typeof Party !== 'undefined') Party.start(); }
+        else if (typeof Party !== 'undefined') Party.stop();
         this.onChange();
       });
       return true;

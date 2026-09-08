@@ -21,19 +21,34 @@ const Net = {
     let room = null;
     try { room = await window.claude.use('room'); } catch (e) { room = null; }
     if (!room) return false;
+    this.attach(room);
+    return true;
+  },
 
+  /* 통신 방식을 갈아 끼웁니다. presence / emit / on / onPeers 만 갖추면
+     어떤 것이든 됩니다 — 아티팩트의 room 이든, 브라우저끼리 직접 잇는
+     WebRTC 방이든 게임 로직은 달라지지 않습니다. */
+  attach(room) {
     this.room = room;
     this.ready = true;
-
     room.onPeers(change => this.onPeers(change), () => { this.ready = false; });
     room.on('start', m => this.onStart(m));
     room.on('shot', m => this.onShot(m));
     room.on('hit', m => this.onHit(m));
     room.on('pick', m => this.onPick(m));
     room.on('died', m => this.onDied(m));
-
     this.push({ mode: 'lobby', name: Profile.nickname(), skin: Profile.data.equipped.skin });
-    return true;
+  },
+
+  /* 친구 방에 들어갔을 때 (Party 가 부릅니다) */
+  useRTC() {
+    if (this.room === RTCRoom) return;
+    RTCRoom.handlers = {};
+    this.attach(RTCRoom);
+  },
+  dropRTC() {
+    if (this.room !== RTCRoom) return;
+    this.room = null; this.ready = false; this.players = {}; this.lobbyPeers = [];
   },
 
   push(patch) { if (this.online) this.room.presence(patch).catch(() => {}); },
