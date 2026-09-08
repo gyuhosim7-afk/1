@@ -12,7 +12,7 @@
      한쪽을 날려 버리면 되돌릴 방법이 없기 때문입니다.
    ============================================================ */
 const Auth = {
-  SDK: 'https://www.gstatic.com/firebasejs/10.12.2/',
+  SDK: 'https://www.gstatic.com/firebasejs/12.18.0/',   // Firebase 콘솔이 안내하는 판
   ready: false,          // Firebase 준비됨
   user: null,            // 로그인한 사람 { uid, name, photo }
   error: null,

@@ -12,8 +12,8 @@
    준비 순서는 README 의 '구글 로그인 붙이기' 를 보세요.
    ============================================================ */
 const FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',            // 예: last-survivor.firebaseapp.com
-  projectId: '',
-  appId: ''
+  apiKey: 'AIzaSyCxVoocMow_p9FTqMyiGOejV8rKWlK84RA',
+  authDomain: 'astronaut-b76d0.firebaseapp.com',
+  projectId: 'astronaut-b76d0',
+  appId: '1:445964389880:web:28e4e3ff7345f555b31a0d'
 };
