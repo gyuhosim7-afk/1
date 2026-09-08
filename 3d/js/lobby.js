@@ -204,6 +204,8 @@ const Lobby = {
       partyInvites: document.getElementById('partyInvites'),
       partyRoomRow: document.getElementById('partyRoomRow'),
       partyRoom: document.getElementById('partyRoom'),
+      partyMake: document.getElementById('partyMake'),
+      partyCopy: document.getElementById('partyCopy'),
       partyLeave: document.getElementById('partyLeave'),
       partyJoin: document.getElementById('partyJoin'),
       partyDoJoin: document.getElementById('partyDoJoin'),
@@ -334,14 +336,18 @@ const Lobby = {
     if (e.partyNote) {
       e.partyNote.textContent = on
         ? (Party.room ? '방 ' + Party.room + ' — 함께: ' + Party.members.map(m => m.name).join(', ')
-                      : '친구를 초대하면 방이 만들어집니다. 같은 방 사람끼리 한 판에서 만납니다.')
+                      : '“방 만들기”를 누르면 방 코드가 나옵니다. 그 코드를 친구에게 알려 주세요.')
         : (Auth && Auth.enabled ? '구글로 로그인하면 친구를 등록하고 함께 플레이할 수 있습니다.'
                                 : '이 판에서는 함께 하기 기능이 꺼져 있습니다.');
     }
     if (!on) { if (e.partyFriends) e.partyFriends.innerHTML = ''; if (e.partyInvites) e.partyInvites.innerHTML = ''; return; }
 
+    // 방이 없으면 "방 만들기"만, 방에 있으면 복사·나가기만 보여 줍니다
+    const inRoom = !!Party.room;
     if (e.partyRoom) e.partyRoom.value = Party.room || '';
-    if (e.partyLeave) e.partyLeave.classList.toggle('hidden', !Party.room);
+    if (e.partyMake) e.partyMake.classList.toggle('hidden', inRoom);
+    if (e.partyCopy) e.partyCopy.classList.toggle('hidden', !inRoom);
+    if (e.partyLeave) e.partyLeave.classList.toggle('hidden', !inRoom);
 
     e.partyFriends.innerHTML = Party.friends.length
       ? Party.friends.map(f =>
@@ -369,6 +375,14 @@ const Lobby = {
       const r = await Party.addFriend(e.partyCode.value);
       this.toast(r.ok ? (r.name + ' 을(를) 친구로 추가했습니다') : r.why);
       if (r.ok) e.partyCode.value = '';
+    });
+    if (e.partyMake) e.partyMake.addEventListener('click', async () => {
+      if (Party.room) return;
+      e.partyMake.disabled = true;
+      const r = await Party.openRoom();
+      e.partyMake.disabled = false;
+      this.toast(r.ok ? ('방 ' + r.code + ' 을(를) 만들었습니다. 코드를 친구에게 알려 주세요')
+                      : (r.why || '방을 만들지 못했습니다'));
     });
     if (e.partyDoJoin) e.partyDoJoin.addEventListener('click', async () => {
       const r = await Party.joinRoom(e.partyJoin.value);

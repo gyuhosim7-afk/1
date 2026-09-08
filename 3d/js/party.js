@@ -293,7 +293,10 @@ const Party = {
     } catch (e) { return { ok: false, why: '초대를 보내지 못했습니다' }; }
   },
 
+  /* 새 방을 만들고 바로 들어갑니다. 나온 방 코드를 친구에게 알려 주면 됩니다. */
   async openRoom() {
+    if (!this.on) return { ok: false, why: '먼저 구글로 로그인해 주세요' };
+    if (this.room) return { ok: true, code: this.room };
     try {
       const F = this.F, code = this.newCode(), uid = Auth.user.uid;
       await F.setDoc(F.doc(this.db, 'rooms', code), {
