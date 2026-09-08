@@ -35,7 +35,11 @@ const Profile = {
     if (this.data.owned.gun.indexOf('stock') < 0) this.data.owned.gun.push('stock');
   },
 
-  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ } },
+  save() {
+    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* 무시 */ }
+    // 로그인해 두었으면 계정에도 올립니다 (게스트면 아무 일도 하지 않습니다)
+    if (typeof Auth !== 'undefined' && Auth.signedIn) Auth.push();
+  },
 
   nickname() { return (this.data.name || '').trim() || '생존자'; },
   setName(v) { this.data.name = (v || '').replace(/[^\S ]/g, '').slice(0, 12); this.save(); },

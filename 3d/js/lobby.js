@@ -191,10 +191,16 @@ const Lobby = {
       friendName: document.getElementById('friendName'),
       friendList: document.getElementById('friendList'),
       islandCode: document.getElementById('islandCode'),
+      authBtn: document.getElementById('authBtn'),
+      authBox: document.getElementById('authBox'),
+      authState: document.getElementById('authState'),
+      authAction: document.getElementById('authAction'),
+      authNote: document.getElementById('authNote'),
       joinIsland: document.getElementById('joinIsland'),
       navNick: document.getElementById('navNick')
     };
     this.bindAccount();
+    this.bindAuth();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
@@ -294,6 +300,51 @@ const Lobby = {
     this.renderFriends();
   },
 
+  /* 로그인 상태를 화면에 반영합니다.
+     설정이 비어 있으면 로그인 칸 자체를 숨겨, 게스트만 쓰는 판에서
+     쓸 수 없는 단추가 보이지 않게 합니다. */
+  renderAccount() {
+    const e = this.el;
+    if (!e || !e.authBtn) return;
+    const on = typeof Auth !== 'undefined' && Auth.enabled;
+    e.authBtn.classList.toggle('hidden', !on);
+    if (e.authBox) e.authBox.classList.toggle('hidden', !on);
+    if (!on) return;
+
+    const me = Auth.user;
+    e.authBtn.textContent = me ? '로그아웃' : '로그인';
+    e.authBtn.classList.toggle('signedIn', !!me);
+    if (e.authState) {
+      e.authState.textContent = me
+        ? (me.name || '구글 계정') + ' 으로 로그인됨'
+        : (Auth.ready ? '게스트로 플레이 중' : '로그인 준비 중…');
+    }
+    if (e.authAction) {
+      e.authAction.textContent = me ? '로그아웃' : '구글로 로그인';
+      e.authAction.disabled = !Auth.ready;
+    }
+    if (e.authNote && Auth.error) e.authNote.textContent = Auth.error;
+  },
+
+  bindAuth() {
+    const e = this.el;
+    if (!e || !e.authBtn) return;
+    const toggle = async () => {
+      if (typeof Auth === 'undefined' || !Auth.enabled) return;
+      if (!Auth.ready) {
+        // 아직 못 불러온 이유를 알려 줍니다 (조용히 아무 일도 안 하면 고장으로 보입니다)
+        this.toast(Auth.error || '로그인 기능을 불러오는 중입니다');
+        return;
+      }
+      if (Auth.signedIn) { await Auth.signOut(); this.toast('로그아웃했습니다'); return; }
+      const r = await Auth.signIn();
+      this.toast(r.ok ? '로그인했습니다' : r.why);
+    };
+    e.authBtn.addEventListener('click', toggle);
+    if (e.authAction) e.authAction.addEventListener('click', toggle);
+    this.renderAccount();
+  },
+
   refreshAccount() {
     const e = this.el;
     if (!e || !e.myCode) return;
@@ -344,7 +395,7 @@ const Lobby = {
   tab(name) {
     this.el.tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     this.el.panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + name));
-    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); }
+    if (name === 'friend') { this.refreshAccount(); this.renderFriends(); this.renderAccount(); }
   },
 
   buildCrates() {

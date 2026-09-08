@@ -152,6 +152,59 @@ python3 tools/build-single.py
 이 명령은 `dist/last-survivor.html`(2D)과 `dist/last-survivor-3d.html`(3D)을 함께 만듭니다.
 3D 단일 파일은 three.js 만 CDN 에서 불러오고 나머지는 파일 안에 들어 있습니다.
 
+### 구글 로그인 붙이기 (선택)
+
+로그인하면 BP·스킨·전적이 계정에 저장되어 다른 기기에서도 이어서 할 수 있습니다.
+**설정하지 않아도 게임은 그대로 돌아갑니다** — 로그인 칸이 숨겨지고 모두 게스트로
+플레이합니다. 링크를 연 친구가 로그인 화면에 막히는 일은 없습니다.
+
+GitHub Pages 는 정적 호스팅이라 서버를 돌릴 수 없으므로, 로그인과 저장은
+Firebase 가 맡습니다. 무료 요금제로 충분합니다.
+
+1. [Firebase 콘솔](https://console.firebase.google.com) 에서 프로젝트를 만듭니다.
+2. **Authentication → Sign-in method → Google** 을 켭니다.
+3. **Authentication → Settings → 승인된 도메인** 에 `gyuhosim7-afk.github.io` 를 넣습니다.
+   (이걸 빼먹으면 로그인 창이 `auth/unauthorized-domain` 으로 거절합니다)
+4. **Firestore Database** 를 만들고 규칙을 아래처럼 둡니다. 남의 기록을 건드리지
+   못하게 자기 문서만 읽고 쓰도록 막는 부분입니다.
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /players/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+
+5. **프로젝트 설정 → 내 앱 → 웹 앱** 을 추가하면 나오는 값을
+   `3d/js/firebase-config.js` 에 채웁니다.
+
+   ```js
+   const FIREBASE_CONFIG = {
+     apiKey: 'AIza...',
+     authDomain: '프로젝트이름.firebaseapp.com',
+     projectId: '프로젝트이름',
+     appId: '1:...:web:...'
+   };
+   ```
+
+   이 값들은 **공개용** 입니다. 브라우저가 어차피 받아 가므로 저장소에 올려도
+   됩니다. 계정을 지키는 것은 이 값이 아니라 위 3·4번(승인된 도메인, 보안 규칙)입니다.
+
+6. 커밋하고 푸시하면 끝입니다.
+
+처음 로그인할 때는 **덮어쓰지 않고 합칩니다** — 이 기기에서 모은 것과 계정에 있던
+것 중 BP 는 큰 쪽, 보유 스킨은 합집합, 전적은 좋은 쪽을 남깁니다. 한쪽을 날려
+버리면 되돌릴 방법이 없기 때문입니다.
+
+**네이버 로그인은 아직 안 됩니다.** 네이버 아이디로 로그인 JS SDK 는 "누구인지"
+까지만 알려 주고 데이터를 저장할 곳을 주지 않습니다. Firebase 에 네이버 계정을
+연결하려면 토큰을 바꿔 주는 서버가 따로 필요한데, 정적 호스팅에서는 돌릴 수
+없습니다. 서버를 두게 되면 그때 붙일 수 있습니다.
+
 ### GitHub Pages
 
 이 저장소는 GitHub Pages 로 공개되어 있습니다 — https://gyuhosim7-afk.github.io/1/
@@ -217,7 +270,9 @@ index.html            첫 화면 = 3D 판 (tools/build-single.py 가 만들어 �
 3d/css/font-*.css     화면에 쓰는 글자만 추려 심어 둔 서체 (tools/make-font.py 가 만듭니다)
 3d/js/config.js       무기, 구경, 자기장, 스킨, 상자 확률, 화면 배색(THEME)
 3d/js/profile.js      BP, 보유 아이템, 상자 뽑기, 전적
-3d/js/account.js      계정·친구·섬 코드
+3d/js/account.js      기기 계정·친구·섬 코드
+3d/js/auth.js         구글 로그인과 클라우드 저장 (설정이 없으면 게스트로 동작)
+3d/js/firebase-config.js  구글 로그인 설정 (비워 두면 로그인 기능이 꺼집니다)
 3d/js/lobby.js        로비 화면과 캐릭터 미리보기
 3d/js/net.js          함께 하기 (아티팩트 전용 실시간 동기화)
 3d/js/world.js        노이즈 높이맵, 충돌 판정, 레이캐스트

@@ -625,6 +625,9 @@ const Main = {
     Lobby.init();
     Lobby.refresh();
     Net.connect().then(ok => { if (ok) Lobby.onNetReady(); });
+    /* 구글 로그인 준비. 설정이 비어 있으면 아무것도 받지 않고 조용히 지나갑니다.
+       게임 시작을 기다리게 하지 않으므로, 로그인이 안 돼도 바로 플레이됩니다. */
+    if (typeof Auth !== 'undefined') Auth.init().then(() => Lobby.renderAccount());
     // db 기능이 켜져 있으면 친구 접속 상태까지 실시간으로 보여 줍니다 (없으면 조용히 넘어감)
     Account.connect().then(ok => { if (ok) Lobby.renderFriends(); });
     window.addEventListener('resize', () => Lobby.resize());

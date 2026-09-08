@@ -6,9 +6,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>라스트 서바이버 3D</title>
-<link rel="stylesheet" href="3d/css/font-body.css?v=4afee0a4">
-<link rel="stylesheet" href="3d/css/font-display.css?v=4afee0a4">
-<link rel="stylesheet" href="3d/css/style.css?v=4afee0a4">
+<link rel="stylesheet" href="3d/css/font-body.css?v=ec93cdb0">
+<link rel="stylesheet" href="3d/css/font-display.css?v=ec93cdb0">
+<link rel="stylesheet" href="3d/css/style.css?v=ec93cdb0">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -135,6 +135,7 @@
       <div class="account">
         <span class="bpTag">BP</span><b id="bp">0</b>
         <span class="nick" id="navNick">생존자</span>
+        <button id="authBtn" class="authBtn hidden">로그인</button>
       </div>
     </header>
 
@@ -189,7 +190,17 @@
       <h2>친구 · 계정</h2>
       <p class="sheetSub">계정은 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 같은 섬 코드로 함께 합니다.</p>
 
-      <h3>내 계정</h3>
+      <h3>구글 계정</h3>
+      <div class="acctBox" id="authBox">
+        <div class="acctRow">
+          <span id="authState">게스트로 플레이 중</span>
+          <button class="mini" id="authAction">구글로 로그인</button>
+        </div>
+        <p class="acctNote" id="authNote">로그인하면 BP·스킨·전적이 계정에 저장되어
+          다른 기기에서도 이어서 할 수 있습니다. 로그인하지 않아도 게임은 그대로 됩니다.</p>
+      </div>
+
+      <h3>이 기기 계정</h3>
       <div class="acctBox">
         <div class="acctRow">
           <span>닉네임</span>
@@ -269,21 +280,23 @@
   </div>
 </div>
 
-<script>window.ASSET_VER='4afee0a4';</script>
-<script src="3d/vendor/three.min.js?v=4afee0a4"></script>
-<script src="3d/vendor/GLTFLoader.js?v=4afee0a4"></script>
-<script src="3d/vendor/SkeletonUtils.js?v=4afee0a4"></script>
-<script src="3d/js/config.js?v=4afee0a4"></script>
-<script src="3d/js/sfx.js?v=4afee0a4"></script>
-<script src="3d/js/profile.js?v=4afee0a4"></script>
-<script src="3d/js/account.js?v=4afee0a4"></script>
-<script src="3d/js/world.js?v=4afee0a4"></script>
-<script src="3d/js/scenery.js?v=4afee0a4"></script>
-<script src="3d/js/entities.js?v=4afee0a4"></script>
-<script src="3d/js/ai.js?v=4afee0a4"></script>
-<script src="3d/js/game.js?v=4afee0a4"></script>
-<script src="3d/js/net.js?v=4afee0a4"></script>
-<script src="3d/js/lobby.js?v=4afee0a4"></script>
-<script src="3d/js/main.js?v=4afee0a4"></script>
+<script>window.ASSET_VER='ec93cdb0';</script>
+<script src="3d/vendor/three.min.js?v=ec93cdb0"></script>
+<script src="3d/vendor/GLTFLoader.js?v=ec93cdb0"></script>
+<script src="3d/vendor/SkeletonUtils.js?v=ec93cdb0"></script>
+<script src="3d/js/config.js?v=ec93cdb0"></script>
+<script src="3d/js/sfx.js?v=ec93cdb0"></script>
+<script src="3d/js/profile.js?v=ec93cdb0"></script>
+<script src="3d/js/firebase-config.js?v=ec93cdb0"></script>
+<script src="3d/js/account.js?v=ec93cdb0"></script>
+<script src="3d/js/auth.js?v=ec93cdb0"></script>
+<script src="3d/js/world.js?v=ec93cdb0"></script>
+<script src="3d/js/scenery.js?v=ec93cdb0"></script>
+<script src="3d/js/entities.js?v=ec93cdb0"></script>
+<script src="3d/js/ai.js?v=ec93cdb0"></script>
+<script src="3d/js/game.js?v=ec93cdb0"></script>
+<script src="3d/js/net.js?v=ec93cdb0"></script>
+<script src="3d/js/lobby.js?v=ec93cdb0"></script>
+<script src="3d/js/main.js?v=ec93cdb0"></script>
 </body>
 </html>
