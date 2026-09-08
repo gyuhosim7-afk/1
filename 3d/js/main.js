@@ -61,7 +61,7 @@ const UI = {
   init() {
     const ids = ['menu', 'over', 'hud', 'hp', 'hpText', 'gunName', 'ammo', 'meds', 'alive',
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
-      'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
+      'startBtn', 'againBtn', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
       'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag'];
@@ -709,11 +709,11 @@ const Main = {
     try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
-    const n = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    const n = CFG.BOTS;          // 참가자 수는 고정입니다 (로비에서 바꿀 수 없습니다)
 
     // 같은 링크를 연 사람이 더 있으면 같은 섬에서 함께 시작합니다
     if (Net.online && Net.playerCount > 1) {
-      Net.hostStart(n);
+      Net.hostStart();
       Lobby.notifyStarting();
       return;
     }

@@ -449,6 +449,7 @@ body.playing.paused { cursor: default; }
 .dockRow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
 .dockRow b { color: var(--text); font-family: var(--display); letter-spacing: .06em; }
 .dockRow span { font-size: 12px; color: var(--muted); }
+.dockRow .fixedNum { color: var(--accent); font-family: var(--display); font-size: 14px; }
 .dockRow input {
   width: 54px; margin: 0 4px; padding: 4px 6px; text-align: center;
   background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 0;
@@ -893,7 +894,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
       </div>
       <div class="dockGroup">
         <span class="dockLabel">모드</span>
-        <div class="dockRow"><b id="modeName">솔로</b><span>봇 <input id="botCount" type="number" min="0" max="59" value="29">명</span></div>
+        <div class="dockRow"><b id="modeName">솔로</b><span>생존자 <b class="fixedNum">30</b>명</span></div>
         <div id="peerList" class="peerList">혼자 플레이 중</div>
       </div>
       <div class="dockGroup">
@@ -904,8 +905,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
         </div>
       </div>
       <button id="startBtn" class="startBtn">시작</button>
-      <p class="dockHint" id="shareHint">친구와 같은 섬에서 하려면 <b>친구</b> 탭의 섬 코드를 알려 주세요.
-        (실시간으로 함께 싸우는 것은 claude.ai 아티팩트로 열었을 때만 됩니다)<br>
+      <p class="dockHint" id="shareHint">참가자는 항상 <b>30명</b>입니다. 친구와 함께 하려면 <b>친구</b> 탭에서 방을 만들어 방 코드를 알려 주세요.<br>
         WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>Z</kbd> 지점 표시 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점<br>
         수송기에서 <kbd>Space</kbd> 로 낙하합니다</p>
     </section>
@@ -934,7 +934,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
     <!-- 친구 · 계정 -->
     <section class="panel sheet hidden" id="tab-friend">
       <h2>친구 · 계정</h2>
-      <p class="sheetSub">계정은 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 같은 섬 코드로 함께 합니다.</p>
+      <p class="sheetSub">계정은 구글 로그인이나 저장 코드 한 줄로 다른 기기에 옮깁니다. 친구와는 방 코드로 함께 합니다.</p>
 
       <h3>구글 계정</h3>
       <div class="acctBox" id="authBox">
@@ -1001,22 +1001,6 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
       </div>
       <div id="friendList" class="friendList"></div>
 
-      <h3>같은 섬에서 함께 하기</h3>
-      <div class="acctBox">
-        <div class="acctRow">
-          <span>섬 코드 만들기</span>
-          <input id="islandCode" type="text" readonly>
-          <button class="mini" id="newIsland">새로 만들기</button>
-          <button class="mini" id="copyIsland">복사</button>
-        </div>
-        <div class="acctRow">
-          <span>코드로 참가</span>
-          <input id="joinIsland" type="text" maxlength="8" placeholder="친구가 준 8자리 코드">
-          <button class="mini" id="doJoin">이 섬에서 시작</button>
-        </div>
-        <p class="acctNote">같은 코드로 시작하면 지형·건물·아이템·차량·자기장이 완전히 같은 섬이 됩니다.
-          같은 링크를 함께 열어 두면 서로의 캐릭터도 실시간으로 보입니다.</p>
-      </div>
     </section>
 
     <!-- 전적 -->
@@ -1061,7 +1045,9 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 const CFG = {
   MAP: 1500,            // 맵 한 변 (m)
   SEG: 208,             // 지형 격자 해상도 (칸 7.2m — 넓어진 맵에서 삼각형을 아낍니다)
-  BOTS: 39,
+  /* 참가자 수는 고정입니다. 예전에는 로비에서 봇 수를 직접 넣을 수 있었는데,
+     1~2명으로 줄여 놓고 쉽게 이기는 식으로 쓰여 전적이 의미를 잃었습니다. */
+  BOTS: 29,               // 봇 29 + 나 = 생존자 30명
   FOG_NEAR: 70,
   FOG_FAR: 390,
   FOV: 72,
@@ -1893,17 +1879,15 @@ const FIREBASE_CONFIG = {
 };
 
 /* ============================================================
-   계정 · 친구 · 같은 섬 코드
+   계정 · 친구
 
    서버 없이 동작하도록 만들었습니다.
    - 계정: 진행 상황(BP·스킨·전적)을 짧은 '저장 코드' 한 줄로 옮깁니다.
            다른 기기에서 그 코드를 붙여 넣으면 그대로 이어서 합니다.
    - 친구: 상대의 '친구 코드'를 등록해 목록으로 관리합니다.
-   - 같은 섬 코드: 섬과 봇 수를 담은 코드입니다. 친구가 같은 코드로 시작하면
-                   지형·건물·아이템·자기장이 완전히 같은 섬에서 플레이합니다.
 
-   claude 의 db 기능이 켜져 있으면(공개 공유를 끄고 조직 전용으로 바꾼 경우)
-   접속 상태와 초대까지 실시간으로 동작하도록 아래 db 경로가 살아납니다.
+   친구와 실제로 같은 매치를 하는 것은 party.js(구글 로그인 + 방 코드) 쪽입니다.
+   여기 db 경로는 claude 의 db 기능이 켜져 있을 때 접속 상태를 보여 주는 용도입니다.
    꺼져 있으면 조용히 로컬 모드로만 동작합니다.
    ============================================================ */
 
@@ -2041,31 +2025,6 @@ const Account = {
     return p.state === 'match' ? 'match' : 'lobby';
   },
 
-  /* ---------- 같은 섬 코드 ----------
-     섬 씨앗(30비트) + 봇 수(6비트) 를 base32 로 8글자에 담습니다. */
-  makeIslandCode(seed, bots) {
-    const s = (seed >>> 0) % 0x40000000;                 // 30비트
-    const n = Math.max(0, Math.min(59, bots | 0));
-    let v = s * 64 + n;                                  // 36비트 → 8글자
-    let out = '';
-    for (let i = 0; i < 8; i++) { out = B32[v % 32] + out; v = Math.floor(v / 32); }
-    return out;
-  },
-
-  parseIslandCode(text) {
-    const s = String(text || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
-    if (s.length !== 8) return null;
-    let v = 0;
-    for (const ch of s) {
-      const i = B32.indexOf(ch);
-      if (i < 0) return null;
-      v = v * 32 + i;
-    }
-    const bots = v % 64, seed = Math.floor(v / 64);
-    if (seed <= 0) return null;
-    return { seed, bots };
-  },
-
   /* ---------- db 가 켜져 있을 때만 쓰는 실시간 부분 ---------- */
   async connect() {
     if (!window.claude || !window.claude.use) return false;
@@ -2103,27 +2062,6 @@ const Account = {
         this._unsub.push(un);
       } catch (e) { /* 무시 */ }
     }
-  },
-
-  /* 친구를 초대합니다 (db 가 있을 때만) */
-  invite(code, bots) {
-    if (!this.online) return false;
-    this.db.doc('party/' + this.data.id)
-      .set({ code, bots, host: this.data.id, name: Profile.nickname(), at: Date.now() })
-      .catch(() => {});
-    return true;
-  },
-
-  /* 친구가 보낸 초대를 읽습니다 */
-  async fetchInvite(friendId) {
-    if (!this.online) return null;
-    try {
-      const snap = await this.db.doc('party/' + friendId).get();
-      if (!snap || !snap.exists) return null;
-      const d = snap.data || {};
-      if (!d.code || Date.now() - (d.at || 0) > 300000) return null;
-      return d;
-    } catch (e) { return null; }
   }
 };
 
@@ -7981,12 +7919,15 @@ const Net = {
   },
 
   /* ---------- 매치 시작 ---------- */
-  hostStart(botCount) {
+  /* 방장은 '어느 섬에서 언제 시작할지' 만 정합니다.
+     참가자 수는 보내지 않습니다 — 방장이 숫자를 조작해 전원을 적은 봇으로
+     시작시키는 길을 막기 위해, 각자 자기 쪽 상수를 씁니다. */
+  hostStart() {
     const seed = (Math.random() * 0x7fffffff) | 0;
     const at = Date.now() + 1200;             // 다 같이 시작하도록 잠깐 여유를 둡니다
     this.hostPeer = this.myPeer;
-    this.send('start', { seed, at, bots: botCount, host: this.myPeer });
-    this.pendingStart = { seed, at, bots: botCount, host: this.myPeer };
+    this.send('start', { seed, at, host: this.myPeer });
+    this.pendingStart = { seed, at, host: this.myPeer };
   },
 
   onStart(msg) {
@@ -7994,7 +7935,7 @@ const Net = {
     if (!d.seed) return;
     if (msg.isMe && msg.sameTab) return;       // 내가 보낸 것은 이미 처리
     this.hostPeer = d.host || msg.peer;
-    this.pendingStart = { seed: d.seed, at: d.at, bots: d.bots || 0, host: this.hostPeer };
+    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer };
     Lobby.notifyStarting();
   },
 
@@ -8003,7 +7944,7 @@ const Net = {
     if (this.pendingStart && Date.now() >= this.pendingStart.at) {
       const s = this.pendingStart;
       this.pendingStart = null;
-      Main.beginMatch(s.bots, { seed: s.seed, startedAt: s.at, online: true });
+      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true });
     }
   },
 
@@ -8359,7 +8300,6 @@ const Lobby = {
       friendCode: document.getElementById('friendCode'),
       friendName: document.getElementById('friendName'),
       friendList: document.getElementById('friendList'),
-      islandCode: document.getElementById('islandCode'),
       authBtn: document.getElementById('authBtn'),
       authBox: document.getElementById('authBox'),
       authState: document.getElementById('authState'),
@@ -8377,7 +8317,6 @@ const Lobby = {
       partyLeave: document.getElementById('partyLeave'),
       partyJoin: document.getElementById('partyJoin'),
       partyDoJoin: document.getElementById('partyDoJoin'),
-      joinIsland: document.getElementById('joinIsland'),
       navNick: document.getElementById('navNick')
     };
     this.bindAccount();
@@ -8443,7 +8382,6 @@ const Lobby = {
 
     document.getElementById('copyCode').addEventListener('click', () => copy(e.myCode, '친구 코드'));
     document.getElementById('copySave').addEventListener('click', () => copy(e.saveCode, '저장 코드'));
-    document.getElementById('copyIsland').addEventListener('click', () => copy(e.islandCode, '섬 코드'));
 
     document.getElementById('doLoad').addEventListener('click', () => {
       const res = Account.importCode(e.loadCode.value);
@@ -8464,18 +8402,6 @@ const Lobby = {
       e.friendCode.value = ''; e.friendName.value = '';
       note('친구를 등록했습니다', 'ok');
       this.renderFriends();
-    });
-
-    document.getElementById('newIsland').addEventListener('click', () => {
-      this.islandSeed = (Math.random() * 0x3fffffff) | 0;
-      this.refreshAccount();
-      note('친구에게 이 섬 코드를 보내세요', 'ok');
-    });
-
-    document.getElementById('doJoin').addEventListener('click', () => {
-      const info = Account.parseIslandCode(e.joinIsland.value);
-      if (!info) { note('섬 코드가 올바르지 않습니다 (8자리)', 'bad'); return; }
-      Main.beginMatch(info.bots, { seed: info.seed });
     });
 
     this.refreshAccount();
@@ -8610,9 +8536,6 @@ const Lobby = {
     e.saveCode.value = Account.exportCode();
     if (e.navNick) e.navNick.textContent = Profile.nickname();
     if (e.acctName && document.activeElement !== e.acctName) e.acctName.value = Profile.data.name || '';
-    if (this.islandSeed == null) this.islandSeed = (Math.random() * 0x3fffffff) | 0;
-    const bots = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
-    e.islandCode.value = Account.makeIslandCode(this.islandSeed, bots);
   },
 
   renderFriends() {
@@ -8841,7 +8764,7 @@ const UI = {
   init() {
     const ids = ['menu', 'over', 'hud', 'hp', 'hpText', 'gunName', 'ammo', 'meds', 'alive',
       'kills', 'zoneText', 'zoneLabel', 'feed', 'prompt', 'result', 'resultSub', 'resultStats',
-      'startBtn', 'againBtn', 'botCount', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
+      'startBtn', 'againBtn', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
       'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag'];
@@ -9489,11 +9412,11 @@ const Main = {
     try { window.focus(); } catch (e) { /* 무시 */ }
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
-    const n = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
+    const n = CFG.BOTS;          // 참가자 수는 고정입니다 (로비에서 바꿀 수 없습니다)
 
     // 같은 링크를 연 사람이 더 있으면 같은 섬에서 함께 시작합니다
     if (Net.online && Net.playerCount > 1) {
-      Net.hostStart(n);
+      Net.hostStart();
       Lobby.notifyStarting();
       return;
     }

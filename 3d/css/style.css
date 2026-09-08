@@ -440,6 +440,7 @@ body.playing.paused { cursor: default; }
 .dockRow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
 .dockRow b { color: var(--text); font-family: var(--display); letter-spacing: .06em; }
 .dockRow span { font-size: 12px; color: var(--muted); }
+.dockRow .fixedNum { color: var(--accent); font-family: var(--display); font-size: 14px; }
 .dockRow input {
   width: 54px; margin: 0 4px; padding: 4px 6px; text-align: center;
   background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 0;

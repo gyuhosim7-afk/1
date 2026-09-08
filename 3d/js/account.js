@@ -1,15 +1,13 @@
 /* ============================================================
-   계정 · 친구 · 같은 섬 코드
+   계정 · 친구
 
    서버 없이 동작하도록 만들었습니다.
    - 계정: 진행 상황(BP·스킨·전적)을 짧은 '저장 코드' 한 줄로 옮깁니다.
            다른 기기에서 그 코드를 붙여 넣으면 그대로 이어서 합니다.
    - 친구: 상대의 '친구 코드'를 등록해 목록으로 관리합니다.
-   - 같은 섬 코드: 섬과 봇 수를 담은 코드입니다. 친구가 같은 코드로 시작하면
-                   지형·건물·아이템·자기장이 완전히 같은 섬에서 플레이합니다.
 
-   claude 의 db 기능이 켜져 있으면(공개 공유를 끄고 조직 전용으로 바꾼 경우)
-   접속 상태와 초대까지 실시간으로 동작하도록 아래 db 경로가 살아납니다.
+   친구와 실제로 같은 매치를 하는 것은 party.js(구글 로그인 + 방 코드) 쪽입니다.
+   여기 db 경로는 claude 의 db 기능이 켜져 있을 때 접속 상태를 보여 주는 용도입니다.
    꺼져 있으면 조용히 로컬 모드로만 동작합니다.
    ============================================================ */
 
@@ -147,31 +145,6 @@ const Account = {
     return p.state === 'match' ? 'match' : 'lobby';
   },
 
-  /* ---------- 같은 섬 코드 ----------
-     섬 씨앗(30비트) + 봇 수(6비트) 를 base32 로 8글자에 담습니다. */
-  makeIslandCode(seed, bots) {
-    const s = (seed >>> 0) % 0x40000000;                 // 30비트
-    const n = Math.max(0, Math.min(59, bots | 0));
-    let v = s * 64 + n;                                  // 36비트 → 8글자
-    let out = '';
-    for (let i = 0; i < 8; i++) { out = B32[v % 32] + out; v = Math.floor(v / 32); }
-    return out;
-  },
-
-  parseIslandCode(text) {
-    const s = String(text || '').trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
-    if (s.length !== 8) return null;
-    let v = 0;
-    for (const ch of s) {
-      const i = B32.indexOf(ch);
-      if (i < 0) return null;
-      v = v * 32 + i;
-    }
-    const bots = v % 64, seed = Math.floor(v / 64);
-    if (seed <= 0) return null;
-    return { seed, bots };
-  },
-
   /* ---------- db 가 켜져 있을 때만 쓰는 실시간 부분 ---------- */
   async connect() {
     if (!window.claude || !window.claude.use) return false;
@@ -209,26 +182,5 @@ const Account = {
         this._unsub.push(un);
       } catch (e) { /* 무시 */ }
     }
-  },
-
-  /* 친구를 초대합니다 (db 가 있을 때만) */
-  invite(code, bots) {
-    if (!this.online) return false;
-    this.db.doc('party/' + this.data.id)
-      .set({ code, bots, host: this.data.id, name: Profile.nickname(), at: Date.now() })
-      .catch(() => {});
-    return true;
-  },
-
-  /* 친구가 보낸 초대를 읽습니다 */
-  async fetchInvite(friendId) {
-    if (!this.online) return null;
-    try {
-      const snap = await this.db.doc('party/' + friendId).get();
-      if (!snap || !snap.exists) return null;
-      const d = snap.data || {};
-      if (!d.code || Date.now() - (d.at || 0) > 300000) return null;
-      return d;
-    } catch (e) { return null; }
   }
 };

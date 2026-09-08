@@ -73,12 +73,15 @@ const Net = {
   },
 
   /* ---------- 매치 시작 ---------- */
-  hostStart(botCount) {
+  /* 방장은 '어느 섬에서 언제 시작할지' 만 정합니다.
+     참가자 수는 보내지 않습니다 — 방장이 숫자를 조작해 전원을 적은 봇으로
+     시작시키는 길을 막기 위해, 각자 자기 쪽 상수를 씁니다. */
+  hostStart() {
     const seed = (Math.random() * 0x7fffffff) | 0;
     const at = Date.now() + 1200;             // 다 같이 시작하도록 잠깐 여유를 둡니다
     this.hostPeer = this.myPeer;
-    this.send('start', { seed, at, bots: botCount, host: this.myPeer });
-    this.pendingStart = { seed, at, bots: botCount, host: this.myPeer };
+    this.send('start', { seed, at, host: this.myPeer });
+    this.pendingStart = { seed, at, host: this.myPeer };
   },
 
   onStart(msg) {
@@ -86,7 +89,7 @@ const Net = {
     if (!d.seed) return;
     if (msg.isMe && msg.sameTab) return;       // 내가 보낸 것은 이미 처리
     this.hostPeer = d.host || msg.peer;
-    this.pendingStart = { seed: d.seed, at: d.at, bots: d.bots || 0, host: this.hostPeer };
+    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer };
     Lobby.notifyStarting();
   },
 
@@ -95,7 +98,7 @@ const Net = {
     if (this.pendingStart && Date.now() >= this.pendingStart.at) {
       const s = this.pendingStart;
       this.pendingStart = null;
-      Main.beginMatch(s.bots, { seed: s.seed, startedAt: s.at, online: true });
+      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true });
     }
   },
 

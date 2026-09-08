@@ -190,7 +190,6 @@ const Lobby = {
       friendCode: document.getElementById('friendCode'),
       friendName: document.getElementById('friendName'),
       friendList: document.getElementById('friendList'),
-      islandCode: document.getElementById('islandCode'),
       authBtn: document.getElementById('authBtn'),
       authBox: document.getElementById('authBox'),
       authState: document.getElementById('authState'),
@@ -208,7 +207,6 @@ const Lobby = {
       partyLeave: document.getElementById('partyLeave'),
       partyJoin: document.getElementById('partyJoin'),
       partyDoJoin: document.getElementById('partyDoJoin'),
-      joinIsland: document.getElementById('joinIsland'),
       navNick: document.getElementById('navNick')
     };
     this.bindAccount();
@@ -274,7 +272,6 @@ const Lobby = {
 
     document.getElementById('copyCode').addEventListener('click', () => copy(e.myCode, '친구 코드'));
     document.getElementById('copySave').addEventListener('click', () => copy(e.saveCode, '저장 코드'));
-    document.getElementById('copyIsland').addEventListener('click', () => copy(e.islandCode, '섬 코드'));
 
     document.getElementById('doLoad').addEventListener('click', () => {
       const res = Account.importCode(e.loadCode.value);
@@ -295,18 +292,6 @@ const Lobby = {
       e.friendCode.value = ''; e.friendName.value = '';
       note('친구를 등록했습니다', 'ok');
       this.renderFriends();
-    });
-
-    document.getElementById('newIsland').addEventListener('click', () => {
-      this.islandSeed = (Math.random() * 0x3fffffff) | 0;
-      this.refreshAccount();
-      note('친구에게 이 섬 코드를 보내세요', 'ok');
-    });
-
-    document.getElementById('doJoin').addEventListener('click', () => {
-      const info = Account.parseIslandCode(e.joinIsland.value);
-      if (!info) { note('섬 코드가 올바르지 않습니다 (8자리)', 'bad'); return; }
-      Main.beginMatch(info.bots, { seed: info.seed });
     });
 
     this.refreshAccount();
@@ -441,9 +426,6 @@ const Lobby = {
     e.saveCode.value = Account.exportCode();
     if (e.navNick) e.navNick.textContent = Profile.nickname();
     if (e.acctName && document.activeElement !== e.acctName) e.acctName.value = Profile.data.name || '';
-    if (this.islandSeed == null) this.islandSeed = (Math.random() * 0x3fffffff) | 0;
-    const bots = Math.max(0, Math.min(59, parseInt(UI.el.botCount.value, 10) || CFG.BOTS));
-    e.islandCode.value = Account.makeIslandCode(this.islandSeed, bots);
   },
 
   renderFriends() {
