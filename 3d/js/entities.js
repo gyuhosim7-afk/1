@@ -982,7 +982,6 @@ class Char3D {
     this.sprayN = 0;               // 연사로 이어 쏜 발수 (탄퍼짐이 벌어집니다)
     this.lastShotT = null;         // 마지막 발의 시각 (끊어 쏘기 판정용)
     this.spawn = null;             // 1대1 결투장에서 다시 살아날 자리
-    this.respawnT = 0;             // 부활까지 남은 시간
     this.safeT = 0;                // 살아난 직후 무적 시간
     this.crouch = false;
     this.flying = null;            // 'freefall' | 'chute' | null

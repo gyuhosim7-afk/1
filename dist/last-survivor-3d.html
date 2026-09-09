@@ -948,7 +948,8 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
         WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>Z</kbd> 지점 표시 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점<br>
         수송기에서 <kbd>Space</kbd> 로 낙하합니다</p>
       <p class="dockHint hidden" id="duelHint">결투장에서 단둘이 <b>7선승</b>으로 싸웁니다. 파밍과 자기장이 없고,
-        쓰러지면 잠깐 뒤 제자리에서 다시 살아납니다. 무기는 둘 다 <b>M416 + 권총</b> 으로 같습니다.<br>
+        한쪽이 쓰러지면 <b>둘 다</b> 체력·실드를 채우고 제 시작 지점으로 돌아가 다음 판을 시작합니다.
+        무기는 둘 다 <b>반달 + 권총</b>, 실드 50 으로 같습니다.<br>
         <b>친구</b> 탭에서 방을 만들어 친구가 들어오면 그 친구와 붙고, 혼자면 봇과 붙습니다.<br>
         WASD 이동 · <kbd>Shift</kbd> 질주 · <kbd>R</kbd> 재장전 · <kbd>Tab</kbd> 지도 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
@@ -1096,9 +1097,9 @@ const CFG = {
   /* ---------- 1대1 결투 ----------
      좁은 결투장에서 단둘이 싸웁니다. 전리품·자기장·수송기가 없고,
      쓰러지면 잠깐 뒤 제 시작 지점에서 다시 살아납니다. */
-  DUEL_WINS: 7,           // 먼저 이만큼 처치하면 승리
-  DUEL_RESPAWN: 2.4,      // 쓰러진 뒤 다시 살아나기까지 (초)
-  DUEL_SAFE: 1.2,         // 살아난 직후 무적 시간 (스폰 지점 사냥 방지)
+  DUEL_WINS: 7,           // 먼저 이만큼 점수를 내면 승리
+  DUEL_ROUND: 2.0,        // 한쪽이 쓰러진 뒤 다음 판이 시작되기까지 (초)
+  DUEL_SAFE: 1.2,         // 새 판 시작 직후 무적 시간 (스폰 지점 사냥 방지)
   FOG_NEAR: 70,
   FOG_FAR: 390,
   FOV: 72,
@@ -5161,7 +5162,6 @@ class Char3D {
     this.sprayN = 0;               // 연사로 이어 쏜 발수 (탄퍼짐이 벌어집니다)
     this.lastShotT = null;         // 마지막 발의 시각 (끊어 쏘기 판정용)
     this.spawn = null;             // 1대1 결투장에서 다시 살아날 자리
-    this.respawnT = 0;             // 부활까지 남은 시간
     this.safeT = 0;                // 살아난 직후 무적 시간
     this.crouch = false;
     this.flying = null;            // 'freefall' | 'chute' | null
@@ -6682,12 +6682,16 @@ const Game = {
     this.pushFeed('전투 시작 — 생존자 ' + this.chars.length + '명');
   },
 
-  /* 쓰러진 사람의 부활 시계. 결투장에서만 돕니다. */
-  updateRespawns(dt) {
-    for (const c of this.chars) {
-      if (!c.dead) continue;
-      c.respawnT -= dt;
-      if (c.respawnT <= 0) this.respawn(c);
+  /* 판이 끝난 뒤 다음 판을 여는 시계. 결투장에서만 돕니다. */
+  updateRound(dt) {
+    if (this.roundT <= 0) return;
+    // 승부가 결정됐으면 새 판을 열지 않고 결과 화면으로 넘깁니다
+    if (Math.max(this.score[0], this.score[1]) >= CFG.DUEL_WINS) { this.roundT = 0; return; }
+    this.roundT -= dt;
+    if (this.roundT <= 0) {
+      this.roundT = 0;
+      for (const c of this.chars) if (!c.remote) this.respawn(c);
+      this.pushFeed('다음 판 — ' + this.score[0] + ' : ' + this.score[1]);
     }
   },
 
@@ -6707,6 +6711,7 @@ const Game = {
     this.plane = null;
     this.planeDoor = 0; this.planeEnd = 0;
     this.dropTimer = Infinity;                  // 공중 보급 없음
+    this.roundT = 0;                            // 다음 판까지 남은 시간
     this.minimapImg = null;                     // 섬 지도를 물려 쓰지 않도록 비웁니다
 
     /* 친구와 붙는 판이면 상대는 사람입니다 (Net 이 캐릭터를 만들어 줍니다).
@@ -6770,7 +6775,8 @@ const Game = {
     c.refreshGear();
   },
 
-  /* 쓰러진 사람을 제 시작 지점에서 되살립니다 */
+  /* 한 사람을 제 시작 지점에서 새 판 상태로 돌립니다
+     (쓰러진 쪽이든 이긴 쪽이든 똑같이 채워 줍니다) */
   respawn(c) {
     const sp = c.spawn || { x: 0, z: 0, yaw: 0 };
     c.pos.set(sp.x, World.groundY(sp.x, sp.z, 40) + 0.05, sp.z);
@@ -6778,7 +6784,7 @@ const Game = {
     c.dead = false; c.deadT = 0; c.hp = c.maxHp;
     c.flying = null; c.climb = null; c.vehicle = null;
     c.reloading = 0; c.healing = 0; c.cooldown = 0; c.swap = 0;
-    c.victory = 0; c.respawnT = 0;
+    c.victory = 0;
     c.safeT = CFG.DUEL_SAFE;
     c.shield = c.shieldMax;
     c.yaw = sp.yaw;
@@ -6892,7 +6898,7 @@ const Game = {
     if (this.state !== 'playing') return;
     this.time += dt;
     if (!this.duel) { this.updateZone(dt); this.updatePlane(dt); }
-    else this.updateRespawns(dt);
+    else this.updateRound(dt);
     this.updatePings(dt);
     this.updateThrown(dt);
 
@@ -7500,10 +7506,13 @@ const Game = {
 
     /* 결투장에서는 탈락이 아니라 한 점입니다. 잠깐 뒤 제 자리에서 다시
        살아나고, 먼저 정해진 점수에 닿은 쪽이 이깁니다. */
+    /* 결투장에서는 한쪽이 쓰러지면 그 판이 끝납니다. 쓰러진 사람만 살아나는
+       것이 아니라, 둘 다 체력·실드·탄약을 새로 채우고 제 시작 지점으로
+       돌아갑니다 — 이긴 쪽이 체력만 남아 다음 판까지 이어 가지 못하게. */
     if (this.duel) {
-      c.respawnT = CFG.DUEL_RESPAWN;
       if (src && src !== c) this.score[src === this.player ? 0 : 1]++;
       else this.score[c === this.player ? 1 : 0]++;      // 자기 실수로 죽으면 상대 점수
+      this.roundT = CFG.DUEL_ROUND;
       this.pushFeed((src ? src.name : '???') + ' → ' + c.name +
                     '   ' + this.score[0] + ' : ' + this.score[1]);
       if (c === this.player) {
@@ -8011,7 +8020,12 @@ const Game = {
       if (ch.pos.y <= g) {
         if (ch === this.player && ch.vy < -6) this.landDip = Math.min(0.34, -ch.vy * 0.022);
         ch.pos.y = g; ch.vy = 0; ch.grounded = true;
-      } else if (ch.vy < -0.2) ch.grounded = false;
+      /* 여기서 grounded 를 떨어질 때만 껐던 것이 '점프 연타로 나는' 원인이었습니다.
+         솟아오르는 동안 vy 가 양수라 이 줄을 타지 않아 계속 땅에 선 것으로 남고,
+         그래서 점프를 누를 때마다 도약 속도가 새로 얹혔습니다.
+         배그 모드에서는 그 나름의 재미가 있어 그대로 두고, 결투장에서는
+         공중에 있는 동안 확실히 꺼서 한 번만 뛰게 합니다. */
+      } else if (ch.vy < -0.2 || this.duel) ch.grounded = false;
     }
 
     ch.speedNow = Math.hypot(ch.pos.x - before.x, ch.pos.z - before.z) / Math.max(dt, 1e-4);
@@ -8788,6 +8802,10 @@ const Net = {
        상대 쪽에서도 같은 순간에 '상대가 득점' 으로 세므로 양쪽 점수가 맞습니다.
        (제 실수로 죽어도 1대1 에서는 남는 사람이 한 점을 가져갑니다) */
     Game.score[0]++;
+    /* 판이 끝났으므로 이쪽도 같은 시각에 다음 판을 예약합니다.
+       내가 쓰러졌을 때는 Game.kill 이 예약하고, 상대가 쓰러졌을 때는
+       여기서 예약합니다 — 양쪽이 같은 길이를 세므로 함께 시작합니다. */
+    Game.roundT = CFG.DUEL_ROUND;
     Game.pushFeed(c.name + ' 처치   ' + Game.score[0] + ' : ' + Game.score[1]);
     Sfx.kill();
   },
