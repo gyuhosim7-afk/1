@@ -53,7 +53,7 @@ const AI = {
       const dist = Math.hypot(dx, dz);
       if (dist > 1.2) {
         mx = dx / dist; mz = dz / dist;
-        speed = a.state === 'zone' ? CFG.SPRINT : (dist > 25 ? CFG.SPRINT * 0.92 : CFG.WALK * 1.2);
+        speed = a.state === 'zone' ? CFG.SPRINT : (dist > 25 ? CFG.SPRINT * 0.92 : CFG.WALK);
         const face = Math.atan2(mx, mz);
         bot.yaw = this.approach(bot.yaw, face, 4 * dt);
         bot.pitch = this.approach(bot.pitch, 0, 2 * dt);
@@ -92,6 +92,21 @@ const AI = {
     }
 
     if (bot.reloading > 0) speed *= 0.8;
+
+    /* 봇도 사람과 같은 속도 규칙을 지키게 합니다.
+       사람은 앞으로 갈 때만 질주할 수 있고, 정조준 중에는 걷기의 60%,
+       옆걸음·뒷걸음은 걷기 속도가 상한입니다. 예전에는 봇만 이 규칙을
+       벗어나 옆으로도 뒤로도 질주해서, 실제로 사람보다 빨랐습니다
+       (교전 중 최대 7.8 m/s — 같은 상황의 사람은 2.64~4.4). */
+    if (mx || mz) {
+      const fwd = Math.sin(bot.yaw) * mx + Math.cos(bot.yaw) * mz;   // 얼마나 '앞으로' 가는가
+      let cap = fwd > 0.5 ? CFG.SPRINT : CFG.WALK;
+      if (bot.ads) cap = CFG.WALK * 0.6;
+      if (bot.crouch) cap = CFG.CROUCH;
+      speed = Math.min(speed, cap);
+    }
+    speed *= CFG.BOT_SPEED;
+
     game.moveChar(bot, mx, mz, speed, dt);
 
     // 오래 제자리면 목적지 재설정
