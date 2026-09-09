@@ -61,6 +61,10 @@ const Scenery = {
     World.resetColliders();
     World.buildings = [];
     World.roads = [];
+    /* 결투장을 한 판 하고 오면 물이 치워진 채로 남습니다.
+       섬을 만들기 전에 해수면을 반드시 되돌려야 합니다 — 이 값으로
+       마을 자리와 해안선을 정하기 때문입니다. */
+    World.waterY = World.WATER_Y;
     World.buildHeights();
 
     // --- 마을 자리 선정 후 평탄화 ---

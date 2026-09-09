@@ -62,6 +62,7 @@ const World = {
   seg: CFG.SEG,
   step: CFG.MAP / CFG.SEG,
   heights: null,
+  WATER_Y: 0.8,     // 섬 모드의 해수면 (결투장은 물을 치우므로 되돌릴 값이 필요합니다)
   waterY: 0.8,
   boxes: [],        // 충돌 상자 { x,y,z, hx,hy,hz, yaw, cos,sin, top, bottom }
   cyls: [],         // 충돌 원기둥 { x,z,r,top }

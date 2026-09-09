@@ -9,6 +9,13 @@ const CFG = {
   /* 참가자 수는 고정입니다. 예전에는 로비에서 봇 수를 직접 넣을 수 있었는데,
      1~2명으로 줄여 놓고 쉽게 이기는 식으로 쓰여 전적이 의미를 잃었습니다. */
   BOTS: 29,               // 봇 29 + 나 = 생존자 30명
+
+  /* ---------- 1대1 결투 ----------
+     좁은 결투장에서 단둘이 싸웁니다. 전리품·자기장·수송기가 없고,
+     쓰러지면 잠깐 뒤 제 시작 지점에서 다시 살아납니다. */
+  DUEL_WINS: 7,           // 먼저 이만큼 처치하면 승리
+  DUEL_RESPAWN: 2.4,      // 쓰러진 뒤 다시 살아나기까지 (초)
+  DUEL_SAFE: 1.2,         // 살아난 직후 무적 시간 (스폰 지점 사냥 방지)
   FOG_NEAR: 70,
   FOG_FAR: 390,
   FOV: 72,
@@ -168,6 +175,15 @@ const GUNS = {
   mk14:    { name:'지정사수총', short:'MK14',   ammo:'762',  dmg:52, rpm:300,  mag:20, reload:2.9, spread:0.024, adsSpread:0.004, range:400, recoil:0.038, auto:true,  canScope:true, color:0x79c0ff, drop:true, model:'dmr' }
 };
 
+/* ---------- 모드 ---------- */
+const MODES = {
+  br:   { name: '배틀로얄', sub: '섬 전체 · 생존자 30명 · 마지막까지 살아남기' },
+  duel: { name: '1대1 결투', sub: '결투장 · 단둘이 · ' + CFG.DUEL_WINS + '선승' }
+};
+
+/* 결투장에서 둘 다 똑같이 받는 장비 (파밍이 없습니다) */
+const DUEL_KIT = { guns: ['rifle', 'pistol'], scope: 2, vest: 2, helmet: 2, meds: 2 };
+
 const GUN_KEYS = Object.keys(GUNS);
 /* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
 const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','mp5k','shotgun','s12k',
@@ -296,9 +312,19 @@ const GUN_SKINS = {
   sand:   { name: '사막',      rarity: 'rare',      metal: 0xa8946e, dark: 0x4b4234, wood: 0x5f5340 },
   frost:  { name: '한파',      rarity: 'rare',      metal: 0xb9c8d4, dark: 0x4c5b68, wood: 0x6c7b88 },
   carbon: { name: '카본',      rarity: 'epic',      metal: 0x3a4048, dark: 0x14171b, wood: 0x21262c },
-  neon:   { name: '네온',      rarity: 'epic',      metal: 0x2c3a58, dark: 0x121826, wood: 0x1d2740 },
-  golden: { name: '황금',      rarity: 'legendary', metal: 0xc8a63f, dark: 0x5c4614, wood: 0x74601f }
+  /* neon·prism 은 스스로 빛나는 에너지 무기입니다.
+     accent 를 주면 강조색이 탄 색 대신 이 색으로 바뀌고,
+     glow 를 주면 총 전체가 그 색으로 옅게 발광합니다. */
+  neon:   { name: '네온',      rarity: 'epic',      metal: 0x1f4d60, dark: 0x0c1e29, wood: 0x15323f,
+            accent: 0x45f2e2, glow: 0x1d7f92, glowP: 0.42 },
+  golden: { name: '황금',      rarity: 'legendary', metal: 0xc8a63f, dark: 0x5c4614, wood: 0x74601f },
+  prism:  { name: '프리즘',    rarity: 'legendary', metal: 0x7b3ad6, dark: 0x2a1150, wood: 0x8e3a86,
+            accent: 0x76f0ff, glow: 0x6a2fc0, glowP: 0.55 }
 };
+
+/* 결투장 지급 무기의 도장. 보유 여부와 상관없이 둘 다 같은 것을 씁니다
+   (결투는 장비 차이 없이 실력만 겨루는 모드입니다). */
+const DUEL_SKIN = 'prism';
 
 /* 상자와 확률 (합이 1 이 되도록 맞춰 두었습니다) */
 const CRATES = {

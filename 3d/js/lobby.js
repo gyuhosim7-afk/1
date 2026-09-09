@@ -135,7 +135,7 @@ const Lobby = {
       hand.add(mount);
 
       const g = new THREE.Mesh(GunArt.geo(gunKey, 0, Profile.data.equipped.gun),
-                               Mats.vc({ roughness: 0.55, metalness: 0.35 }));
+                               GunArt.mat(Profile.data.equipped.gun));
       g.castShadow = true;
       g.scale.setScalar(0.82);
       g.position.set(0, 0, 0.06);
@@ -216,6 +216,11 @@ const Lobby = {
     this.bindParty();
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
+
+    /* 모드 전환. 고른 모드는 저장해 두어 다음에 열 때도 그대로 시작합니다. */
+    this.modeBtns = document.querySelectorAll('#modeSeg button[data-mode]');
+    this.modeBtns.forEach(btn => btn.addEventListener('click', () => this.setMode(btn.dataset.mode)));
+    this.setMode(Settings.data.mode === 'duel' ? 'duel' : 'br');
 
     // 시점(1인칭/3인칭) 전환
     this.viewBtns = document.querySelectorAll('.segmented button[data-view]');
@@ -535,9 +540,33 @@ const Lobby = {
     this.refreshUI();
   },
 
+  /* 고른 모드를 화면과 설정에 반영합니다 */
+  setMode(mode) {
+    this.mode = mode === 'duel' ? 'duel' : 'br';
+    Settings.data.mode = this.mode;
+    Settings.save();
+    if (this.modeBtns) {
+      this.modeBtns.forEach(b => b.classList.toggle('on', b.dataset.mode === this.mode));
+    }
+    const duel = this.mode === 'duel';
+    const sub = document.getElementById('modeSub');
+    if (sub) sub.textContent = MODES[this.mode].sub;
+    // 결투장은 참가자가 둘뿐이라 인원·함께하기 안내를 바꿔 줍니다
+    const swap = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
+    swap('shareHint', !duel);
+    swap('duelHint', duel);
+    swap('peerList', !duel);
+    const cnt = document.getElementById('modeCount');
+    if (cnt) cnt.innerHTML = duel ? '단둘이 · <b class="fixedNum">' + CFG.DUEL_WINS + '</b>선승'
+                                  : '생존자 <b class="fixedNum">30</b>명';
+    if (this.el && this.el.modeName) this.el.modeName.textContent = duel ? '1대1' : '솔로';
+    if (!duel) this.showPeers(Net.lobbyPeers);
+  },
+
   /* 함께 접속한 사람 목록 */
   showPeers(list) {
     if (!this.el || !this.el.peerList) return;
+    if (this.mode === 'duel') return;          // 결투장은 인원 표시를 쓰지 않습니다
     const others = (list || []).filter(p => !p.isMe && p.kind === 'viewer');
     if (!Net.online) { this.el.peerList.textContent = '혼자 플레이 중'; this.el.modeName.textContent = '솔로'; return; }
     if (!others.length) {

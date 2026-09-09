@@ -98,6 +98,24 @@ const GunArt = {
   cache: {},
   METAL: 0x33383f, DARK: 0x1f2227, WOOD: 0x7a5433, OLIVE: 0x4a5340,
 
+  /* 총 재질. 도장에 glow 가 있으면 스스로 빛나는 재질을 씁니다.
+     three.js 의 emissive 는 정점 색이 아니라 재질 하나에 걸리는 값이라,
+     '빛나는 부품만' 따로 두려면 메시를 쪼개야 합니다. 총 한 자루에
+     드로우콜을 둘 쓰지 않으려고, 총 전체가 옅게 발광하도록 했습니다. */
+  mat(skinKey) {
+    const sk = GUN_SKINS[skinKey] || GUN_SKINS.stock;
+    if (!sk.glow) return Mats.vc({ roughness: 0.55, metalness: 0.25 });
+    const id = 'gunGlow|' + skinKey;
+    if (!Mats.cache[id]) {
+      Mats.cache[id] = new THREE.MeshStandardMaterial({
+        vertexColors: true, roughness: 0.28, metalness: 0.55,
+        emissive: new THREE.Color(srgb(sk.glow)),
+        emissiveIntensity: sk.glowP == null ? 0.5 : sk.glowP
+      });
+    }
+    return Mats.cache[id];
+  },
+
   geo(key, scope, skinKey) {
     const sk = GUN_SKINS[skinKey] || GUN_SKINS.stock;
     const id = key + ':' + (scope || 0) + ':' + (skinKey || 'stock');
@@ -132,7 +150,8 @@ const GunArt = {
   parts(key, sk) {
     sk = sk || GUN_SKINS.stock;
     const B = Build, M = sk.metal, D = sk.dark, P = sk.wood;
-    const A = GUNS[key].color;          // 강조색 = 쓰는 탄의 색
+    // 강조색은 기본적으로 쓰는 탄의 색이고, 에너지 도장은 제 색을 씁니다
+    const A = sk.accent || GUNS[key].color;
     /* 총열 위에 얹는 레일. 어느 총이든 같은 규칙으로 붙여 한 벌처럼 보이게 합니다. */
     const rail = (len, y, z) => [
       B.box(0.026, 0.012, len, D, 0, y, z),
@@ -958,6 +977,9 @@ class Char3D {
     this.deadT = 0;
     this.kills = 0;
     this.rank = 0;
+    this.spawn = null;             // 1대1 결투장에서 다시 살아날 자리
+    this.respawnT = 0;             // 부활까지 남은 시간
+    this.safeT = 0;                // 살아난 직후 무적 시간
     this.crouch = false;
     this.flying = null;            // 'freefall' | 'chute' | null
     this.chuteTilt = 0;
@@ -1248,7 +1270,7 @@ class Char3D {
   }
 
   refreshGuns() {
-    const mat = Mats.vc({ roughness: 0.55, metalness: 0.25 });
+    const mat = GunArt.mat(this.gunSkin);
     if (this.gunMesh) { this.gunMount.remove(this.gunMesh); this.gunMesh = null; }
     if (this.backMesh) { this.backMount.remove(this.backMesh); this.backMesh = null; }
     if (this.gun) {

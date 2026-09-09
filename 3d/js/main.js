@@ -7,7 +7,7 @@
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8 },
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8, mode: 'br' },
   controls: [],
 
   load() {
@@ -25,6 +25,7 @@ const Settings = {
     this.data.edge = !!this.data.edge;      // 기본은 끔 (켜면 화면 끝에서 계속 돌아갑니다)
     this.data.fpv = this.data.fpv !== false;
     this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
+    this.data.mode = this.data.mode === 'duel' ? 'duel' : 'br';
     Sfx.setVolume(this.data.vol);
   },
 
@@ -64,7 +65,8 @@ const UI = {
       'startBtn', 'againBtn', 'cross', 'hitmark', 'hurt', 'minimap', 'compass',
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
-      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag'];
+      'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag',
+      'aliveChip', 'zoneChip', 'duelChip', 'duelScore'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -93,13 +95,23 @@ const UI = {
       '<div class="row total"><span>획득 BP</span><b>+' + rw.total.toLocaleString() + '</b></div>';
     Lobby.refresh();
     Lobby.refreshUI();
-    this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
-    this.el.result.className = r.won ? 'win' : 'lose';
-    this.el.resultSub.textContent = r.won ? '마지막까지 살아남았습니다' : r.rank + '위 / ' + r.total + '명';
-    this.el.resultStats.innerHTML =
-      '<div><b>' + r.kills + '</b><span>처치</span></div>' +
-      '<div><b>#' + r.rank + '</b><span>순위</span></div>' +
-      '<div><b>' + this.time(r.time) + '</b><span>생존</span></div>';
+    if (r.duel) {
+      this.el.result.textContent = r.won ? '결투 승리' : '결투 패배';
+      this.el.result.className = r.won ? 'win' : 'lose';
+      this.el.resultSub.textContent = r.kills + ' : ' + r.lost;
+      this.el.resultStats.innerHTML =
+        '<div><b>' + r.kills + '</b><span>내 점수</span></div>' +
+        '<div><b>' + r.lost + '</b><span>상대 점수</span></div>' +
+        '<div><b>' + this.time(r.time) + '</b><span>경기 시간</span></div>';
+    } else {
+      this.el.result.textContent = r.won ? '치킨 디너!' : '탈락';
+      this.el.result.className = r.won ? 'win' : 'lose';
+      this.el.resultSub.textContent = r.won ? '마지막까지 살아남았습니다' : r.rank + '위 / ' + r.total + '명';
+      this.el.resultStats.innerHTML =
+        '<div><b>' + r.kills + '</b><span>처치</span></div>' +
+        '<div><b>#' + r.rank + '</b><span>순위</span></div>' +
+        '<div><b>' + this.time(r.time) + '</b><span>생존</span></div>';
+    }
     document.exitPointerLock && document.exitPointerLock();
   },
   time(sec) {
@@ -189,13 +201,21 @@ const UI = {
         p.vehicle.spec.name + ' · ' + Math.max(0, Math.round(p.vehicle.hp));
     } else this.el.speedo.classList.add('hidden');
 
-    this.el.alive.textContent = g.alive;
     this.el.kills.textContent = p.kills;
+    this.el.aliveChip.classList.toggle('hidden', !!g.duel);
+    this.el.zoneChip.classList.toggle('hidden', !!g.duel);
+    this.el.duelChip.classList.toggle('hidden', !g.duel);
 
     const z = g.zone;
-    this.el.zoneLabel.textContent = z.shrinking ? '자기장 축소 중' : '다음 자기장';
-    this.el.zoneText.textContent = z.phase >= PHASES.length && !z.shrinking ? '최종' : this.time(z.timer);
-    this.el.zoneText.style.color = z.shrinking ? '#f85149' : '#e6edf3';
+    if (g.duel) {
+      this.el.duelScore.textContent = g.score[0] + ' : ' + g.score[1];
+      this.el.duelScore.style.color = g.score[0] >= g.score[1] ? '#7ee787' : '#f85149';
+    } else {
+      this.el.alive.textContent = g.alive;
+      this.el.zoneLabel.textContent = z.shrinking ? '자기장 축소 중' : '다음 자기장';
+      this.el.zoneText.textContent = z.phase >= PHASES.length && !z.shrinking ? '최종' : this.time(z.timer);
+      this.el.zoneText.style.color = z.shrinking ? '#f85149' : '#e6edf3';
+    }
 
     this.el.feed.innerHTML = g.feed.map(f =>
       '<div style="opacity:' + Math.max(0, Math.min(1, f.life)) + '">' + f.text + '</div>').join('');
@@ -231,7 +251,7 @@ const UI = {
 
     // 자기장 밖 경고 + 체력 낮을 때 붉은 화면
     const dz = Math.hypot(p.pos.x - z.x, p.pos.z - z.z);
-    const outside = dz > z.r;
+    const outside = !g.duel && dz > z.r;
     this.el.hurt.style.opacity = Math.min(0.55, (outside ? 0.25 : 0) + (1 - hp) * 0.42);
 
     // 피격 방향 표시
@@ -276,21 +296,27 @@ const UI = {
 
   drawMinimap(g) {
     const c = this.mctx, S = this.el.minimap.width;
-    const span = 280;                                   // 미니맵에 보이는 실제 거리(m)
+    /* 결투장은 88×64m 밖에 안 되므로 좁게 봐서 맵 전체가 들어오게 합니다 */
+    const span = g.duel ? 110 : 280;                    // 미니맵에 보이는 실제 거리(m)
     const p = g.player;
-    const src = g.minimapImg;
-    const scale = src.width / World.size;
-    const sx = (p.pos.x + World.half - span / 2) * scale;
-    const sy = (p.pos.z + World.half - span / 2) * scale;
-    const sw = span * scale;
-    c.fillStyle = '#0d1117';
-    c.fillRect(0, 0, S, S);
-    c.drawImage(src, sx, sy, sw, sw, 0, 0, S, S);
+    if (g.duel) {
+      Arena.drawMini(c, S, p.pos.x, p.pos.z, span);
+    } else {
+      const src = g.minimapImg;
+      const scale = src.width / World.size;
+      const sx = (p.pos.x + World.half - span / 2) * scale;
+      const sy = (p.pos.z + World.half - span / 2) * scale;
+      const sw = span * scale;
+      c.fillStyle = '#0d1117';
+      c.fillRect(0, 0, S, S);
+      c.drawImage(src, sx, sy, sw, sw, 0, 0, S, S);
+    }
 
     const toPx = (x, z) => [((x - p.pos.x) / span + 0.5) * S, ((z - p.pos.z) / span + 0.5) * S];
     const z = g.zone;
 
     // 자기장
+    if (!g.duel) {
     c.save();
     c.beginPath(); c.rect(0, 0, S, S);
     const zc = toPx(z.x, z.z);
@@ -305,6 +331,7 @@ const UI = {
       c.beginPath(); c.arc(tc[0], tc[1], (z.tr / span) * S, 0, Math.PI * 2);
       c.strokeStyle = '#fff'; c.lineWidth = 1.2; c.stroke();
       c.setLineDash([]);
+    }
     }
 
     // 차량
@@ -384,6 +411,7 @@ const UI = {
 
   drawBigMap(g) {
     const c = this.bctx, S = this.el.bigmapCanvas.width;
+    if (g.duel) return this.drawBigDuel(g, c, S);
     c.fillStyle = '#0d1117'; c.fillRect(0, 0, S, S);
     c.drawImage(g.minimapImg, 0, 0, S, S);
     const toPx = (x, z) => [((x + World.half) / World.size) * S, ((z + World.half) / World.size) * S];
@@ -433,6 +461,32 @@ const UI = {
     for (const t of World.towns) { const q = toPx(t.x, t.z); c.fillText(t.name, q[0], q[1]); }
     const pp = toPx(g.player.pos.x, g.player.pos.z);
     c.save(); c.translate(pp[0], pp[1]); c.rotate(Math.PI - Game.look.yaw);
+    c.fillStyle = '#58a6ff';
+    c.beginPath(); c.moveTo(0, -9); c.lineTo(6, 7); c.lineTo(-6, 7); c.closePath(); c.fill();
+    c.restore();
+  },
+
+  /* 결투장 전체 지도. 맵이 작아 화면에 그대로 다 들어갑니다. */
+  drawBigDuel(g, c, S) {
+    const pad = 14, k = Math.min((S - pad * 2) / Arena.W, (S - pad * 2) / Arena.D);
+    const tx = x => S / 2 + x * k, tz = z => S / 2 + z * k;
+    c.fillStyle = '#0d1117'; c.fillRect(0, 0, S, S);
+    c.fillStyle = '#2f3237';
+    c.fillRect(tx(-Arena.W / 2), tz(-Arena.D / 2), Arena.W * k, Arena.D * k);
+    for (const b of Arena.solids) {
+      c.fillStyle = b.h > 2.5 ? '#8b8578' : '#6a6f76';
+      c.fillRect(tx(b.x - b.sx / 2), tz(b.z - b.sz / 2), b.sx * k, b.sz * k);
+    }
+    // 시작 지점
+    Arena.spawns.forEach((sp, i) => {
+      c.strokeStyle = i === 0 ? '#2fd3c4' : '#ff5a4a';
+      c.lineWidth = 2;
+      c.strokeRect(tx(sp.x - 4.5), tz(sp.z - 4.5), 9 * k, 9 * k);
+    });
+    for (const pg of (g.pings || [])) this.pingMark(c, tx(pg.pos.x), tz(pg.pos.z), 9);
+    // 나 (시선 방향)
+    c.save(); c.translate(tx(g.player.pos.x), tz(g.player.pos.z));
+    c.rotate(Math.PI - Game.look.yaw);
     c.fillStyle = '#58a6ff';
     c.beginPath(); c.moveTo(0, -9); c.lineTo(6, 7); c.lineTo(-6, 7); c.closePath(); c.fill();
     c.restore();
@@ -710,14 +764,16 @@ const Main = {
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
     const n = CFG.BOTS;          // 참가자 수는 고정입니다 (로비에서 바꿀 수 없습니다)
+    const mode = Lobby.mode === 'duel' ? 'duel' : 'br';
 
-    // 같은 링크를 연 사람이 더 있으면 같은 섬에서 함께 시작합니다
-    if (Net.online && Net.playerCount > 1) {
+    /* 같은 방에 사람이 더 있으면 같은 섬에서 함께 시작합니다.
+       결투장은 아직 봇과 1대1 이라 혼자 바로 엽니다. */
+    if (mode === 'br' && Net.online && Net.playerCount > 1) {
       Net.hostStart();
       Lobby.notifyStarting();
       return;
     }
-    this.beginMatch(n, {});
+    this.beginMatch(n, { mode });
   },
 
   beginMatch(n, opts) {

@@ -98,7 +98,8 @@ const Profile = {
     s.matches++;
     if (result.won) s.wins++;
     s.kills += result.kills;
-    s.best = Math.min(s.best || 99, result.rank);
+    // 결투는 2명뿐이라 순위를 배틀로얄 최고 기록에 섞지 않습니다
+    if (!result.duel) s.best = Math.min(s.best || 99, result.rank);
     s.bestKills = Math.max(s.bestKills || 0, result.kills);
     this.save();
     return { total: bp, base: REWARD.base, kills, rankBonus, win };
