@@ -175,6 +175,12 @@ const AI = {
       let target = null, bd = 80 * 80;
       for (const l of game.loots) {
         if (l.dead) continue;
+        if (a.skip && a.skip.get(l) > game.time) continue;   // 한동안 포기한 아이템
+        /* 이미 가진 총인데 그 구경 탄약까지 가득이면 주워도 얻을 것이 없습니다.
+           예전에는 이런 총을 목표로 잡고 그 자리에서 줍기만 끝없이 되풀이해,
+           봇이 접속이 끊긴 것처럼 굳어 있다가 나중에 갑자기 움직였습니다. */
+        if (l.kind === 'gun' && bot.guns.indexOf(l.gun) >= 0 &&
+            (bot.reserve[GUNS[l.gun].ammo] || 0) >= bot.ammoCap) continue;
         if (l.kind === 'ammo' && (!bot.usesCaliber(l.gun) ||
             (bot.reserve[l.gun] || 0) >= bot.ammoCap)) continue;
         if (l.kind === 'med' && bot.meds >= bot.medCap) continue;
@@ -190,7 +196,21 @@ const AI = {
       if (target) {
         a.state = 'loot';
         a.dest = { x: target.pos.x, z: target.pos.z };
-        if (bd < CFG.PICK_RANGE * CFG.PICK_RANGE) game.pickUp(bot, target);
+        /* 한 아이템이 봇을 영영 붙잡아 두지 못하게 하는 안전장치입니다.
+           목표에 가까워지지 못한 채 6초가 지나면 — 지붕이나 벼랑처럼 걸어서
+           닿을 수 없는 자리든, 주워도 얻을 것이 없어 아이템이 그대로 남든 —
+           그 아이템은 한동안 포기하고 다른 것을 찾습니다. 예전에는 이때 봇이
+           접속이 끊긴 것처럼 굳어 있다가 갑자기 다시 움직였습니다. */
+        const d = Math.sqrt(bd);
+        if (a.stuckOn !== target) { a.stuckOn = target; a.stuckAt = game.time; a.stuckBest = d; }
+        else if (d < a.stuckBest - 0.5) { a.stuckBest = d; a.stuckAt = game.time; }
+        else if (game.time - a.stuckAt > 6) {
+          if (!a.skip) a.skip = new Map();
+          a.skip.set(target, game.time + 60);
+          a.stuckOn = null;
+          return;
+        }
+        if (bd < CFG.PICK_RANGE * CFG.PICK_RANGE && game.pickUp(bot, target)) a.stuckOn = null;
         return;
       }
     }

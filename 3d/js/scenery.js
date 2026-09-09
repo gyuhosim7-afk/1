@@ -319,12 +319,32 @@ const Scenery = {
     this.boxDefs.push({ x, y: ly, z, sx: w, sy: h, sz: thick, yaw, color, solid: false });
   },
 
+  /* 이 모델을 이 자리에 앉힐 때의 바닥 높이.
+     가운데 한 점만 재면 비탈에서 낮은 쪽 모서리가 공중에 뜨므로,
+     모델이 실제로 덮는 넓이를 보고 그 안에서 가장 낮은 지면에 맞춥니다. */
+  sit(name, s, x, z, yaw) {
+    const b = SpaceKit.size(name, s);
+    if (!b) return World.height(x, z);
+    const hx = b.sx / 2, hz = b.sz / 2, c = Math.cos(yaw), sn = Math.sin(yaw);
+    let low = Infinity;
+    for (const ox of [-hx, 0, hx]) {
+      for (const oz of [-hz, 0, hz]) {
+        low = Math.min(low, World.height(x + ox * c - oz * sn, z + ox * sn + oz * c));
+      }
+    }
+    return low;
+  },
+
+  /* 부품을 앉힐 높이. 발자국 안에서 '가장 낮은' 지면에 맞춥니다.
+     가장 높은 곳에 맞추면 비탈에서 낮은 쪽 모서리가 그만큼 공중에 뜹니다
+     — 실제로 건물이 떠 보이던 원인이었습니다. 낮은 쪽에 맞추면 반대로
+     높은 쪽이 지면에 조금 묻히는데, 이쪽이 훨씬 자연스럽습니다. */
   padY(cx, cz, w, d, yaw) {
     let h = World.height(cx, cz);
     for (let i = -1; i <= 1; i++) {
       for (let j = -1; j <= 1; j++) {
         const [x, z] = this.local(cx, cz, yaw, i * w * 0.5, j * d * 0.5);
-        h = Math.max(h, World.height(x, z));
+        h = Math.min(h, World.height(x, z));
       }
     }
     return h + 0.04;
@@ -363,7 +383,8 @@ const Scenery = {
       World.addCyl({ x, z, r: 1.45 * sc, top: World.height(x, z) + 1.4 * sc, h: 3 * sc });
     }
     // 가운데에 올라설 수 있는 넓적한 바위
-    this.prop('rocks_B', cx, base, cz, rnd() * Math.PI * 2, 2.2);
+    const rockYaw = rnd() * Math.PI * 2;
+    this.prop('rocks_B', cx, this.sit('rocks_B', 2.2, cx, cz, rockYaw), cz, rockYaw, 2.2);
     this.lootSpot(cx, cz, 0, 0, 2.4, base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'rocks', r: 5 });
   },
@@ -378,8 +399,8 @@ const Scenery = {
     for (let i = 0; i < 4; i++) {
       const a = rnd() * Math.PI * 2, r = 6 + rnd() * 4;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      this.prop(rnd() < 0.5 ? 'cargo_A_stacked' : 'cargo_B_stacked',
-                x, World.height(x, z), z, rnd() * Math.PI * 2, 2.4);
+      const cn = rnd() < 0.5 ? 'cargo_A_stacked' : 'cargo_B_stacked', cy2 = rnd() * Math.PI * 2;
+      this.prop(cn, x, this.sit(cn, 2.4, x, z, cy2), z, cy2, 2.4);
     }
     for (let i = 0; i < 2; i++) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 9, (rnd() - 0.5) * 9, base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'ruin', r: 7 });
@@ -410,7 +431,7 @@ const Scenery = {
       this.lootSpot(px, pz, 0, 0, pb.sz * 0.66, podBase + 0.05);
       if (rnd() < 0.5) {
         const sx = px + Math.cos(a) * 7, sz = pz + Math.sin(a) * 7;
-        this.prop('solarpanel', sx, World.height(sx, sz), sz, a, 4.0, false);
+        this.prop('solarpanel', sx, this.sit('solarpanel', 4.0, sx, sz, a), sz, a, 4.0, false);
       }
     }
     this.prop('lights', cx + 8, this.padY(cx + 8, cz + 8, 2, 2, 0), cz + 8, rnd() * 6.28, 2.4, false);
@@ -426,8 +447,10 @@ const Scenery = {
     const r1 = pb.sx * 0.5 + 1.5, r2 = pb.sx * 0.5 + 0.4;
     const x1 = px + Math.cos(a) * r1, z1 = pz + Math.sin(a) * r1;
     const x2 = px + Math.cos(a) * r2, z2 = pz + Math.sin(a) * r2;
-    this.prop(rnd() < 0.5 ? 'cargo_A' : 'cargo_B', x1, World.height(x1, z1), z1, rnd() * 6.28, 2.4);
-    this.prop(rnd() < 0.5 ? 'cargo_A_stacked' : 'cargo_B_stacked', x2, World.height(x2, z2), z2, rnd() * 6.28, 3.2);
+    const n1 = rnd() < 0.5 ? 'cargo_A' : 'cargo_B', y1 = rnd() * 6.28;
+    this.prop(n1, x1, this.sit(n1, 2.4, x1, z1, y1), z1, y1, 2.4);
+    const n2 = rnd() < 0.5 ? 'cargo_A_stacked' : 'cargo_B_stacked', y2 = rnd() * 6.28;
+    this.prop(n2, x2, this.sit(n2, 3.2, x2, z2, y2), z2, y2, 3.2);
     // 지붕 위에도 주울 것을 둡니다 (올라갈 값어치가 있도록)
     this.lootSpot(px, pz, 0, 0, 0, base + pb.sy + 0.05);
   },
@@ -483,7 +506,8 @@ const Scenery = {
     this.prop(name, cx, base, cz, yaw, 4.2);
     if (rnd() < 0.7) {
       const [x, z] = this.local(cx, cz, yaw, 5.5, 2.0);
-      this.prop('solarpanel', x, World.height(x, z), z, yaw + Math.PI / 2, 4.0, false);
+      this.prop('solarpanel', x, this.sit('solarpanel', 4.0, x, z, yaw + Math.PI / 2), z,
+                yaw + Math.PI / 2, 4.0, false);
     }
     this.lootSpot(cx, cz, yaw, 5.4, -2.2, base + 0.05);
     World.buildings.push({ x: cx, z: cz, kind: 'depot', r: 5 });
@@ -540,7 +564,7 @@ const Scenery = {
                    'containers_A', 'containers_B', 'containers_C', 'containers_D'];
     const name = kinds[Math.floor(rnd() * kinds.length)];
     const s = name.indexOf('containers') === 0 ? 6.0 : 3.4;   // 팔레트류는 납작해서 크게
-    const b = this.prop(name, cx, base, cz, yaw, s);
+    const b = this.prop(name, cx, this.sit(name, s, cx, cz, yaw), cz, yaw, s);
     if (!b) return;
     if (rnd() < 0.4) this.lootSpot(cx, cz, yaw, (rnd() - 0.5) * 5, b.sz / 2 + 1.6, base + 0.05);
   },
@@ -582,12 +606,14 @@ const Scenery = {
       const r = rnd();
       const name = r < 0.34 ? 'rock_A' : r < 0.62 ? 'rock_B' : r < 0.86 ? 'rocks_A' : 'rocks_B';
       const sc = (name === 'rocks_B' ? 2.6 : 4.2) * (0.7 + rnd() * 0.8);
-      this.prop(name, sp.x, sp.y, sp.z, rnd() * Math.PI * 2, sc, name === 'rocks_B');
+      const ry = rnd() * Math.PI * 2;
+      this.prop(name, sp.x, this.sit(name, sc, sp.x, sp.z, ry), sp.z, ry, sc, name === 'rocks_B');
     }
     // 채굴 시추기: 마을 바깥에 서 있는 이정표
     for (let i = 0; i < 16; i++) {
       const sp = World.freeSpot(12);
-      this.prop('drill_structure', sp.x, sp.y, sp.z, rnd() * Math.PI * 2, 7.5);
+      const dy = rnd() * Math.PI * 2;
+      this.prop('drill_structure', sp.x, this.sit('drill_structure', 7.5, sp.x, sp.z, dy), sp.z, dy, 7.5);
     }
 
     for (let i = 0; i < Math.round(3400 * density); i++) {
