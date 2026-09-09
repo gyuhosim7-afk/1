@@ -947,6 +947,35 @@ const Game = {
   },
 
   /* ---------- 사격 ---------- */
+  /* 이 사람이 지금 한 발 쏘면 얼마나 벌어지는가.
+     사격과 조준선이 같은 값을 쓰도록 한 곳에 모았습니다 — 따로 계산하면
+     화면에 보이는 조준선이 실제 탄퍼짐과 어긋납니다.
+     정조준 탄퍼짐은 사람·봇이 같습니다(예전에는 봇에게만 1.45배를 물려
+     같은 총을 들어도 봇이 더 못 맞혔습니다). */
+  aimSpread(ch) {
+    const spec = ch.spec;
+    if (!spec) return 0.05;
+    const aiming = ch.isPlayer ? this.ads : ch.ads;
+    let spread = aiming ? spec.adsSpread : spec.spread;
+
+    /* 발로란트식 끊어 쏘기. tap 이 있는 총은
+       - 서서 tap 초 이상 쉬고 쏘는 첫 발이 조준점에 정확히 꽂히고
+       - 연사를 이을수록 bloom 만큼 벌어집니다. */
+    if (spec.tap != null) {
+      const rested = this.time - (ch.lastShotT == null ? -99 : ch.lastShotT) > spec.tap;
+      const n = rested ? 0 : (ch.sprayN || 0);
+      const still = ch.speedNow < 0.8 && !ch.flying && !ch.vehicle;
+      /* 서서 쉬고 쏘는 첫 발만 정확히 0 입니다. 그 밖에는 총의 기본
+         탄퍼짐에서 시작해 연사만큼 벌어집니다.
+         (예전에는 bloom × n 만 썼는데 n=0 이면 0 이 되어, 걸으면서 쏘는
+         첫 발까지 조준점에 정확히 꽂혔습니다 — 발로란트는 움직이며 쏘는
+         것을 크게 벌리므로 그 반대여야 합니다.) */
+      spread = (n === 0 && still) ? 0
+             : Math.min(spec.spread * 1.8, spread + (spec.bloom || 0.014) * n);
+    }
+    return spread * (ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1));
+  },
+
   fireShot(ch, ox, oy, oz, dir) {
     if (!ch.canShoot()) return;
     const spec = ch.spec;
@@ -955,31 +984,19 @@ const Game = {
     ch.recoil = 1;
     this.muzzleFlash(ox, oy, oz, ch === this.player);
     const pellets = spec.pellets || 1;
-    /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
-       사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
-    /* 정조준 탄퍼짐은 사람·봇이 같습니다. 예전에는 봇에게만 1.45배를
-       물려서, 같은 총을 들어도 봇이 더 못 맞혔습니다. */
-    const aiming = ch.isPlayer ? this.ads : ch.ads;
-    let spread = aiming ? spec.adsSpread : spec.spread;
-
-    /* 발로란트식 끊어 쏘기. tap 이 있는 총은
-       - 서서 tap 초 이상 쉬고 쏜 첫 발이 조준점에 정확히 꽂히고
-       - 연사를 이을수록 bloom 만큼 탄이 벌어집니다.
-       배그처럼 계속 갈기는 것보다 한 발씩 끊어 쏘는 쪽이 유리해집니다. */
+    /* 이번 한 발의 탄퍼짐. 조준선도 같은 함수를 쓰므로 화면에 보이는
+       벌어짐이 실제 탄퍼짐과 항상 일치합니다. */
+    const s0 = this.aimSpread(ch);
+    // 연사 기록 갱신 (끊어 쏘기 판정용). 값을 구한 뒤에 올려야 합니다.
     if (spec.tap != null) {
       if (this.time - (ch.lastShotT == null ? -99 : ch.lastShotT) > spec.tap) ch.sprayN = 0;
       ch.lastShotT = this.time;
-      const still = ch.speedNow < 0.8 && !ch.flying && !ch.vehicle;
-      spread = (ch.sprayN === 0 && still)
-        ? 0
-        : Math.min(spec.spread * 1.8, (spec.bloom || 0.014) * ch.sprayN);
       ch.sprayN++;
     }
-    const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
 
     for (let i = 0; i < pellets; i++) {
       const d = this._v.copy(dir);
-      const s = spread * moving;
+      const s = s0;
       d.x += (Math.random() * 2 - 1) * s;
       d.y += (Math.random() * 2 - 1) * s;
       d.z += (Math.random() * 2 - 1) * s;

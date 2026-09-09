@@ -85,7 +85,8 @@ const UI = {
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
       'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag',
-      'aliveChip', 'zoneChip', 'duelChip', 'duelScore', 'shieldBox', 'shieldText', 'medbox'];
+      'aliveChip', 'zoneChip', 'duelChip', 'duelScore', 'shieldBox', 'shieldText', 'medbox',
+      'adsRet', 'adsVig'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -269,13 +270,23 @@ const UI = {
       this.el.prompt.innerHTML = '<kbd>F</kbd> ' + hint;
     } else this.el.prompt.classList.add('hidden');
 
-    // 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점
-    const spread = p.gun ? (Game.ads ? GUNS[p.gun].adsSpread : GUNS[p.gun].spread) : 0.05;
-    const moveMul = p.speedNow > 2.5 ? 1.6 : 1;
-    this.el.cross.style.setProperty('--gap', (4 + spread * 460 * moveMul).toFixed(1) + 'px');
-    this.el.cross.style.setProperty('--ring', (14 + spread * 620 * moveMul).toFixed(1) + 'px');
+    /* 조준선: 평소에는 십자선, 레드도트 조준경으로 정조준할 때만 빨간 점.
+       벌어짐은 사격과 똑같은 함수에서 가져오므로, 화면에 보이는 조준선이
+       지금 실제 탄퍼짐과 항상 일치합니다(끊어 쏘기로 모인 상태까지). */
+    const spread = p.gun ? g.aimSpread(p) : 0.05;
+    this.el.cross.style.setProperty('--gap', (4 + spread * 460).toFixed(1) + 'px');
+    this.el.cross.style.setProperty('--ring', (14 + spread * 620).toFixed(1) + 'px');
     this.el.cross.classList.toggle('reddot', Game.ads && p.zoom === 2);
-    this.el.cross.style.opacity = (p.flying || scoped) ? 0 : 1;
+
+    /* 1대1 정조준 조준경. 조준선 대신 육각 브래킷을 띄우고, 탄퍼짐만큼
+       벌어지게 해서 지금 총이 얼마나 모여 있는지 그대로 읽히게 합니다. */
+    const duelAds = !!g.duel && Game.ads && !p.flying && !p.dead;
+    this.el.adsRet.classList.toggle('hidden', !duelAds);
+    this.el.adsVig.classList.toggle('hidden', !duelAds);
+    if (duelAds) {
+      this.el.adsRet.style.transform = 'scale(' + (1 + Math.min(0.7, spread * 13)).toFixed(3) + ')';
+    }
+    this.el.cross.style.opacity = (p.flying || scoped || duelAds) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
 
@@ -398,13 +409,16 @@ const UI = {
       this.dropMark(c, q[0], q[1], a.landed, 7);
     }
 
-    // 근처 적
-    for (const ch of g.chars) {
-      if (ch.dead || ch.isPlayer) continue;
-      if (p.pos.distanceTo(ch.pos) > 80) continue;
-      const q = toPx(ch.pos.x, ch.pos.z);
-      c.fillStyle = '#ff6b6b';
-      c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI * 2); c.fill();
+    /* 근처 적. 결투장에서는 그리지 않습니다 — 상대가 어디 있는지 지도로
+       알려 주면 모서리를 까고 나아가는 재미가 사라집니다. */
+    if (!g.duel) {
+      for (const ch of g.chars) {
+        if (ch.dead || ch.isPlayer) continue;
+        if (p.pos.distanceTo(ch.pos) > 80) continue;
+        const q = toPx(ch.pos.x, ch.pos.z);
+        c.fillStyle = '#ff6b6b';
+        c.beginPath(); c.arc(q[0], q[1], 2.6, 0, Math.PI * 2); c.fill();
+      }
     }
 
     // 플레이어 (시야 방향 삼각형)

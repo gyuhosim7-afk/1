@@ -776,3 +776,40 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
   width: 11px; height: 13px; background: #7fd2ff;
   clip-path: polygon(50% 0, 100% 22%, 100% 62%, 50% 100%, 0 62%, 0 22%);
 }
+
+/* --- 1대1 정조준 조준경 ---
+   발로란트처럼 화면을 살짝 당긴 위에 호박색 육각 브래킷을 겹칩니다.
+   육각형은 변 여섯 개를 따로 놓아 꼭짓점마다 틈이 남게 했습니다 —
+   닫힌 테두리보다 목표가 잘 보이고, 브래킷처럼 읽힙니다.
+   반지름 58px, 변 중점은 중심에서 50.2px, 각 변은 40px 입니다. */
+#adsRet {
+  --ads: #ffcf4d;
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 10;
+  pointer-events: none;
+}
+#adsRet .s {
+  position: absolute; left: -20px; top: -1px; width: 40px; height: 2px;
+  background: var(--ads); box-shadow: 0 0 3px rgba(0, 0, 0, .85);
+}
+#adsRet .s1 { transform: translate(43.5px, 25.1px) rotate(120deg); }
+#adsRet .s2 { transform: translate(0, 50.2px); }
+#adsRet .s3 { transform: translate(-43.5px, 25.1px) rotate(60deg); }
+#adsRet .s4 { transform: translate(-43.5px, -25.1px) rotate(120deg); }
+#adsRet .s5 { transform: translate(0, -50.2px); }
+#adsRet .s6 { transform: translate(43.5px, -25.1px) rotate(60deg); }
+/* 위아래에서 가운데를 가리키는 짧은 눈금 */
+#adsRet .tick {
+  position: absolute; left: -1px; width: 2px; height: 10px;
+  background: var(--ads); opacity: .85; box-shadow: 0 0 3px rgba(0, 0, 0, .85);
+}
+#adsRet .tu { top: -34px; }
+#adsRet .td { top: 24px; }
+#adsRet .pip {
+  position: absolute; left: -1.5px; top: -1.5px; width: 3px; height: 3px;
+  background: #fff; box-shadow: 0 0 4px rgba(0, 0, 0, .9);
+}
+#adsVig {
+  position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .28) 72%, rgba(0, 0, 0, .62) 100%);
+}
