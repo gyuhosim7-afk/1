@@ -813,3 +813,17 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
   background: radial-gradient(ellipse at center,
     rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .28) 72%, rgba(0, 0, 0, .62) 100%);
 }
+
+/* --- 1대1 기본 조준점: 발로란트처럼 가운데 점 하나 ---
+   벌어지지 않습니다. 지금 얼마나 모여 있는지는 정조준 브래킷이 알려 주고,
+   평소에는 화면 정중앙의 점 하나만 남겨 시야를 막지 않습니다. */
+#cross.dotOnly .t, #cross.dotOnly .b,
+#cross.dotOnly .l, #cross.dotOnly .r,
+#cross.dotOnly .ring { display: none; }
+#cross.dotOnly .dot {
+  display: block;
+  left: -2px; top: -2px; width: 4px; height: 4px; border-radius: 50%;
+  background: #fff;
+  /* 밝은 벽에서도 보이도록 검은 테두리를 한 겹 두릅니다 */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .9), 0 0 3px rgba(0, 0, 0, .65);
+}

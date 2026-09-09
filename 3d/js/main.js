@@ -286,6 +286,8 @@ const UI = {
     if (duelAds) {
       this.el.adsRet.style.transform = 'scale(' + (1 + Math.min(0.7, spread * 13)).toFixed(3) + ')';
     }
+    // 1대1 평소 조준선은 발로란트처럼 가운데 점 하나입니다
+    this.el.cross.classList.toggle('dotOnly', !!g.duel && !duelAds);
     this.el.cross.style.opacity = (p.flying || scoped || duelAds) ? 0 : 1;
 
     this.el.hitmark.style.opacity = Math.max(0, g.hitMarker * 4);
