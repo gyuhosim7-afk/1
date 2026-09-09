@@ -926,6 +926,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
         수송기에서 <kbd>Space</kbd> 로 낙하합니다</p>
       <p class="dockHint hidden" id="duelHint">결투장에서 단둘이 <b>7선승</b>으로 싸웁니다. 파밍과 자기장이 없고,
         쓰러지면 잠깐 뒤 제자리에서 다시 살아납니다. 무기는 둘 다 <b>M416 + 권총</b> 으로 같습니다.<br>
+        <b>친구</b> 탭에서 방을 만들어 친구가 들어오면 그 친구와 붙고, 혼자면 봇과 붙습니다.<br>
         WASD 이동 · <kbd>Shift</kbd> 질주 · <kbd>R</kbd> 재장전 · <kbd>Tab</kbd> 지도 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점</p>
     </section>
 
@@ -6435,8 +6436,13 @@ const Game = {
   /* seed 를 주면 모두가 같은 섬에서 시작합니다 (함께 하기용) */
   start(botCount, opts) {
     opts = opts || {};
+    /* 참가자 총원은 항상 같습니다. 함께 하는 사람이 늘면 그만큼 봇을 줄여야
+       하는데, 예전에는 각자 봇을 29명씩 만든 뒤 상대를 얹어 31명이 됐습니다. */
+    const humans = Math.max(1, opts.humans || 1);
+    botCount = Math.max(1, (botCount + 1) - humans);
     this.mode = opts.mode === 'duel' ? 'duel' : 'br';
     this.duel = this.mode === 'duel';
+    this.duelSlot = opts.slot === 1 ? 1 : 0;      // 결투장에서 내가 쓸 시작 지점
     this.seed = opts.seed || (Math.random() * 0x7fffffff) | 0;
     this.online = !!opts.online;
     this.startedAt = opts.startedAt || Date.now();
@@ -6618,27 +6624,36 @@ const Game = {
     this.dropTimer = Infinity;                  // 공중 보급 없음
     this.minimapImg = null;                     // 섬 지도를 물려 쓰지 않도록 비웁니다
 
+    /* 친구와 붙는 판이면 상대는 사람입니다 (Net 이 캐릭터를 만들어 줍니다).
+       혼자면 봇 한 명을 상대로 세웁니다. */
+    const vsHuman = this.online && Net.playerCount === 2;
     const sp = Arena.spawns;
+    const mine = sp[this.duelSlot] || sp[0];
+    const theirs = sp[1 - this.duelSlot] || sp[1];
+
     const mySkin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
-    this.player = new Char3D(sp[0].x, sp[0].z, true, '나', mySkin);
+    this.player = new Char3D(mine.x, mine.z, true, '나', mySkin);
     this.player.gunSkin = DUEL_SKIN;         // 결투장 지급 무기 (둘 다 같습니다)
-    this.player.spawn = sp[0];
+    this.player.spawn = mine;
     this.scene.add(this.player.mesh);
     this.chars.push(this.player);
-    this.look.yaw = sp[0].yaw;
+    this.look.yaw = mine.yaw;
     this.look.pitch = -0.05;
     this.view.yaw = this.look.yaw; this.view.pitch = this.look.pitch;
 
-    const foeName = NAMES[Math.floor(Math.random() * NAMES.length)] || '도전자';
-    const foe = new Char3D(sp[1].x, sp[1].z, false, foeName, OUTFITS[3 % OUTFITS.length]);
-    foe.netId = 0;
-    foe.spawn = sp[1];
-    foe.gunSkin = DUEL_SKIN;
-    foe.ai.skill = 0.72;                        // 사람과 붙을 만한 실력
-    this.botById[0] = foe;
-    this.scene.add(foe.mesh);
-    this.chars.push(foe);
-    this.foe = foe;
+    this.foe = null;
+    if (!vsHuman) {
+      const foeName = NAMES[Math.floor(Math.random() * NAMES.length)] || '도전자';
+      const foe = new Char3D(theirs.x, theirs.z, false, foeName, OUTFITS[3 % OUTFITS.length]);
+      foe.netId = 0;
+      foe.spawn = theirs;
+      foe.gunSkin = DUEL_SKIN;
+      foe.ai.skill = 0.72;                      // 사람과 붙을 만한 실력
+      this.botById[0] = foe;
+      this.scene.add(foe.mesh);
+      this.chars.push(foe);
+      this.foe = foe;
+    }
 
     for (const c of this.chars) this.giveDuelKit(c);
 
@@ -6646,7 +6661,7 @@ const Game = {
     this.camDist = CFG.CAM_DIST;
     this.updateCamera(0.016);
     this.state = 'playing';
-    this.pushFeed('결투 시작 — ' + CFG.DUEL_WINS + '선승');
+    this.pushFeed((vsHuman ? '친구와 결투 시작 — ' : '결투 시작 — ') + CFG.DUEL_WINS + '선승');
   },
 
   /* 결투장 장비. 둘 다 똑같이 받고, 다시 살아날 때도 이걸로 채웁니다. */
@@ -7375,7 +7390,12 @@ const Game = {
       else this.score[c === this.player ? 1 : 0]++;      // 자기 실수로 죽으면 상대 점수
       this.pushFeed((src ? src.name : '???') + ' → ' + c.name +
                     '   ' + this.score[0] + ' : ' + this.score[1]);
-      if (c === this.player) { this.deathWait = 0; Sfx.hurt(); }
+      if (c === this.player) {
+        this.deathWait = 0;
+        Sfx.hurt();
+        // 상대 쪽에서도 점수를 올릴 수 있게 알립니다 (이 알림이 없으면 상대 점수가 안 오릅니다)
+        if (this.online) Net.died(src ? src.name : '');
+      }
       return;
     }
 
@@ -8441,12 +8461,24 @@ const Net = {
   /* 방장은 '어느 섬에서 언제 시작할지' 만 정합니다.
      참가자 수는 보내지 않습니다 — 방장이 숫자를 조작해 전원을 적은 봇으로
      시작시키는 길을 막기 위해, 각자 자기 쪽 상수를 씁니다. */
-  hostStart() {
+  hostStart(mode) {
     const seed = (Math.random() * 0x7fffffff) | 0;
     const at = Date.now() + 1200;             // 다 같이 시작하도록 잠깐 여유를 둡니다
     this.hostPeer = this.myPeer;
-    this.send('start', { seed, at, host: this.myPeer });
-    this.pendingStart = { seed, at, host: this.myPeer };
+    /* 누가 어느 시작 지점을 쓸지는 방장이 정한 순서로 정합니다.
+       각자 제 목록을 정렬해 쓰면, 목록이 아직 안 맞은 순간에 둘이 같은
+       자리에서 시작하는 일이 생깁니다. */
+    const order = this.lobbyPeers.filter(x => x.kind === 'viewer').map(x => x.peer).sort();
+    const d = { seed, at, host: this.myPeer, mode: mode || 'br', order };
+    this.send('start', d);
+    this.pendingStart = d;
+  },
+
+  /* 결투장에서 내가 쓸 시작 지점 번호 (0 이 방장) */
+  slotOf(order) {
+    if (!order || !order.length) return 0;
+    const i = order.indexOf(this.myPeer);
+    return i < 0 ? 1 : (i % 2);
   },
 
   onStart(msg) {
@@ -8454,8 +8486,9 @@ const Net = {
     if (!d.seed) return;
     if (msg.isMe && msg.sameTab) return;       // 내가 보낸 것은 이미 처리
     this.hostPeer = d.host || msg.peer;
-    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer };
-    Lobby.notifyStarting();
+    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer,
+                          mode: d.mode || 'br', order: d.order || [] };
+    Lobby.notifyStarting(d.mode);
   },
 
   /* 예약된 시작 시각이 되면 매치를 엽니다 */
@@ -8463,7 +8496,11 @@ const Net = {
     if (this.pendingStart && Date.now() >= this.pendingStart.at) {
       const s = this.pendingStart;
       this.pendingStart = null;
-      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true });
+      /* 사람 수는 방장이 보낸 목록 길이로 셉니다. 각자 제 목록을 세면
+         목록이 아직 안 맞은 순간에 봇 수가 달라져 서로 다른 섬이 됩니다. */
+      const humans = (s.order || []).length || 1;
+      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true, humans,
+                                  mode: s.mode || 'br', slot: this.slotOf(s.order) });
     }
   },
 
@@ -8479,7 +8516,7 @@ const Net = {
       mode: 'match',
       name: Profile.nickname(),
       skin: Profile.data.equipped.skin,
-      gunSkin: Profile.data.equipped.gun,
+      gunSkin: p.gunSkin,
       x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
       yaw: +p.yaw.toFixed(2), pitch: +p.pitch.toFixed(2),
       hp: Math.max(0, Math.round(p.hp)),
@@ -8613,16 +8650,36 @@ const Net = {
     if (l && !l.dead) { l.dead = true; Game.scene.remove(l.mesh); }
   },
 
-  died(byName) { this.send('died', { by: byName || '' }); },
+  died(byName) {
+    this.deathNo = (this.deathNo || 0) + 1;
+    this.send('died', { by: byName || '', n: this.deathNo });
+  },
   onDied(m) {
     if (m.isMe || Game.state !== 'playing') return;
     const c = this.players[m.peer];
-    if (c && !c.dead) { c.dead = true; c.deadT = 0; Game.pushFeed(c.name + ' 탈락'); }
+    if (!c) return;
+    /* 죽음마다 번호를 붙여 세는 이유:
+       위치(presence)가 이 알림보다 먼저 도착하면 c.dead 가 이미 true 라,
+       'c.dead 가 아니면 센다' 로는 점수를 놓칩니다. 번호로 세면 순서가
+       뒤바뀌어도 한 번만, 빠짐없이 셉니다. */
+    const n = (m.data || {}).n || 0;
+    const seen = this.deathSeen || (this.deathSeen = {});
+    if (n && seen[m.peer] === n) return;         // 같은 죽음을 두 번 세지 않습니다
+    seen[m.peer] = n;
+    if (!c.dead) { c.dead = true; c.deadT = 0; }
+    if (!Game.duel) { Game.pushFeed(c.name + ' 탈락'); return; }
+    /* 1대1 에서는 상대가 쓰러졌다는 것이 곧 내 한 점입니다.
+       상대 쪽에서도 같은 순간에 '상대가 득점' 으로 세므로 양쪽 점수가 맞습니다.
+       (제 실수로 죽어도 1대1 에서는 남는 사람이 한 점을 가져갑니다) */
+    Game.score[0]++;
+    Game.pushFeed(c.name + ' 처치   ' + Game.score[0] + ' : ' + Game.score[1]);
+    Sfx.kill();
   },
 
   leaveMatch() {
     for (const id in this.players) this.removePlayer(id);
     this.players = {};
+    this.deathNo = 0; this.deathSeen = {};
     this.push({ mode: 'lobby', bots: null });
   }
 };
@@ -9184,32 +9241,47 @@ const Lobby = {
     const swap = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
     swap('shareHint', !duel);
     swap('duelHint', duel);
-    swap('peerList', !duel);
+
     const cnt = document.getElementById('modeCount');
     if (cnt) cnt.innerHTML = duel ? '단둘이 · <b class="fixedNum">' + CFG.DUEL_WINS + '</b>선승'
                                   : '생존자 <b class="fixedNum">30</b>명';
-    if (this.el && this.el.modeName) this.el.modeName.textContent = duel ? '1대1' : '솔로';
-    if (!duel) this.showPeers(Net.lobbyPeers);
+    this.showPeers(Net.lobbyPeers);
   },
 
   /* 함께 접속한 사람 목록 */
   showPeers(list) {
     if (!this.el || !this.el.peerList) return;
-    if (this.mode === 'duel') return;          // 결투장은 인원 표시를 쓰지 않습니다
+    const duel = this.mode === 'duel';
     const others = (list || []).filter(p => !p.isMe && p.kind === 'viewer');
-    if (!Net.online) { this.el.peerList.textContent = '혼자 플레이 중'; this.el.modeName.textContent = '솔로'; return; }
+    if (!Net.online) {
+      this.el.peerList.textContent = duel ? '봇과 1대1 (방에 들어가면 친구와)' : '혼자 플레이 중';
+      this.el.modeName.textContent = duel ? '1대1' : '솔로';
+      return;
+    }
     if (!others.length) {
-      this.el.peerList.innerHTML = '<span class="dot on"></span>연결됨 · 링크를 공유해 보세요';
-      this.el.modeName.textContent = '솔로';
+      this.el.peerList.innerHTML = '<span class="dot on"></span>' +
+        (duel ? '방에 나 혼자 — 친구가 들어오면 사람과 붙습니다' : '연결됨 · 링크를 공유해 보세요');
+      this.el.modeName.textContent = duel ? '1대1' : '솔로';
       return;
     }
     const names = others.map(p => (p.presence && p.presence.name) || '생존자');
+    if (duel) {
+      // 결투는 두 명 전용입니다. 셋 이상이면 시작할 수 없다고 미리 알려 줍니다
+      const n = others.length + 1;
+      this.el.modeName.textContent = n === 2 ? '1대1 (친구)' : '1대1';
+      this.el.peerList.innerHTML = '<span class="dot on"></span>' +
+        (n === 2 ? names[0] + ' 님과 1대1'
+                 : '지금 ' + n + '명 — 결투는 두 명일 때만 됩니다');
+      return;
+    }
     this.el.modeName.textContent = '함께 ' + (others.length + 1) + '명';
     this.el.peerList.innerHTML = '<span class="dot on"></span>' + names.join(', ') + ' 님과 함께';
   },
 
   onNetReady() { this.showPeers(Net.lobbyPeers); },
-  notifyStarting() { this.toast('곧 함께 시작합니다'); },
+  notifyStarting(mode) {
+    this.toast(mode === 'duel' ? '곧 친구와 1대1 을 시작합니다' : '곧 함께 시작합니다');
+  },
 
   toast(msg) {
     const t = document.getElementById('lobbyToast');
@@ -10031,11 +10103,15 @@ const Main = {
     const n = CFG.BOTS;          // 참가자 수는 고정입니다 (로비에서 바꿀 수 없습니다)
     const mode = Lobby.mode === 'duel' ? 'duel' : 'br';
 
-    /* 같은 방에 사람이 더 있으면 같은 섬에서 함께 시작합니다.
-       결투장은 아직 봇과 1대1 이라 혼자 바로 엽니다. */
-    if (mode === 'br' && Net.online && Net.playerCount > 1) {
-      Net.hostStart();
-      Lobby.notifyStarting();
+    /* 같은 방에 사람이 더 있으면 함께 시작합니다.
+       결투는 두 명 전용이므로, 셋 이상이면 시작하지 않고 알려 줍니다. */
+    if (Net.online && Net.playerCount > 1) {
+      if (mode === 'duel' && Net.playerCount !== 2) {
+        Lobby.toast('결투는 두 명일 때만 됩니다 (지금 ' + Net.playerCount + '명)');
+        return;
+      }
+      Net.hostStart(mode);
+      Lobby.notifyStarting(mode);
       return;
     }
     this.beginMatch(n, { mode });

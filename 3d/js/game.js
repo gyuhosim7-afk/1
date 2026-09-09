@@ -290,8 +290,13 @@ const Game = {
   /* seed 를 주면 모두가 같은 섬에서 시작합니다 (함께 하기용) */
   start(botCount, opts) {
     opts = opts || {};
+    /* 참가자 총원은 항상 같습니다. 함께 하는 사람이 늘면 그만큼 봇을 줄여야
+       하는데, 예전에는 각자 봇을 29명씩 만든 뒤 상대를 얹어 31명이 됐습니다. */
+    const humans = Math.max(1, opts.humans || 1);
+    botCount = Math.max(1, (botCount + 1) - humans);
     this.mode = opts.mode === 'duel' ? 'duel' : 'br';
     this.duel = this.mode === 'duel';
+    this.duelSlot = opts.slot === 1 ? 1 : 0;      // 결투장에서 내가 쓸 시작 지점
     this.seed = opts.seed || (Math.random() * 0x7fffffff) | 0;
     this.online = !!opts.online;
     this.startedAt = opts.startedAt || Date.now();
@@ -473,27 +478,36 @@ const Game = {
     this.dropTimer = Infinity;                  // 공중 보급 없음
     this.minimapImg = null;                     // 섬 지도를 물려 쓰지 않도록 비웁니다
 
+    /* 친구와 붙는 판이면 상대는 사람입니다 (Net 이 캐릭터를 만들어 줍니다).
+       혼자면 봇 한 명을 상대로 세웁니다. */
+    const vsHuman = this.online && Net.playerCount === 2;
     const sp = Arena.spawns;
+    const mine = sp[this.duelSlot] || sp[0];
+    const theirs = sp[1 - this.duelSlot] || sp[1];
+
     const mySkin = SKINS[Profile.data.equipped.skin] || SKINS.recruit;
-    this.player = new Char3D(sp[0].x, sp[0].z, true, '나', mySkin);
+    this.player = new Char3D(mine.x, mine.z, true, '나', mySkin);
     this.player.gunSkin = DUEL_SKIN;         // 결투장 지급 무기 (둘 다 같습니다)
-    this.player.spawn = sp[0];
+    this.player.spawn = mine;
     this.scene.add(this.player.mesh);
     this.chars.push(this.player);
-    this.look.yaw = sp[0].yaw;
+    this.look.yaw = mine.yaw;
     this.look.pitch = -0.05;
     this.view.yaw = this.look.yaw; this.view.pitch = this.look.pitch;
 
-    const foeName = NAMES[Math.floor(Math.random() * NAMES.length)] || '도전자';
-    const foe = new Char3D(sp[1].x, sp[1].z, false, foeName, OUTFITS[3 % OUTFITS.length]);
-    foe.netId = 0;
-    foe.spawn = sp[1];
-    foe.gunSkin = DUEL_SKIN;
-    foe.ai.skill = 0.72;                        // 사람과 붙을 만한 실력
-    this.botById[0] = foe;
-    this.scene.add(foe.mesh);
-    this.chars.push(foe);
-    this.foe = foe;
+    this.foe = null;
+    if (!vsHuman) {
+      const foeName = NAMES[Math.floor(Math.random() * NAMES.length)] || '도전자';
+      const foe = new Char3D(theirs.x, theirs.z, false, foeName, OUTFITS[3 % OUTFITS.length]);
+      foe.netId = 0;
+      foe.spawn = theirs;
+      foe.gunSkin = DUEL_SKIN;
+      foe.ai.skill = 0.72;                      // 사람과 붙을 만한 실력
+      this.botById[0] = foe;
+      this.scene.add(foe.mesh);
+      this.chars.push(foe);
+      this.foe = foe;
+    }
 
     for (const c of this.chars) this.giveDuelKit(c);
 
@@ -501,7 +515,7 @@ const Game = {
     this.camDist = CFG.CAM_DIST;
     this.updateCamera(0.016);
     this.state = 'playing';
-    this.pushFeed('결투 시작 — ' + CFG.DUEL_WINS + '선승');
+    this.pushFeed((vsHuman ? '친구와 결투 시작 — ' : '결투 시작 — ') + CFG.DUEL_WINS + '선승');
   },
 
   /* 결투장 장비. 둘 다 똑같이 받고, 다시 살아날 때도 이걸로 채웁니다. */
@@ -1230,7 +1244,12 @@ const Game = {
       else this.score[c === this.player ? 1 : 0]++;      // 자기 실수로 죽으면 상대 점수
       this.pushFeed((src ? src.name : '???') + ' → ' + c.name +
                     '   ' + this.score[0] + ' : ' + this.score[1]);
-      if (c === this.player) { this.deathWait = 0; Sfx.hurt(); }
+      if (c === this.player) {
+        this.deathWait = 0;
+        Sfx.hurt();
+        // 상대 쪽에서도 점수를 올릴 수 있게 알립니다 (이 알림이 없으면 상대 점수가 안 오릅니다)
+        if (this.online) Net.died(src ? src.name : '');
+      }
       return;
     }
 

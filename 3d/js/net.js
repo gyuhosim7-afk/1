@@ -76,12 +76,24 @@ const Net = {
   /* 방장은 '어느 섬에서 언제 시작할지' 만 정합니다.
      참가자 수는 보내지 않습니다 — 방장이 숫자를 조작해 전원을 적은 봇으로
      시작시키는 길을 막기 위해, 각자 자기 쪽 상수를 씁니다. */
-  hostStart() {
+  hostStart(mode) {
     const seed = (Math.random() * 0x7fffffff) | 0;
     const at = Date.now() + 1200;             // 다 같이 시작하도록 잠깐 여유를 둡니다
     this.hostPeer = this.myPeer;
-    this.send('start', { seed, at, host: this.myPeer });
-    this.pendingStart = { seed, at, host: this.myPeer };
+    /* 누가 어느 시작 지점을 쓸지는 방장이 정한 순서로 정합니다.
+       각자 제 목록을 정렬해 쓰면, 목록이 아직 안 맞은 순간에 둘이 같은
+       자리에서 시작하는 일이 생깁니다. */
+    const order = this.lobbyPeers.filter(x => x.kind === 'viewer').map(x => x.peer).sort();
+    const d = { seed, at, host: this.myPeer, mode: mode || 'br', order };
+    this.send('start', d);
+    this.pendingStart = d;
+  },
+
+  /* 결투장에서 내가 쓸 시작 지점 번호 (0 이 방장) */
+  slotOf(order) {
+    if (!order || !order.length) return 0;
+    const i = order.indexOf(this.myPeer);
+    return i < 0 ? 1 : (i % 2);
   },
 
   onStart(msg) {
@@ -89,8 +101,9 @@ const Net = {
     if (!d.seed) return;
     if (msg.isMe && msg.sameTab) return;       // 내가 보낸 것은 이미 처리
     this.hostPeer = d.host || msg.peer;
-    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer };
-    Lobby.notifyStarting();
+    this.pendingStart = { seed: d.seed, at: d.at, host: this.hostPeer,
+                          mode: d.mode || 'br', order: d.order || [] };
+    Lobby.notifyStarting(d.mode);
   },
 
   /* 예약된 시작 시각이 되면 매치를 엽니다 */
@@ -98,7 +111,11 @@ const Net = {
     if (this.pendingStart && Date.now() >= this.pendingStart.at) {
       const s = this.pendingStart;
       this.pendingStart = null;
-      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true });
+      /* 사람 수는 방장이 보낸 목록 길이로 셉니다. 각자 제 목록을 세면
+         목록이 아직 안 맞은 순간에 봇 수가 달라져 서로 다른 섬이 됩니다. */
+      const humans = (s.order || []).length || 1;
+      Main.beginMatch(CFG.BOTS, { seed: s.seed, startedAt: s.at, online: true, humans,
+                                  mode: s.mode || 'br', slot: this.slotOf(s.order) });
     }
   },
 
@@ -114,7 +131,7 @@ const Net = {
       mode: 'match',
       name: Profile.nickname(),
       skin: Profile.data.equipped.skin,
-      gunSkin: Profile.data.equipped.gun,
+      gunSkin: p.gunSkin,
       x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),
       yaw: +p.yaw.toFixed(2), pitch: +p.pitch.toFixed(2),
       hp: Math.max(0, Math.round(p.hp)),
@@ -248,16 +265,36 @@ const Net = {
     if (l && !l.dead) { l.dead = true; Game.scene.remove(l.mesh); }
   },
 
-  died(byName) { this.send('died', { by: byName || '' }); },
+  died(byName) {
+    this.deathNo = (this.deathNo || 0) + 1;
+    this.send('died', { by: byName || '', n: this.deathNo });
+  },
   onDied(m) {
     if (m.isMe || Game.state !== 'playing') return;
     const c = this.players[m.peer];
-    if (c && !c.dead) { c.dead = true; c.deadT = 0; Game.pushFeed(c.name + ' 탈락'); }
+    if (!c) return;
+    /* 죽음마다 번호를 붙여 세는 이유:
+       위치(presence)가 이 알림보다 먼저 도착하면 c.dead 가 이미 true 라,
+       'c.dead 가 아니면 센다' 로는 점수를 놓칩니다. 번호로 세면 순서가
+       뒤바뀌어도 한 번만, 빠짐없이 셉니다. */
+    const n = (m.data || {}).n || 0;
+    const seen = this.deathSeen || (this.deathSeen = {});
+    if (n && seen[m.peer] === n) return;         // 같은 죽음을 두 번 세지 않습니다
+    seen[m.peer] = n;
+    if (!c.dead) { c.dead = true; c.deadT = 0; }
+    if (!Game.duel) { Game.pushFeed(c.name + ' 탈락'); return; }
+    /* 1대1 에서는 상대가 쓰러졌다는 것이 곧 내 한 점입니다.
+       상대 쪽에서도 같은 순간에 '상대가 득점' 으로 세므로 양쪽 점수가 맞습니다.
+       (제 실수로 죽어도 1대1 에서는 남는 사람이 한 점을 가져갑니다) */
+    Game.score[0]++;
+    Game.pushFeed(c.name + ' 처치   ' + Game.score[0] + ' : ' + Game.score[1]);
+    Sfx.kill();
   },
 
   leaveMatch() {
     for (const id in this.players) this.removePlayer(id);
     this.players = {};
+    this.deathNo = 0; this.deathSeen = {};
     this.push({ mode: 'lobby', bots: null });
   }
 };

@@ -766,11 +766,15 @@ const Main = {
     const n = CFG.BOTS;          // 참가자 수는 고정입니다 (로비에서 바꿀 수 없습니다)
     const mode = Lobby.mode === 'duel' ? 'duel' : 'br';
 
-    /* 같은 방에 사람이 더 있으면 같은 섬에서 함께 시작합니다.
-       결투장은 아직 봇과 1대1 이라 혼자 바로 엽니다. */
-    if (mode === 'br' && Net.online && Net.playerCount > 1) {
-      Net.hostStart();
-      Lobby.notifyStarting();
+    /* 같은 방에 사람이 더 있으면 함께 시작합니다.
+       결투는 두 명 전용이므로, 셋 이상이면 시작하지 않고 알려 줍니다. */
+    if (Net.online && Net.playerCount > 1) {
+      if (mode === 'duel' && Net.playerCount !== 2) {
+        Lobby.toast('결투는 두 명일 때만 됩니다 (지금 ' + Net.playerCount + '명)');
+        return;
+      }
+      Net.hostStart(mode);
+      Lobby.notifyStarting(mode);
       return;
     }
     this.beginMatch(n, { mode });

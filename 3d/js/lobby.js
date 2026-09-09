@@ -555,32 +555,47 @@ const Lobby = {
     const swap = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
     swap('shareHint', !duel);
     swap('duelHint', duel);
-    swap('peerList', !duel);
+
     const cnt = document.getElementById('modeCount');
     if (cnt) cnt.innerHTML = duel ? '단둘이 · <b class="fixedNum">' + CFG.DUEL_WINS + '</b>선승'
                                   : '생존자 <b class="fixedNum">30</b>명';
-    if (this.el && this.el.modeName) this.el.modeName.textContent = duel ? '1대1' : '솔로';
-    if (!duel) this.showPeers(Net.lobbyPeers);
+    this.showPeers(Net.lobbyPeers);
   },
 
   /* 함께 접속한 사람 목록 */
   showPeers(list) {
     if (!this.el || !this.el.peerList) return;
-    if (this.mode === 'duel') return;          // 결투장은 인원 표시를 쓰지 않습니다
+    const duel = this.mode === 'duel';
     const others = (list || []).filter(p => !p.isMe && p.kind === 'viewer');
-    if (!Net.online) { this.el.peerList.textContent = '혼자 플레이 중'; this.el.modeName.textContent = '솔로'; return; }
+    if (!Net.online) {
+      this.el.peerList.textContent = duel ? '봇과 1대1 (방에 들어가면 친구와)' : '혼자 플레이 중';
+      this.el.modeName.textContent = duel ? '1대1' : '솔로';
+      return;
+    }
     if (!others.length) {
-      this.el.peerList.innerHTML = '<span class="dot on"></span>연결됨 · 링크를 공유해 보세요';
-      this.el.modeName.textContent = '솔로';
+      this.el.peerList.innerHTML = '<span class="dot on"></span>' +
+        (duel ? '방에 나 혼자 — 친구가 들어오면 사람과 붙습니다' : '연결됨 · 링크를 공유해 보세요');
+      this.el.modeName.textContent = duel ? '1대1' : '솔로';
       return;
     }
     const names = others.map(p => (p.presence && p.presence.name) || '생존자');
+    if (duel) {
+      // 결투는 두 명 전용입니다. 셋 이상이면 시작할 수 없다고 미리 알려 줍니다
+      const n = others.length + 1;
+      this.el.modeName.textContent = n === 2 ? '1대1 (친구)' : '1대1';
+      this.el.peerList.innerHTML = '<span class="dot on"></span>' +
+        (n === 2 ? names[0] + ' 님과 1대1'
+                 : '지금 ' + n + '명 — 결투는 두 명일 때만 됩니다');
+      return;
+    }
     this.el.modeName.textContent = '함께 ' + (others.length + 1) + '명';
     this.el.peerList.innerHTML = '<span class="dot on"></span>' + names.join(', ') + ' 님과 함께';
   },
 
   onNetReady() { this.showPeers(Net.lobbyPeers); },
-  notifyStarting() { this.toast('곧 함께 시작합니다'); },
+  notifyStarting(mode) {
+    this.toast(mode === 'duel' ? '곧 친구와 1대1 을 시작합니다' : '곧 함께 시작합니다');
+  },
 
   toast(msg) {
     const t = document.getElementById('lobbyToast');
