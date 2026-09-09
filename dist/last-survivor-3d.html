@@ -766,6 +766,26 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 #modeSeg button { flex: 1; }
 .chip.duelChip b { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
 
+/* --- 실드 (1대1 결투) --- */
+#shieldBox {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px 3px 7px;
+  background: rgba(0, 0, 0, .62);
+  border: 1px solid rgba(120, 200, 255, .45);
+  border-radius: 7px;
+}
+#shieldBox b {
+  font-size: 15px; font-weight: 600; color: #7fd2ff;
+  font-variant-numeric: tabular-nums; min-width: 20px; text-align: right;
+}
+#shieldBox.empty { border-color: rgba(255, 255, 255, .16); }
+#shieldBox.empty b, #shieldBox.empty .shIcon { color: #6e7681; background: #6e7681; }
+#shieldBox.empty b { background: none; }
+.shIcon {
+  width: 11px; height: 13px; background: #7fd2ff;
+  clip-path: polygon(50% 0, 100% 22%, 100% 62%, 50% 100%, 0 62%, 0 22%);
+}
+
 </style>
 
 <canvas id="scene"></canvas>
@@ -806,6 +826,9 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
     <div id="hpWrap">
       <div id="hpBar"><div id="hp"></div></div>
       <span id="hpText">100</span>
+      <div id="shieldBox" class="hidden" title="실드 — 받은 만큼 먼저 깎입니다">
+        <i class="shIcon"></i><b id="shieldText">50</b>
+      </div>
       <div id="medbox"><i class="kit"></i><b id="meds">1</b></div>
       <div id="gear">
         <span id="fragTag" class="gearTag off" title="수류탄 (G)"><i class="gi frag"></i><b>-</b></span>
@@ -1217,6 +1240,17 @@ const GUNS = {
   scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x7ee787, model:'rifle' },
   ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0x79c0ff, model:'rifle' },
 
+  /* ---------- 발로란트식 소총 ----------
+     발로란트는 배그와 노는 방식이 다릅니다. 거리에 따른 피해 감소가 없고,
+     실드는 비율이 아니라 받은 만큼 먼저 깎이며, 헤드샷 한 발로 끝납니다.
+     아래 값은 원작 수치를 그대로 옮긴 것입니다.
+       39 × 4 = 156  ≥  실드 50 + 체력 100  → 머리 한 발이면 끝(원탭)
+       39 × 4발      = 156                  → 몸통은 네 발
+     tap/bloom 은 '끊어 쏘기' 를 만드는 값입니다. 서서 잠깐 쉬고 쏜 첫 발은
+     조준점에 정확히 꽂히고, 연사를 이을수록 탄이 벌어집니다. */
+  vandal:  { name:'돌격소총',   short:'반달',   ammo:'556',  dmg:39, rpm:585,  mag:25, reload:2.5, spread:0.050, adsSpread:0.030, range:300, recoil:0.034, auto:true,  canScope:true,  color:0x7ee787, model:'rifle',
+             noFalloff:true, headMul:4, tap:0.30, bloom:0.017 },
+
   /* ---------- 지정사수총 ---------- */
   dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0x79c0ff },
   mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0x7ee787, model:'dmr' },
@@ -1241,13 +1275,15 @@ const MODES = {
   duel: { name: '1대1 결투', sub: '결투장 · 단둘이 · ' + CFG.DUEL_WINS + '선승' }
 };
 
-/* 결투장에서 둘 다 똑같이 받는 장비 (파밍이 없습니다) */
-const DUEL_KIT = { guns: ['rifle', 'pistol'], scope: 2, vest: 2, helmet: 2, meds: 2 };
+/* 결투장에서 둘 다 똑같이 받는 장비 (파밍이 없습니다).
+   조준경과 방탄조끼 대신 발로란트식 실드를 씁니다 — 비율로 깎지 않고
+   받은 만큼 먼저 흡수하므로, 실드 50 + 체력 100 = 150 이 됩니다. */
+const DUEL_KIT = { guns: ['vandal', 'pistol'], scope: 0, shield: 50, meds: 0 };
 
 const GUN_KEYS = Object.keys(GUNS);
 /* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
 const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','mp5k','shotgun','s12k',
-                   'rifle','rifle','scar','ak','ak','dmr','mini14','slr','vss','kar98'];
+                   'rifle','rifle','scar','ak','ak','vandal','dmr','mini14','slr','vss','kar98'];
 /* 보급 상자 전용 무기 */
 const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
 /* 바닥에 떨어지는 탄약 구경 */
@@ -5075,6 +5111,10 @@ class Char3D {
     this.deadT = 0;
     this.kills = 0;
     this.rank = 0;
+    this.shield = 0;               // 발로란트식 실드 (받은 만큼 먼저 흡수)
+    this.shieldMax = 0;            // 0 이면 실드를 안 쓰고 방탄조끼 규칙을 씁니다
+    this.sprayN = 0;               // 연사로 이어 쏜 발수 (탄퍼짐이 벌어집니다)
+    this.lastShotT = null;         // 마지막 발의 시각 (끊어 쏘기 판정용)
     this.spawn = null;             // 1대1 결투장에서 다시 살아날 자리
     this.respawnT = 0;             // 부활까지 남은 시간
     this.safeT = 0;                // 살아난 직후 무적 시간
@@ -6673,13 +6713,16 @@ const Game = {
     DUEL_KIT.guns.forEach((k, i) => {
       c.guns[i] = k;
       c.mags[i] = GUNS[k].mag;
-      c.scopes[i] = GUNS[k].canScope ? DUEL_KIT.scope : 0;
+      c.scopes[i] = GUNS[k].canScope && DUEL_KIT.scope ? DUEL_KIT.scope : 0;
       c.reserve[GUNS[k].ammo] = 240;
     });
-    c.wear('vest', DUEL_KIT.vest);
-    c.wear('helmet', DUEL_KIT.helmet);
+    c.vest = 0; c.helmet = 0; c.bag = 0;      // 실드를 쓰므로 방어구는 없습니다
+    c.shieldMax = DUEL_KIT.shield;
+    c.shield = DUEL_KIT.shield;
     c.meds = DUEL_KIT.meds;
+    c.sprayN = 0; c.lastShotT = null;
     c.refreshGuns();
+    c.refreshGear();
   },
 
   /* 쓰러진 사람을 제 시작 지점에서 되살립니다 */
@@ -6692,6 +6735,7 @@ const Game = {
     c.reloading = 0; c.healing = 0; c.cooldown = 0; c.swap = 0;
     c.victory = 0; c.respawnT = 0;
     c.safeT = CFG.DUEL_SAFE;
+    c.shield = c.shieldMax;
     c.yaw = sp.yaw;
     this.giveDuelKit(c);
     if (c === this.player) {
@@ -7094,8 +7138,22 @@ const Game = {
     const pellets = spec.pellets || 1;
     /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
        사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
-    const spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
-                               : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
+    let spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
+                             : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
+
+    /* 발로란트식 끊어 쏘기. tap 이 있는 총은
+       - 서서 tap 초 이상 쉬고 쏜 첫 발이 조준점에 정확히 꽂히고
+       - 연사를 이을수록 bloom 만큼 탄이 벌어집니다.
+       배그처럼 계속 갈기는 것보다 한 발씩 끊어 쏘는 쪽이 유리해집니다. */
+    if (spec.tap != null) {
+      if (this.time - (ch.lastShotT == null ? -99 : ch.lastShotT) > spec.tap) ch.sprayN = 0;
+      ch.lastShotT = this.time;
+      const still = ch.speedNow < 0.8 && !ch.flying && !ch.vehicle;
+      spread = (ch.sprayN === 0 && still)
+        ? 0
+        : Math.min(spec.spread * 1.8, (spec.bloom || 0.014) * ch.sprayN);
+      ch.sprayN++;
+    }
     const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
 
     for (let i = 0; i < pellets; i++) {
@@ -7112,7 +7170,11 @@ const Game = {
       let endT = Math.min(wallT, maxT);
       if (hit && hit.t < wallT) {
         endT = hit.t;
-        const dmg = spec.dmg * (hit.head ? HEADSHOT : 1) * (1 - Math.min(0.45, hit.t / spec.range * 0.45));
+        /* 헤드샷 배수는 총마다 따로 줄 수 있고(없으면 공용값),
+           noFalloff 인 총은 거리가 멀어도 피해가 줄지 않습니다. */
+        const mul = hit.head ? (spec.headMul || HEADSHOT) : 1;
+        const fall = spec.noFalloff ? 1 : (1 - Math.min(0.45, hit.t / spec.range * 0.45));
+        const dmg = spec.dmg * mul * fall;
         if (ch.isPlayer && this.online && hit.char.remote) {
           // 상대의 체력은 상대가 관리합니다. 맞았다는 사실만 보냅니다
           const peerId = Object.keys(Net.players).find(k => Net.players[k] === hit.char);
@@ -7356,8 +7418,17 @@ const Game = {
     /* 방어구: 몸통은 조끼가, 머리는 헬멧이 막아 줍니다.
        자기장 피해는 어느 쪽도 막지 못합니다. */
     if (!isZone) {
-      if (head) { if (target.headArmor > 0) amount *= (1 - target.headArmor); }
-      else if (target.armor > 0) amount *= (1 - target.armor);
+      if (target.shieldMax > 0) {
+        /* 발로란트식 실드: 비율로 깎지 않고 받은 만큼 먼저 흡수합니다.
+           머리든 몸이든 같아서, 실드 50 + 체력 100 = 150 이 그대로 기준이 됩니다. */
+        const take = Math.min(target.shield, amount);
+        target.shield -= take;
+        amount -= take;
+      } else if (head) {
+        if (target.headArmor > 0) amount *= (1 - target.headArmor);
+      } else if (target.armor > 0) {
+        amount *= (1 - target.armor);
+      }
     }
     target.hp -= amount;
     if (!isZone) {
@@ -9403,7 +9474,7 @@ const UI = {
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
       'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag',
-      'aliveChip', 'zoneChip', 'duelChip', 'duelScore'];
+      'aliveChip', 'zoneChip', 'duelChip', 'duelScore', 'shieldBox', 'shieldText', 'medbox'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -9463,6 +9534,17 @@ const UI = {
     this.el.hp.style.width = (hp * 100) + '%';
     this.el.hp.style.background = hp > 0.5 ? '#3fb950' : (hp > 0.25 ? '#d29922' : '#f85149');
     this.el.hpText.textContent = Math.max(0, Math.ceil(p.hp));
+
+    // 결투장에는 자가 치료와 투척 무기가 없으므로 그 칸은 감춥니다
+    this.el.medbox.classList.toggle('hidden', !!g.duel);
+    this.el.gear.classList.toggle('hidden', !!g.duel);
+
+    // 실드는 쓰는 판(결투장)에서만 보여 줍니다
+    if (p.shieldMax > 0) {
+      this.el.shieldBox.classList.remove('hidden');
+      this.el.shieldBox.classList.toggle('empty', p.shield <= 0);
+      this.el.shieldText.textContent = Math.max(0, Math.round(p.shield));
+    } else this.el.shieldBox.classList.add('hidden');
 
     if (p.gun) {
       this.el.gunName.textContent = GUNS[p.gun].short

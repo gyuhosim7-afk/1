@@ -66,7 +66,7 @@ const UI = {
       'bigmap', 'bigmapCanvas', 'dmgDir', 'pause', 'lockHint', 'healBar', 'healFill', 'resumeBtn',
       'scope', 'alt', 'slots', 'winBanner', 'lobbyBtn', 'rewardBox',
       'gear', 'vestTag', 'helmetTag', 'bagTag', 'speedo', 'debug', 'fragTag', 'smokeTag',
-      'aliveChip', 'zoneChip', 'duelChip', 'duelScore'];
+      'aliveChip', 'zoneChip', 'duelChip', 'duelScore', 'shieldBox', 'shieldText', 'medbox'];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.mctx = this.el.minimap.getContext('2d');
     this.cctx = this.el.compass.getContext('2d');
@@ -126,6 +126,17 @@ const UI = {
     this.el.hp.style.width = (hp * 100) + '%';
     this.el.hp.style.background = hp > 0.5 ? '#3fb950' : (hp > 0.25 ? '#d29922' : '#f85149');
     this.el.hpText.textContent = Math.max(0, Math.ceil(p.hp));
+
+    // 결투장에는 자가 치료와 투척 무기가 없으므로 그 칸은 감춥니다
+    this.el.medbox.classList.toggle('hidden', !!g.duel);
+    this.el.gear.classList.toggle('hidden', !!g.duel);
+
+    // 실드는 쓰는 판(결투장)에서만 보여 줍니다
+    if (p.shieldMax > 0) {
+      this.el.shieldBox.classList.remove('hidden');
+      this.el.shieldBox.classList.toggle('empty', p.shield <= 0);
+      this.el.shieldText.textContent = Math.max(0, Math.round(p.shield));
+    } else this.el.shieldBox.classList.add('hidden');
 
     if (p.gun) {
       this.el.gunName.textContent = GUNS[p.gun].short

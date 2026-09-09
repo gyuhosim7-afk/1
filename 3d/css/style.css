@@ -756,3 +756,23 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
 }
 #modeSeg button { flex: 1; }
 .chip.duelChip b { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+
+/* --- 실드 (1대1 결투) --- */
+#shieldBox {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px 3px 7px;
+  background: rgba(0, 0, 0, .62);
+  border: 1px solid rgba(120, 200, 255, .45);
+  border-radius: 7px;
+}
+#shieldBox b {
+  font-size: 15px; font-weight: 600; color: #7fd2ff;
+  font-variant-numeric: tabular-nums; min-width: 20px; text-align: right;
+}
+#shieldBox.empty { border-color: rgba(255, 255, 255, .16); }
+#shieldBox.empty b, #shieldBox.empty .shIcon { color: #6e7681; background: #6e7681; }
+#shieldBox.empty b { background: none; }
+.shIcon {
+  width: 11px; height: 13px; background: #7fd2ff;
+  clip-path: polygon(50% 0, 100% 22%, 100% 62%, 50% 100%, 0 62%, 0 22%);
+}

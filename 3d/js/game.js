@@ -527,13 +527,16 @@ const Game = {
     DUEL_KIT.guns.forEach((k, i) => {
       c.guns[i] = k;
       c.mags[i] = GUNS[k].mag;
-      c.scopes[i] = GUNS[k].canScope ? DUEL_KIT.scope : 0;
+      c.scopes[i] = GUNS[k].canScope && DUEL_KIT.scope ? DUEL_KIT.scope : 0;
       c.reserve[GUNS[k].ammo] = 240;
     });
-    c.wear('vest', DUEL_KIT.vest);
-    c.wear('helmet', DUEL_KIT.helmet);
+    c.vest = 0; c.helmet = 0; c.bag = 0;      // 실드를 쓰므로 방어구는 없습니다
+    c.shieldMax = DUEL_KIT.shield;
+    c.shield = DUEL_KIT.shield;
     c.meds = DUEL_KIT.meds;
+    c.sprayN = 0; c.lastShotT = null;
     c.refreshGuns();
+    c.refreshGear();
   },
 
   /* 쓰러진 사람을 제 시작 지점에서 되살립니다 */
@@ -546,6 +549,7 @@ const Game = {
     c.reloading = 0; c.healing = 0; c.cooldown = 0; c.swap = 0;
     c.victory = 0; c.respawnT = 0;
     c.safeT = CFG.DUEL_SAFE;
+    c.shield = c.shieldMax;
     c.yaw = sp.yaw;
     this.giveDuelKit(c);
     if (c === this.player) {
@@ -948,8 +952,22 @@ const Game = {
     const pellets = spec.pellets || 1;
     /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
        사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
-    const spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
-                               : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
+    let spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
+                             : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
+
+    /* 발로란트식 끊어 쏘기. tap 이 있는 총은
+       - 서서 tap 초 이상 쉬고 쏜 첫 발이 조준점에 정확히 꽂히고
+       - 연사를 이을수록 bloom 만큼 탄이 벌어집니다.
+       배그처럼 계속 갈기는 것보다 한 발씩 끊어 쏘는 쪽이 유리해집니다. */
+    if (spec.tap != null) {
+      if (this.time - (ch.lastShotT == null ? -99 : ch.lastShotT) > spec.tap) ch.sprayN = 0;
+      ch.lastShotT = this.time;
+      const still = ch.speedNow < 0.8 && !ch.flying && !ch.vehicle;
+      spread = (ch.sprayN === 0 && still)
+        ? 0
+        : Math.min(spec.spread * 1.8, (spec.bloom || 0.014) * ch.sprayN);
+      ch.sprayN++;
+    }
     const moving = ch.speedNow > 2.5 ? 1.9 : (ch.crouch ? 0.6 : 1);
 
     for (let i = 0; i < pellets; i++) {
@@ -966,7 +984,11 @@ const Game = {
       let endT = Math.min(wallT, maxT);
       if (hit && hit.t < wallT) {
         endT = hit.t;
-        const dmg = spec.dmg * (hit.head ? HEADSHOT : 1) * (1 - Math.min(0.45, hit.t / spec.range * 0.45));
+        /* 헤드샷 배수는 총마다 따로 줄 수 있고(없으면 공용값),
+           noFalloff 인 총은 거리가 멀어도 피해가 줄지 않습니다. */
+        const mul = hit.head ? (spec.headMul || HEADSHOT) : 1;
+        const fall = spec.noFalloff ? 1 : (1 - Math.min(0.45, hit.t / spec.range * 0.45));
+        const dmg = spec.dmg * mul * fall;
         if (ch.isPlayer && this.online && hit.char.remote) {
           // 상대의 체력은 상대가 관리합니다. 맞았다는 사실만 보냅니다
           const peerId = Object.keys(Net.players).find(k => Net.players[k] === hit.char);
@@ -1210,8 +1232,17 @@ const Game = {
     /* 방어구: 몸통은 조끼가, 머리는 헬멧이 막아 줍니다.
        자기장 피해는 어느 쪽도 막지 못합니다. */
     if (!isZone) {
-      if (head) { if (target.headArmor > 0) amount *= (1 - target.headArmor); }
-      else if (target.armor > 0) amount *= (1 - target.armor);
+      if (target.shieldMax > 0) {
+        /* 발로란트식 실드: 비율로 깎지 않고 받은 만큼 먼저 흡수합니다.
+           머리든 몸이든 같아서, 실드 50 + 체력 100 = 150 이 그대로 기준이 됩니다. */
+        const take = Math.min(target.shield, amount);
+        target.shield -= take;
+        amount -= take;
+      } else if (head) {
+        if (target.headArmor > 0) amount *= (1 - target.headArmor);
+      } else if (target.armor > 0) {
+        amount *= (1 - target.armor);
+      }
     }
     target.hp -= amount;
     if (!isZone) {

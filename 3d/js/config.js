@@ -157,6 +157,17 @@ const GUNS = {
   scar:    { name:'돌격소총',   short:'SCAR-L', ammo:'556',  dmg:27, rpm:600,  mag:30, reload:2.4, spread:0.032, adsSpread:0.009, range:230, recoil:0.015, auto:true,  canScope:true,  color:0x7ee787, model:'rifle' },
   ak:      { name:'돌격소총',   short:'AKM',    ammo:'762',  dmg:33, rpm:600,  mag:30, reload:2.6, spread:0.040, adsSpread:0.014, range:240, recoil:0.028, auto:true,  canScope:true,  color:0x79c0ff, model:'rifle' },
 
+  /* ---------- 발로란트식 소총 ----------
+     발로란트는 배그와 노는 방식이 다릅니다. 거리에 따른 피해 감소가 없고,
+     실드는 비율이 아니라 받은 만큼 먼저 깎이며, 헤드샷 한 발로 끝납니다.
+     아래 값은 원작 수치를 그대로 옮긴 것입니다.
+       39 × 4 = 156  ≥  실드 50 + 체력 100  → 머리 한 발이면 끝(원탭)
+       39 × 4발      = 156                  → 몸통은 네 발
+     tap/bloom 은 '끊어 쏘기' 를 만드는 값입니다. 서서 잠깐 쉬고 쏜 첫 발은
+     조준점에 정확히 꽂히고, 연사를 이을수록 탄이 벌어집니다. */
+  vandal:  { name:'돌격소총',   short:'반달',   ammo:'556',  dmg:39, rpm:585,  mag:25, reload:2.5, spread:0.050, adsSpread:0.030, range:300, recoil:0.034, auto:true,  canScope:true,  color:0x7ee787, model:'rifle',
+             noFalloff:true, headMul:4, tap:0.30, bloom:0.017 },
+
   /* ---------- 지정사수총 ---------- */
   dmr:     { name:'지정사수총', short:'SKS',    ammo:'762',  dmg:44, rpm:260,  mag:20, reload:2.6, spread:0.026, adsSpread:0.005, range:320, recoil:0.030, auto:false, canScope:true,  color:0x79c0ff },
   mini14:  { name:'지정사수총', short:'Mini14', ammo:'556',  dmg:38, rpm:290,  mag:20, reload:2.4, spread:0.022, adsSpread:0.004, range:340, recoil:0.020, auto:false, canScope:true,  color:0x7ee787, model:'dmr' },
@@ -181,13 +192,15 @@ const MODES = {
   duel: { name: '1대1 결투', sub: '결투장 · 단둘이 · ' + CFG.DUEL_WINS + '선승' }
 };
 
-/* 결투장에서 둘 다 똑같이 받는 장비 (파밍이 없습니다) */
-const DUEL_KIT = { guns: ['rifle', 'pistol'], scope: 2, vest: 2, helmet: 2, meds: 2 };
+/* 결투장에서 둘 다 똑같이 받는 장비 (파밍이 없습니다).
+   조준경과 방탄조끼 대신 발로란트식 실드를 씁니다 — 비율로 깎지 않고
+   받은 만큼 먼저 흡수하므로, 실드 50 + 체력 100 = 150 이 됩니다. */
+const DUEL_KIT = { guns: ['vandal', 'pistol'], scope: 0, shield: 50, meds: 0 };
 
 const GUN_KEYS = Object.keys(GUNS);
 /* 바닥에 떨어지는 무기 (보급 전용은 빠집니다). 여러 번 적을수록 자주 나옵니다 */
 const LOOT_GUNS = ['pistol','pistol','revolver','smg','smg','vector','mp5k','shotgun','s12k',
-                   'rifle','rifle','scar','ak','ak','dmr','mini14','slr','vss','kar98'];
+                   'rifle','rifle','scar','ak','ak','vandal','dmr','mini14','slr','vss','kar98'];
 /* 보급 상자 전용 무기 */
 const DROP_GUNS = GUN_KEYS.filter(k => GUNS[k].drop);
 /* 바닥에 떨어지는 탄약 구경 */
