@@ -120,13 +120,22 @@ const AI = {
     const dz = Math.hypot(bot.pos.x - zone.x, bot.pos.z - zone.z);
     const outside = dz > zone.r - 12;
 
-    // 적 탐색
+    /* 적 탐색.
+       사람은 화면에 담긴 각도만 볼 수 있으므로 봇도 같게 제한합니다.
+       예전에는 '시야각 밖은 늦게 인지' 라는 주석만 있고 검사가 없어서,
+       봇이 등 뒤 165m 까지 다 보고 있었습니다 — 사람에게 없는 이점이었습니다.
+       뒤쪽은 발소리·총성으로 아는 정도만 인정해, 가까울 때만 알아챕니다. */
+    const cosFov = Math.cos(CFG.BOT_FOV * Math.PI / 360);      // 반각의 코사인
     let enemy = null, best = Infinity;
     for (const c of game.chars) {
       if (c === bot || c.dead) continue;
       const d = bot.pos.distanceTo(c.pos);
       if (d > CFG.BOT_VISION || d > best) continue;
-      // 시야각 밖(뒤쪽)은 조금 늦게 인지
+      if (d > CFG.BOT_HEAR) {
+        const ex = c.pos.x - bot.pos.x, ez = c.pos.z - bot.pos.z;
+        const len = Math.hypot(ex, ez) || 1e-4;
+        if ((Math.sin(bot.yaw) * ex + Math.cos(bot.yaw) * ez) / len < cosFov) continue;
+      }
       if (!World.clear(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       // 연막 너머는 보이지 않습니다
       if (game.smoked(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;

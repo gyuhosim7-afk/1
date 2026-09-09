@@ -1110,10 +1110,10 @@ const CFG = {
   WALK: 4.4,
   SPRINT: 7.8,
   CROUCH: 2.2,
-  /* 봇 이동 속도 배수. 봇은 사람과 같은 속도 규칙(앞으로만 질주 등)을
-     지키는데, 그 위에 이 값을 한 번 더 곱해 사람보다 조금 느리게 둡니다.
-     1 로 두면 사람과 완전히 같은 속도가 됩니다. */
-  BOT_SPEED: 0.85,
+  /* 봇 이동 속도 배수. 봇은 사람과 같은 속도 규칙(앞으로만 질주, 정조준 중
+     감속 등)을 지키므로 1 이면 사람과 완전히 같은 속도입니다. 어느 쪽도
+     유리하지 않게 1 로 둡니다. 난이도를 낮추고 싶을 때만 내리세요. */
+  BOT_SPEED: 1.0,
   EYE: 1.62,            // 눈높이 (사람 체형, 키 1.83m)
   BODY_R: 0.40,         // 몸통 반지름 (충돌)
   BODY_H: 1.80,
@@ -1155,6 +1155,11 @@ const CFG = {
   THROW_UP: 0.22,         // 던질 때 위로 들어 올리는 정도 (rad)
   BASE_AMMO_CAP: 180,     // 가방이 없을 때 구경별 예비 탄약 한도
   BOT_VISION: 165,        // 봇 시야 거리 (m)
+  /* 봇이 볼 수 있는 좌우 각도(가로, 도). 사람은 화면에 담긴 만큼만 보므로
+     — 세로 72° 를 16:9 화면으로 펴면 가로 약 105° — 봇도 같게 둡니다.
+     이 각도 밖은 아래 BOT_HEAR 안쪽에서만 알아챕니다(발소리·총성). */
+  BOT_FOV: 105,
+  BOT_HEAR: 20,           // 등 뒤라도 이 거리 안이면 알아챕니다 (m)
   MAX_DT: 0.1,          // 프레임이 느려도 슬로모션이 되지 않게 (이동은 잘게 나눠 처리)
 
   /* ---------- 차량 ---------- */
@@ -6052,13 +6057,22 @@ const AI = {
     const dz = Math.hypot(bot.pos.x - zone.x, bot.pos.z - zone.z);
     const outside = dz > zone.r - 12;
 
-    // 적 탐색
+    /* 적 탐색.
+       사람은 화면에 담긴 각도만 볼 수 있으므로 봇도 같게 제한합니다.
+       예전에는 '시야각 밖은 늦게 인지' 라는 주석만 있고 검사가 없어서,
+       봇이 등 뒤 165m 까지 다 보고 있었습니다 — 사람에게 없는 이점이었습니다.
+       뒤쪽은 발소리·총성으로 아는 정도만 인정해, 가까울 때만 알아챕니다. */
+    const cosFov = Math.cos(CFG.BOT_FOV * Math.PI / 360);      // 반각의 코사인
     let enemy = null, best = Infinity;
     for (const c of game.chars) {
       if (c === bot || c.dead) continue;
       const d = bot.pos.distanceTo(c.pos);
       if (d > CFG.BOT_VISION || d > best) continue;
-      // 시야각 밖(뒤쪽)은 조금 늦게 인지
+      if (d > CFG.BOT_HEAR) {
+        const ex = c.pos.x - bot.pos.x, ez = c.pos.z - bot.pos.z;
+        const len = Math.hypot(ex, ez) || 1e-4;
+        if ((Math.sin(bot.yaw) * ex + Math.cos(bot.yaw) * ez) / len < cosFov) continue;
+      }
       if (!World.clear(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       // 연막 너머는 보이지 않습니다
       if (game.smoked(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
