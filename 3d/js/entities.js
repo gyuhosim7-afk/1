@@ -1019,7 +1019,7 @@ class Char3D {
     this.ai = isPlayer ? null : {
       state: 'loot', target: null, reaction: 0,
       strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 1 + Math.random(),
-      dest: null, destT: 0, skill: 0.3 + Math.random() * 0.62,
+      dest: null, destT: 0,
       think: Math.random() * 0.2
     };
   }

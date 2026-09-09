@@ -24,10 +24,10 @@ const AI = {
       const dx = enemy.pos.x - bot.pos.x, dz = enemy.pos.z - bot.pos.z;
       const dist = Math.hypot(dx, dz);
       const toE = Math.atan2(dx, dz);
-      // 조준: 숙련도가 높을수록 빠르게 겨눔
-      const turn = (2.4 + a.skill * 5.5) * dt;
+      // 조준 회전: 사람이 마우스로 낼 수 있는 속도에 맞춰 둡니다
+      const turn = CFG.BOT_TURN * dt;
       bot.yaw = this.approach(bot.yaw, toE, turn);
-      const dy = (enemy.pos.y + 1.05) - (bot.pos.y + 1.15);
+      const dy = (enemy.pos.y + CFG.BOT_AIM_Y) - (bot.pos.y + 1.15);
       bot.pitch = this.approach(bot.pitch, Math.atan2(dy, dist), turn);
 
       /* 교전 자세.
@@ -141,7 +141,8 @@ const AI = {
       if (game.smoked(bot.pos.x, bot.pos.y + 1.15, bot.pos.z, c.pos.x, c.pos.y + 1.0, c.pos.z)) continue;
       best = d; enemy = c;
     }
-    if (enemy && enemy !== a.target) a.reaction = (1.3 - a.skill) * (0.25 + Math.random() * 0.35);
+    // 처음 본 순간의 반응 지연 (사람 평균 반응 속도 만큼)
+    if (enemy && enemy !== a.target) a.reaction = CFG.BOT_REACT * (0.75 + Math.random() * 0.5);
     a.target = enemy;
 
     // 무기를 두 자루 들었으면 교전 거리에 맞는 쪽으로 바꿉니다
@@ -278,7 +279,7 @@ const AI = {
     if (!bot.canShoot()) return;
     if (dist > this.engageRange(bot)) return;
 
-    const ex = enemy.pos.x, ey = enemy.pos.y + 1.00, ez = enemy.pos.z;
+    const ex = enemy.pos.x, ey = enemy.pos.y + CFG.BOT_AIM_Y, ez = enemy.pos.z;
     const bx = bot.pos.x, by = bot.pos.y + 1.15, bz = bot.pos.z;
     if (!World.clear(bx, by, bz, ex, ey, ez)) return;
 
@@ -301,8 +302,9 @@ const AI = {
     if (Math.abs(this.angleDiff(bot.yaw, toE)) > 0.16) return;
 
     const v = this._v.set(ex - bx, ey - by, ez - bz).normalize();
-    // 숙련도와 거리에 따른 조준 오차
-    const err = (1.05 - a.skill) * 0.036 * (0.55 + dist / 130);
+    /* 사람에게 없는 인공 조준 오차. 기본은 0 이라 봇의 명중률은
+       사람과 같은 탄퍼짐(총 성능)만으로 결정됩니다. */
+    const err = CFG.BOT_AIM_ERR * (0.55 + dist / 130);
     v.x += (Math.random() * 2 - 1) * err;
     v.y += (Math.random() * 2 - 1) * err * 0.6;
     v.z += (Math.random() * 2 - 1) * err;

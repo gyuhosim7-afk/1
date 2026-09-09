@@ -507,7 +507,6 @@ const Game = {
       foe.netId = 0;
       foe.spawn = theirs;
       foe.gunSkin = DUEL_SKIN;
-      foe.ai.skill = 0.72;                      // 사람과 붙을 만한 실력
       this.botById[0] = foe;
       this.scene.add(foe.mesh);
       this.chars.push(foe);
@@ -958,8 +957,10 @@ const Game = {
     const pellets = spec.pellets || 1;
     /* 탄퍼짐. 봇도 자리를 잡으면(ads) 총구가 모이지만,
        사람처럼 완벽하지는 않도록 정조준 값보다 넉넉하게 둡니다. */
-    let spread = ch.isPlayer ? (this.ads ? spec.adsSpread : spec.spread)
-                             : (ch.ads ? spec.adsSpread * 1.45 : spec.spread);
+    /* 정조준 탄퍼짐은 사람·봇이 같습니다. 예전에는 봇에게만 1.45배를
+       물려서, 같은 총을 들어도 봇이 더 못 맞혔습니다. */
+    const aiming = ch.isPlayer ? this.ads : ch.ads;
+    let spread = aiming ? spec.adsSpread : spec.spread;
 
     /* 발로란트식 끊어 쏘기. tap 이 있는 총은
        - 서서 tap 초 이상 쉬고 쏜 첫 발이 조준점에 정확히 꽂히고
