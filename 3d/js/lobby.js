@@ -225,8 +225,7 @@ const Lobby = {
     // 시점(1인칭/3인칭) 전환
     this.viewBtns = document.querySelectorAll('.segmented button[data-view]');
     this.viewBtns.forEach(btn => btn.addEventListener('click', () => {
-      Settings.data.fpv = btn.dataset.view === 'fpp';
-      Settings.save(); Settings.sync();
+      Settings.setFpv(btn.dataset.view === 'fpp', this.mode);
       this.syncView();
     }));
     this.syncView();
@@ -559,6 +558,8 @@ const Lobby = {
     const cnt = document.getElementById('modeCount');
     if (cnt) cnt.innerHTML = duel ? '단둘이 · <b class="fixedNum">' + CFG.DUEL_WINS + '</b>선승'
                                   : '생존자 <b class="fixedNum">30</b>명';
+    Settings.useMode(this.mode);      // 그 모드에서 쓰던 시점을 보여 줍니다
+    this.syncView();
     this.showPeers(Net.lobbyPeers);
   },
 

@@ -7,7 +7,11 @@
    ============================================================ */
 const Settings = {
   KEY: 'lastSurvivor3d.settings',
-  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8, mode: 'br' },
+  /* fpv 는 '지금 쓰는 시점' 이고, fpvBr / fpvDuel 은 모드별로 기억해 두는
+     값입니다. 결투는 좁은 실내라 1인칭이 기본이고, 배틀로얄에서 3인칭으로
+     바꿔 두어도 결투에 끌려오지 않습니다. */
+  data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8, mode: 'br',
+          fpvBr: true, fpvDuel: true },
   controls: [],
 
   load() {
@@ -24,8 +28,23 @@ const Settings = {
     this.data.invert = !!this.data.invert;
     this.data.edge = !!this.data.edge;      // 기본은 끔 (켜면 화면 끝에서 계속 돌아갑니다)
     this.data.fpv = this.data.fpv !== false;
+    this.data.fpvBr = this.data.fpvBr !== false;
+    this.data.fpvDuel = this.data.fpvDuel !== false;     // 결투는 1인칭이 기본
     this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
     this.data.mode = this.data.mode === 'duel' ? 'duel' : 'br';
+  },
+
+  /* 이 모드에서 쓸 시점을 꺼내 지금 값으로 세웁니다 */
+  useMode(mode) {
+    this.data.fpv = mode === 'duel' ? this.data.fpvDuel : this.data.fpvBr;
+    return this.data.fpv;
+  },
+  /* 시점을 바꿨을 때, 지금 모드 쪽에 기억해 둡니다 */
+  setFpv(on, mode) {
+    this.data.fpv = !!on;
+    if ((mode || this.data.mode) === 'duel') this.data.fpvDuel = !!on;
+    else this.data.fpvBr = !!on;
+    this.save(); this.sync();
     Sfx.setVolume(this.data.vol);
   },
 
@@ -626,7 +645,7 @@ const Input = {
         else { Sfx.swap(); Game.pushFeed('조준경 ' + (on ? '장착' : '분리')); }
       }
       if (c === 'KeyV') {
-        Settings.data.fpv = !Settings.data.fpv; Settings.save(); Settings.sync();
+        Settings.setFpv(!Settings.data.fpv, Game.mode);
         Game.pushFeed(Settings.data.fpv ? '1인칭 시점' : '3인칭 시점');
       }
     });
@@ -793,6 +812,8 @@ const Main = {
 
   beginMatch(n, opts) {
     Sfx.init();
+    // 이 모드에서 쓰던 시점으로 맞춥니다 (결투는 1인칭이 기본)
+    Settings.useMode((opts && opts.mode) === 'duel' ? 'duel' : 'br');
     Input.settingsOpen = false;
     UI.el.bigmap.classList.add('hidden');
     UI.showGame();
