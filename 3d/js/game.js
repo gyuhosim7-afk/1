@@ -460,6 +460,8 @@ const Game = {
     if (this.roundT <= 0) {
       this.roundT = 0;
       for (const c of this.chars) if (!c.remote) this.respawn(c);
+      Habit.beginRound();
+      this.aimBotAtHabit();
       this.pushFeed('다음 판 — ' + this.score[0] + ' : ' + this.score[1]);
     }
   },
@@ -519,6 +521,8 @@ const Game = {
     this.camDist = CFG.CAM_DIST;
     this.updateCamera(0.016);
     this.state = 'playing';
+    Habit.beginRound();
+    this.aimBotAtHabit();
     this.pushFeed((vsHuman ? '친구와 결투 시작 — ' : '결투 시작 — ') + CFG.DUEL_WINS + '선승');
   },
 
@@ -541,6 +545,21 @@ const Game = {
     c.sprayN = 0; c.lastShotT = null;
     c.refreshGuns();
     c.refreshGear();
+  },
+
+  /* 익힌 습관이 있으면, 봇에게 사람이 자주 지나는 길목을 목적지로 줍니다.
+     익힌 게 없으면 아무것도 하지 않고 봇이 원래대로 돌아다닙니다. */
+  aimBotAtHabit() {
+    const foe = this.foe;
+    if (!foe || !foe.ai) return;
+    const spot = Habit.ambush();
+    if (!spot) return;
+    foe.ai.dest = spot;
+    foe.ai.destT = 14;                 // 도착할 때까지 목적지를 바꾸지 않습니다
+    foe.ai.state = 'rotate';
+    /* 익혔다는 사실만 알리고 어디로 갔는지는 말하지 않습니다 —
+       칸 이름을 적어 주면 지키러 간 자리가 그대로 새어 나갑니다. */
+    this.pushFeed('상대가 당신의 버릇을 읽고 있습니다');
   },
 
   /* 한 사람을 제 시작 지점에서 새 판 상태로 돌립니다
@@ -666,7 +685,7 @@ const Game = {
     if (this.state !== 'playing') return;
     this.time += dt;
     if (!this.duel) { this.updateZone(dt); this.updatePlane(dt); }
-    else this.updateRound(dt);
+    else { this.updateRound(dt); Habit.observe(this, dt); }
     this.updatePings(dt);
     this.updateThrown(dt);
 
@@ -2204,6 +2223,7 @@ const Game = {
     if (this.state !== 'playing') return;
     Sfx.engine(false); Sfx.wind(0);
     this.state = 'over';
+    if (this.duel) Habit.endMatch();      // 한 판에 한 번만 저장합니다
     const p = this.player;
     this.result = this.duel
       ? { won, duel: true, rank: won ? 1 : 2, kills: this.score[0], lost: this.score[1],

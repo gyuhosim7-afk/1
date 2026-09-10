@@ -250,9 +250,16 @@ const AI = {
     // 자기장 안쪽 목적지로 이동
     a.state = 'rotate';
     if (!a.dest || Math.hypot(a.dest.x - bot.pos.x, a.dest.z - bot.pos.z) < 6) {
-      const ang = Math.random() * Math.PI * 2;
-      const rad = Math.random() * zone.r * 0.7;
-      a.dest = { x: zone.x + Math.cos(ang) * rad, z: zone.z + Math.sin(ang) * rad };
+      /* 결투장에서는 익힌 길목 쪽으로 다시 잡습니다. 익힌 게 없으면
+         맵 안의 아무 칸이나 고릅니다 — 자기장 반지름으로 뽑으면 결투장에서는
+         맵 밖을 향해 벽에 붙어 서 있게 됩니다. */
+      const spot = game.duel ? (Habit.ambush() || Habit.spotOf(Math.floor(Math.random() * 25))) : null;
+      if (spot) a.dest = spot;
+      else {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = Math.random() * zone.r * 0.7;
+        a.dest = { x: zone.x + Math.cos(ang) * rad, z: zone.z + Math.sin(ang) * rad };
+      }
       a.destT = 8 + Math.random() * 6;
     }
     if (bot.gun && bot.mag < bot.spec.mag && bot.reserveAmmo > 0) bot.startReload();

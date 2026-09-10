@@ -217,6 +217,20 @@ const Lobby = {
 
     this.el.tabs.forEach(btn => btn.addEventListener('click', () => this.tab(btn.dataset.tab)));
 
+    /* 학습 봇 켜기·끄기와 기억 지우기 */
+    this.learnBtns = document.querySelectorAll('#learnSeg button[data-learn]');
+    this.learnBtns.forEach(btn => btn.addEventListener('click', () => {
+      Settings.data.learn = btn.dataset.learn === 'on';
+      Settings.save();
+      this.renderLearn();
+    }));
+    const lr = document.getElementById('learnReset');
+    if (lr) lr.addEventListener('click', () => {
+      Habit.reset();
+      this.renderLearn();
+      this.toast('봇이 익힌 습관을 지웠습니다');
+    });
+
     /* 모드 전환. 고른 모드는 저장해 두어 다음에 열 때도 그대로 시작합니다. */
     this.modeBtns = document.querySelectorAll('#modeSeg button[data-mode]');
     this.modeBtns.forEach(btn => btn.addEventListener('click', () => this.setMode(btn.dataset.mode)));
@@ -558,9 +572,30 @@ const Lobby = {
     const cnt = document.getElementById('modeCount');
     if (cnt) cnt.innerHTML = duel ? '단둘이 · <b class="fixedNum">' + CFG.DUEL_WINS + '</b>선승'
                                   : '생존자 <b class="fixedNum">30</b>명';
+    swap('learnGroup', duel);         // 학습 봇은 결투장에만 있습니다
+    this.renderLearn();
     Settings.useMode(this.mode);      // 그 모드에서 쓰던 시점을 보여 줍니다
     this.syncView();
     this.showPeers(Net.lobbyPeers);
+  },
+
+  /* 학습 봇 상태 표시 */
+  renderLearn() {
+    const on = Settings.data.learn !== false;
+    if (this.learnBtns) {
+      this.learnBtns.forEach(b => b.classList.toggle('on', (b.dataset.learn === 'on') === on));
+    }
+    const info = document.getElementById('learnInfo');
+    if (!info) return;
+    const s = Habit.summary();
+    if (!on) {
+      info.textContent = '끔 — 봇이 버릇을 익히지 않습니다';
+    } else if (!s.ready) {
+      info.textContent = '익히는 중 · ' + s.rounds + '판 (' + Habit.MIN_ROUNDS + '판부터 씁니다)';
+    } else {
+      info.textContent = s.rounds + '판 익힘 · 가장 자주 가는 곳: ' + Habit.nameOf(s.top)
+                       + ' · 앉아 싸우는 비율 ' + s.crouchPct + '%';
+    }
   },
 
   /* 함께 접속한 사람 목록 */

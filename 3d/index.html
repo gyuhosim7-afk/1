@@ -176,6 +176,15 @@
       <p class="dockHint" id="shareHint">참가자는 항상 <b>30명</b>입니다. 친구와 함께 하려면 <b>친구</b> 탭에서 방을 만들어 방 코드를 알려 주세요.<br>
         WASD 이동 · <kbd>F</kbd> 줍기·탑승 · <kbd>Z</kbd> 지점 표시 · <kbd>O</kbd> 설정 · <kbd>V</kbd> 시점<br>
         수송기에서 <kbd>Space</kbd> 로 낙하합니다</p>
+      <div class="dockGroup hidden" id="learnGroup">
+        <span class="dockLabel">학습 봇</span>
+        <div class="segmented" id="learnSeg">
+          <button data-learn="on" class="on">켬</button>
+          <button data-learn="off">끔</button>
+        </div>
+        <p class="modeSub" id="learnInfo">아직 익힌 것이 없습니다</p>
+        <button class="mini" id="learnReset">기억 지우기</button>
+      </div>
       <p class="dockHint hidden" id="duelHint">결투장에서 단둘이 <b>7선승</b>으로 싸웁니다. 파밍과 자기장이 없고,
         한쪽이 쓰러지면 <b>둘 다</b> 체력·실드를 채우고 제 시작 지점으로 돌아가 다음 판을 시작합니다.
         무기는 둘 다 <b>반달 + 권총</b>, 실드 50 으로 같습니다.<br>
@@ -320,6 +329,7 @@
 <script src="js/world.js"></script>
 <script src="js/scenery.js"></script>
 <script src="js/arena.js"></script>
+<script src="js/habit.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/game.js"></script>

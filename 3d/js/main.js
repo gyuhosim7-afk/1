@@ -11,7 +11,7 @@ const Settings = {
      값입니다. 결투는 좁은 실내라 1인칭이 기본이고, 배틀로얄에서 3인칭으로
      바꿔 두어도 결투에 끌려오지 않습니다. */
   data: { sens: 1.0, ads: 0.65, invert: false, edge: false, fpv: true, vol: 0.8, mode: 'br',
-          fpvBr: true, fpvDuel: true },
+          fpvBr: true, fpvDuel: true, learn: true },
   controls: [],
 
   load() {
@@ -30,6 +30,7 @@ const Settings = {
     this.data.fpv = this.data.fpv !== false;
     this.data.fpvBr = this.data.fpvBr !== false;
     this.data.fpvDuel = this.data.fpvDuel !== false;     // 결투는 1인칭이 기본
+    this.data.learn = this.data.learn !== false;         // 결투 봇의 습관 기억
     this.data.vol = Math.max(0, Math.min(1, this.data.vol == null ? 0.8 : +this.data.vol));
     this.data.mode = this.data.mode === 'duel' ? 'duel' : 'br';
   },
@@ -751,6 +752,7 @@ const Main = {
     Settings.bind();
     Profile.load();
     Account.load();
+    Habit.load();
     const canvas = document.getElementById('scene');
     Game.init(canvas);
     Input.init(canvas);

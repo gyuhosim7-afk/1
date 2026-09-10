@@ -827,3 +827,7 @@ button.mini.gold { background: linear-gradient(180deg, #ffd75e, #e0ac1f); color:
   /* 밝은 벽에서도 보이도록 검은 테두리를 한 겹 두릅니다 */
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .9), 0 0 3px rgba(0, 0, 0, .65);
 }
+
+/* --- 학습 봇 --- */
+#learnSeg button { flex: 1; }
+#learnReset { margin-top: 6px; align-self: flex-start; }
